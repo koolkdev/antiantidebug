@@ -9,6 +9,9 @@ class Executable(object):
 
     def get_instruction(self, address):
         return instruction.Instruction(address, self.read(address, 32))
+        
+    def get_reader(self, address):
+        return instruction.InstructionReader(self, address)
 
     def read_format(self, address, fmt):
         return struct.unpack(fmt, self.read(address, struct.calcsize(fmt)))[0]

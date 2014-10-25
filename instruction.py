@@ -318,8 +318,25 @@ class Instruction(object):
 
     def __repr__(self):
         return "<instruction.Instruction '%s' >" % str(self)
-                
-                
-            
-
     
+class ReaderException(Exception):
+    pass
+    
+class InstructionReader(object):
+    def __init__(self, executable, address):
+        self.address = address
+        self.executable = executable
+
+    def get(self):
+        res = self.executable.get_instruction(self.address)
+        self.address = res.next
+        return res
+
+    def get_cond(self, cond):
+        old_address = self.address
+        res = self.get()
+        if not cond(res):
+            self.address = old_address
+            raise ReaderException("Wrong condition: %s" % str(res))
+        return res
+        
