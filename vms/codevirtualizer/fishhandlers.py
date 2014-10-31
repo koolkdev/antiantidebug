@@ -1,24 +1,79 @@
 from collections import deque
 
-class Invalid(object):
+class Expression(object):
+    def __init__(self):
+        pass
+        
+    def equals(self, expression):
+        return type(self) == type(expression)
+    
+    def contains(self, expression):
+        return self.equals(expression)
+        
+    def __repr__(self):
+        return ""
+            
+class UnaryExpression(Expression):
+    def __init__(self, value):
+        self.value = value
+        
+    def equals(self, expression):
+        return Expression.equals(self, expression) and self.value.equals(expression.value)
+        
+    def contains(self, expression):
+        return Expression.contains(self, expression) or self.value.contains(expression)
+            
+class BinaryExpression(Expression):
+    def __init__(self, lvalue, rvalue):
+        self.lvalue = lvalue
+        self.rvalue = rvalue
+        
+    def equals(self, expression):
+        return Expression.equals(self, expression) and (self.lvalue.equals(expression.lvalue) and self.rvalue.equals(expression.rvalue)) 
+        
+    def contains(self, expression):
+        return Expression.contains(self, expression) or self.lvalue.contains(expression) or self.rvalue.contains(expression)
+            
+class BinaryOperationExpression(BinaryExpression):
+    def __init__(self, lvalue, rvalue, op_str):
+        BinaryExpression.__init__(self, lvalue, rvalue)
+        self.op_str = op_str
+        
+    def equals(self, expression):
+        return Expression.equals(self, expression) and ((lvalue.equals(expression.lvalue) and rvalue.equals(expression.rvalue)) or (rvalue.equals(expression.lvalue) and lvalue.equals(expression.rvalue)))
+        
+    def __repr__(self):
+        return "(%s%s%s)" % (repr(self.lvalue), self.op_str, repr(self.rvalue))
+
+class Invalid(Expression):
     def __repr__(self):
         return "Invalid"
     
-class VMStruct(object):
+class VMStruct(Expression):
     def __repr__(self):
         return "VMStruct"
         
-class Immediate(object):
+class VMStructField(UnaryExpression):   
+    def __repr__(self):
+        return "VMStructField(%s)" % repr(self.value)
+        
+class Immediate(Expression):   
     def __init__(self, value):
         self.value = value
-   
+        
+    def equals(self, expression):
+        return Expression.equals(self, expression) and self.value == expression.value
+        
     def __repr__(self):
         return "0x%08X" % self.value
 
-class ValueOf(object):
-    def __init__(self, addr, size):
-        self.addr = addr
+class ValueOf(UnaryExpression):
+    def __init__(self, value, size):
+        UnaryExpression.__init__(self, value)
         self.size = size
+        
+    def equals(self, expression):
+        return UnaryExpression.equals(self, expression) and self.size == expression.size
         
     def __repr__(self):
         if self.size == 1:
@@ -27,70 +82,51 @@ class ValueOf(object):
             s = "WORD"
         if self.size == 4:
             s = "DWORD"
-        return "*(%s*)%s" % (s, repr(self.addr))
+        return "*(%s*)%s" % (s, repr(self.value))
         
-class SetValue(object):
-    def __init__(self, a, b):
-        self.a = a
-        self.b = b
-        
+class SetValue(BinaryExpression):        
     def __repr__(self):
-        return "%s = %s" % (repr(self.a), repr(self.b))
+        return "%s = %s" % (repr(self.lvalue), repr(self.rvalue))
 
-class Add(object):
-    def __init__(self, a, b):
-        self.a = a
-        self.b = b
-    def __repr__(self):
-        return "(%s+%s)" % (repr(self.a), repr(self.b))
+class Add(BinaryOperationExpression):
+    def __init__(self, lvalue, rvalue):
+        BinaryOperationExpression.__init__(self, lvalue, rvalue, "+")
 
-class Sub(object):
-    def __init__(self, a, b):
-        self.a = a
-        self.b = b
-    def __repr__(self):
-        return "(%s-%s)" % (repr(self.a), repr(self.b))
+class Sub(BinaryOperationExpression):
+    def __init__(self, lvalue, rvalue):
+        BinaryOperationExpression.__init__(self, lvalue, rvalue, "-")
 
-class Xor(object):
-    def __init__(self, a, b):
-        self.a = a
-        self.b = b
-    def __repr__(self):
-        return "(%s^%s)" % (repr(self.a), repr(self.b))
+class Xor(BinaryOperationExpression):
+    def __init__(self, lvalue, rvalue):
+        BinaryOperationExpression.__init__(self, lvalue, rvalue, "^")
 
-class And(object):
-    def __init__(self, a, b):
-        self.a = a
-        self.b = b
-    def __repr__(self):
-        return "(%s&%s)" % (repr(self.a), repr(self.b))
+class And(BinaryOperationExpression):
+    def __init__(self, lvalue, rvalue):
+        BinaryOperationExpression.__init__(self, lvalue, rvalue, "&")
 
-class Or(object):
-    def __init__(self, a, b):
-        self.a = a
-        self.b = b
-    def __repr__(self):
-        return "(%s|%s)" % (repr(self.a), repr(self.b))
+class Or(BinaryOperationExpression):
+    def __init__(self, lvalue, rvalue):
+        BinaryOperationExpression.__init__(self, lvalue, rvalue, "|")
 
-class Shl(object):
-    def __init__(self, a, b):
-        self.a = a
-        self.b = b
-    def __repr__(self):
-        return "(%s<<%s)" % (repr(self.a), repr(self.b))
+class Shl(BinaryOperationExpression):
+    def __init__(self, lvalue, rvalue):
+        BinaryOperationExpression.__init__(self, lvalue, rvalue, "<<")
 
-class Shr(object):
-    def __init__(self, a, b):
-        self.a = a
-        self.b = b
-    def __repr__(self):
-        return "(%s>>%s)" % (repr(self.a), repr(self.b))
+class Shr(BinaryOperationExpression):
+    def __init__(self, lvalue, rvalue):
+        BinaryOperationExpression.__init__(self, lvalue, rvalue, ">>")
 
-class Jump(object):
-    def __init__(self, value):
-        self.value = value
+class Jump(UnaryExpression):
     def __repr__(self):
         return "JUMP(%s)" % (repr(self.value))
+        
+class Variable(UnaryExpression):
+    def __init__(self, name, value):
+        UnaryExpression.__init__(self, value)
+        self.name = name
+        
+    def __repr__(self):
+        return "%s" % self.name
         
 def get_handler(reader):
     instructions = []
@@ -101,6 +137,8 @@ def get_handler(reader):
                  "ebp": VMStruct(),
                  "esi": Invalid(),
                  "edi": Invalid()}
+    vars = {}
+    vars_index = 1
     stack = deque()
     flags = Invalid()
     def get_operand_value(op):
@@ -118,7 +156,12 @@ def get_handler(reader):
             value = get_operand_value(opcode.operand2)
             lvalue = get_operand_value(opcode.operand1)
             if opcode.opcode == "add":
-                value = Add(lvalue, value)
+                if type(lvalue) == VMStruct:
+                    value = VMStructField(value)
+                elif type(value) == VMStruct:
+                    value = VMStructField(lvalue)
+                else:
+                    value = Add(lvalue, value)
             elif opcode.opcode == "sub":
                 value = Sub(lvalue, value)
             elif opcode.opcode == "xor":
@@ -139,6 +182,13 @@ def get_handler(reader):
             elif opcode.operand1.is_memory():
                 # TODO: check for changed values and move them to temporary variables instead
                 assert opcode.operand1.index == None and opcode.operand1.displacement == 0 and opcode.operand1.scale == 0  # TODO (in case of unobfuscation)
+                if isinstance(lvalue, ValueOf):                    
+                    for k, v in registers.iteritems():
+                        if v.contains(lvalue):
+                            var = Variable("v%d" % vars_index, v)
+                            registers[k] = var
+                            vars_index += 1
+                            instructions.append(SetValue(var, v))
                 instructions.append(SetValue(lvalue, value))
         elif opcode.opcode == "jmp":
             instructions.append(Jump(get_operand_value(opcode.operand1)))

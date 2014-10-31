@@ -397,7 +397,7 @@ class VMFunction(object):
         self.code = None
 
     def clean(self):
-        TEMPLATES = [r"codevirtualizer\cisc_pre.txt", r"codevirtualizer\cisc.txt", r"ag_templates.txt", r"codevirtualizer\cisc.txt", r"ag_templates.txt"]
+        TEMPLATES = [r"codevirtualizer\cisc_pre.txt", r"codevirtualizer\cisc.txt", r"ag_templates.txt", r"codevirtualizer\cisc.txt", r"ag_templates.txt", r"templates_final.txt"]
 
         # Clean nops
         i = 0
@@ -649,7 +649,11 @@ def fix_vms(pe, code_section = 0, vms_section = 3):
                 if not (jmp_inst.opcode == "jmp" and jmp_inst.operand1.is_immediate()): continue
                 print hex(address)
                 vm = get_vm(exe, jmp_address)
-                code = vm.get_code()
+                try:
+                    code = vm.get_code()
+                except:
+                    vm.printfunc()
+                    raise
                 last_line = code.splitlines()[-1]
                 assert last_line.startswith("jmp ")
                 end_address = int(last_line.split()[1], 16)
