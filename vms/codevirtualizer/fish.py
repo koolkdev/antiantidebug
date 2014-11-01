@@ -41,20 +41,28 @@ class VMStruct(object):
         
 class VMInit(VMHandler):
     cache = {}
-    def __init__(self, vm_info, reader):
+    def __init__(self, vm_info, executable, address):
+        clean = cleaner.Cleaner(executable)
+        clean.set_option("fixOperationConstantThruRegOnStack", True)
+        clean.set_option("fixPush_allowConstants", True)
+        clean.set_option("ignore_jumps", False)
+        reader = clean.get_reader(cleaner.JunkSkipper(executable).get_next_real_instruction(address).address)
         # pushf
-        reader.get_cond(lambda x: x.opcode == "pushf")
+        #reader.get_cond(lambda x: x.opcode == "pushf")  # In new version the pushf is before the jump
         self.regs = ["flags"]
         # pusha
-        reader.get_cond(lambda x: x.opcode == "pusha")
-        self.regs += ["eax", "ecx", "edx", "ebx", "esp", "ebp", "esi", "edi"]
+        #reader.get_cond(lambda x: x.opcode == "pusha") # In new version it is splitted
+        pusha_regs = ["eax", "ecx", "edx", "ebx", "ebx", "ebp", "esi", "edi"]
+        for reg in pusha_regs:
+            reader.get_cond(lambda x: x.opcode == "push" and x.operand1.is_reg(reg))
+            self.regs.append(reg)
         # call $+5
         self.base_address = reader.get_cond(lambda x: x.opcode == "call" and x.operand1.value == x.address + 5).operand1.value
         # pop ecx
         reader.get_cond(lambda x: x.opcode == "pop" and x.operand1.is_reg("ecx"))
-        # sub ecx, 7
-        reader.get_cond(lambda x: x.opcode == "sub" and x.operand1.is_reg("ecx") and x.operand2.is_immediate(0x7)) # Get the address of the start of main handler
-        self.base_address -= 7
+        # sub ecx, X
+        self.base_address -= reader.get_cond(lambda x: x.opcode == "sub" and x.operand1.is_reg("ecx") and x.operand2.is_immediate()).operand2.value # Get the address of the start of main handler
+        assert self.base_address == address
         # sub ecx, X
         self.base_address -= reader.get_cond(lambda x: x.opcode == "sub" and x.operand1.is_reg("ecx") and x.operand2.is_immediate()).operand2.value
         # mov ebp, X
@@ -134,7 +142,7 @@ class VMInit(VMHandler):
         # add eax, 4
         reader.get_cond(lambda x: x.opcode == "add" and x.operand1.is_reg("eax") and x.operand2.is_immediate(4))
         # dec ebx
-        reader.get_cond(lambda x: x.opcode == "dec" and x.operand1.is_reg("ebx"))
+        reader.get_cond(lambda x: (x.opcode == "dec" and x.operand1.is_reg("ebx")) or (x.opcode == "sub" and x.operand1.is_reg("ebx") and x.operand2.is_immediate(1))) # TODO fix cleaner
         # jmp init_next_handler
         reader.get_cond(lambda x: x.opcode == "jmp" and x.operand1.is_immediate(init_next_handler))
 
@@ -242,7 +250,7 @@ class VMInfo(object):
     cache = {}
     def __init__(self, executable, vm_address):
         self.struct = VMStruct()
-        self.init_handler = VMInit(self, executable.get_reader(vm_address))
+        self.init_handler = VMInit(self, executable, vm_address)
         self.handlers = VMHandlers(executable, self)
 
     @classmethod
@@ -263,16 +271,40 @@ class VMFunctionSection(object):
         self.start = False
         self.end = False
         self.instructions = [] 
-        
+
+
+class VMFunctionJumper(object):
+    def __init__(self, executable, address):
+        clean = cleaner.Cleaner(executable)
+        clean.set_option("fixOperationConstantThruRegOnStack", True)
+        clean.set_option("fixPush_allowConstants", True)
+        clean.set_option("ignore_jumps", False)
+        reader = clean.get_reader(cleaner.JunkSkipper(executable).get_next_real_instruction(address).address)
+        # pushf
+        reader.get_cond(lambda x: x.opcode == "pushf")
+        # push first_handler
+        self.first_handler = reader.get_cond(lambda x: x.opcode == "push" and x.operand1.is_immediate()).operand1.value
+        # push vm_code_address
+        self.vm_code_address = reader.get_cond(lambda x: x.opcode == "push" and x.operand1.is_immediate()).operand1.value
+        # Now switch between pushf and vm_code_address (so it will be as in the order of the old versions)
+        reader.get_cond(lambda x: str(x) == "push eax")
+        reader.get_cond(lambda x: str(x) == "push ebx")
+        reader.get_cond(lambda x: str(x) == "mov eax, [esp+0x10]")
+        reader.get_cond(lambda x: str(x) == "mov ebx, [esp+0x8]")
+        reader.get_cond(lambda x: str(x) == "mov dword [esp+0x8], eax")
+        reader.get_cond(lambda x: str(x) == "mov dword [esp+0x10], ebx")
+        reader.get_cond(lambda x: str(x) == "pop ebx")
+        reader.get_cond(lambda x: str(x) == "pop eax")
+        self.vm_address = reader.get_cond(lambda x: x.opcode == "jmp" and x.operand1.is_immediate()).operand1.value
+        self.end = reader.address
+      
 class VMFunction(object):
-    def __init__(self, executable, push_address_inst, push_handler_inst, jmp_inst):
+    def __init__(self, executable, jumper):
         self.executable = executable
-        assert push_address_inst.opcode == "push" and push_address_inst.operand1.is_immediate()
-        assert push_handler_inst.opcode == "push" and push_handler_inst.operand1.is_immediate()
-        assert jmp_inst.opcode == "jmp" and jmp_inst.operand1.is_immediate()
-        vm_address = jmp_inst.operand1.value
-        vm_code_address = push_address_inst.operand1.value
-        first_handler = push_handler_inst.operand1.value
+
+        vm_address = jumper.vm_address
+        vm_code_address = jumper.vm_code_address
+        first_handler = jumper.first_handler
         print "Getting VM %08X %08X" % (vm_address, vm_code_address)
 
         self.vm_info = VMInfo.get_vm_info(executable, vm_address)
@@ -316,7 +348,7 @@ class VMFunction(object):
             except:
                 start_address -= 1
                 continue
-            if jmp.opcode == "jmp" and jmp.operand1.is_immediate() and jmp_inst.address <= jmp.operand1.value <= jmp_inst.address + 0x20:
+            if jmp.opcode == "jmp" and jmp.operand1.is_immediate() and jumper.end <= jmp.operand1.value <= jumper.end + 0x20:
                 break
             start_address -= 1
         start_address += jmp.length
@@ -582,10 +614,7 @@ class VMFunction(object):
             print inst
 
 def get_vm(executable, address):
-    push_address_inst = executable.get_instruction(address)
-    push_handler_inst = executable.get_instruction(push_address_inst.next)
-    jmp_inst = executable.get_instruction(push_handler_inst.next)
-    vm = VMFunction(executable, push_address_inst, push_handler_inst, jmp_inst)
+    vm = VMFunction(executable, VMFunctionJumper(executable, address))
     #vm.clean()
     return vm
         

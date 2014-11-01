@@ -103,6 +103,56 @@ class CleanReader(object):
             raise CleanerException("Wrong condition: %s" % str(res))
         return res
 
+class JunkSkipper(object):
+    def __init__(self, executable):
+        self.executable = executable
+        self.instructions = {}
+        self.loop = {}
+
+    def get_next_real_instruction(self, address):
+        if self.instructions.has_key(address):
+            return self.instructions[address]
+        if self.loop.has_key(address):
+            raise Exception("loop")
+        self.loop[address] = 1
+        inst = self.executable.get_instruction(address)
+        inst = self._clean_instruction(inst)
+        self.instructions[address] = inst
+        return inst
+
+    def _clean_instruction(self, inst):
+        if inst.opcode == "jmp" and inst.operand1.is_immediate():
+            return self.get_next_real_instruction(inst.operand1.value)
+        elif inst.opcode in ("ja", "jnb", "jc", "jbe", "jz", "jg", "jge", "jl", "jle", "jnz", "jno", "jnp", "jns", "jo", "jp", "js"):
+            next1 = self.get_next_real_instruction(inst.next)
+            next2 = self.get_next_real_instruction(inst.operand1.value)
+            if next1.address != next2.address:
+                return inst
+            return next1
+        elif inst.opcode == "pusha":
+            next = self.get_next_real_instruction(inst.next)
+            if next.opcode != "popa":
+                return inst
+            return self.get_next_real_instruction(next.next)
+        elif inst.opcode == "pushf":
+            next = self.get_next_real_instruction(inst.next)
+            if next.opcode != "popf":
+                return inst
+            return self.get_next_real_instruction(next.next)
+        elif inst.opcode == "push" and inst.operand1.is_reg():
+            next = self.get_next_real_instruction(inst.next)
+            if next.opcode == "pop" and next.operand1.is_reg(inst.operand1.value):
+                return self.get_next_real_instruction(next.next)
+            if inst.operand1.is_reg("eax") and next.opcode == "push" and next.operand1.is_reg("edx"):
+                next2 = self.get_next_real_instruction(next.next)
+                next3 = self.get_next_real_instruction(next2.next)
+                next4 = self.get_next_real_instruction(next3.next)
+                if next2.opcode == "rdtsc" and next3.opcode == "pop" and next3.operand1.is_reg("edx") and next4.opcode == "pop" and next4.operand1.is_reg("eax"):
+                    return self.get_next_real_instruction(next4.next)
+            return inst
+        return inst
+
+
 """   
 
 MATH_OPERANDS = ("inc", "dec", "add", "sub", "shr", "shl", "not", "or", "and", "xor", "neg")
