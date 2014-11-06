@@ -5,6 +5,9 @@ class Expression(object):
     def __init__(self):
         pass
         
+    def get_childrens(self):
+        return [self]
+
     def equals(self, expression):
         return type(self) == type(expression)
     
@@ -18,6 +21,9 @@ class UnaryExpression(Expression):
     def __init__(self, value):
         self.value = value
         
+    def get_childrens(self):
+        return Expression.get_childrens(self) + self.value.get_childrens()
+        
     def equals(self, expression):
         return Expression.equals(self, expression) and self.value.equals(expression.value)
         
@@ -28,6 +34,9 @@ class BinaryExpression(Expression):
     def __init__(self, lvalue, rvalue):
         self.lvalue = lvalue
         self.rvalue = rvalue
+        
+    def get_childrens(self):
+        return Expression.get_childrens(self) + self.lvalue.get_childrens() + self.rvalue.get_childrens()
         
     def equals(self, expression):
         return Expression.equals(self, expression) and (self.lvalue.equals(expression.lvalue) and self.rvalue.equals(expression.rvalue)) 
@@ -42,7 +51,6 @@ class BinaryOperationExpression(BinaryExpression):
         self.swappable = swappable
         
     def equals(self, expression):
-        
         return Expression.equals(self, expression) and ((self.lvalue.equals(expression.lvalue) and self.rvalue.equals(expression.rvalue)) or (self.swappable and self.rvalue.equals(expression.lvalue) and self.lvalue.equals(expression.rvalue)))
         
     def __repr__(self):
@@ -83,6 +91,7 @@ class SetValueOperation(BinaryExpression):
     def __init__(self, lvalue, rvalue, op_str):
         BinaryExpression.__init__(self, lvalue, rvalue)
         self.op_str = op_str
+        self.visible = False
         
     def __repr__(self):
         return "%s %s= %s" % (repr(self.lvalue), self.op_str, repr(self.rvalue))
@@ -216,6 +225,17 @@ class Variable(UnaryExpression):
     def __repr__(self):
         return "%s" % self.name
         
+class RegisterVariable(Expression):
+    def __init__(self, reg):
+        self.reg = reg
+        self.instructions = []
+
+    def equals(self, other):
+        return Expression.equals(self, other) and self.reg == other.reg
+
+    def __repr__(self):
+        return "var_%s"  % self.reg
+
 class PushFlags(Expression):
     def __repr__(self):
         return "PushFlags"
@@ -224,6 +244,7 @@ class State(object):
     def __init__(self, copy_state = None):
         if copy_state:
             self.registers = dict(copy_state.registers)
+            self.registers_variables = dict(copy_state.registers_variables)
             self.vars = dict(copy_state.vars)
             self.vars_index = copy_state.vars_index
             self.stack = deque(copy_state.stack)
@@ -236,14 +257,23 @@ class State(object):
                              "ebp": VMStruct(),
                              "esi": Invalid(),
                              "edi": Invalid()}
+            self.registers_variables = {"eax": RegisterVariable("eax"),
+                                                     "ecx": RegisterVariable("ecx"),
+                                                     "edx": RegisterVariable("edx"),
+                                                     "ebx": RegisterVariable("ebx"),
+                                                     "ebp": RegisterVariable("ebp"),
+                                                     "esi": RegisterVariable("esi"),
+                                                     "edi": RegisterVariable("edi")}
             self.vars = {}
             self.vars_index = 1
             self.stack = deque()
             self.flags = Invalid()
     def invalidate_diff(self, other):
         for k, v in self.registers.iteritems():
-            if not v.equals(other.registers[k]):
-                self.registers[k] = Invalid()
+            # TODO is it the right condition?
+            if not v.equals(other.registers[k]) or self.registers_variables[k].instructions != other.registers_variables[k].instructions:
+                self.registers_variables[k].instructions += other.registers_variables[k].instructions
+                self.registers[k] = self.registers_variables[k]
             # TODO vars
             # TODO stack
             if not self.flags.equals(other.flags):
@@ -266,14 +296,30 @@ class State(object):
         
     def set_register(self, reg, value):
         self.registers[self._get_full_register(reg)] = value
-                
-            
+
+    def get_register_variable(self, reg):
+        return self.registers_variables[self._get_full_register(reg)]
+
+    def new_register_variable(self, reg):
+        var =  RegisterVariable(self._get_full_register(reg))
+        self.registers_variables[self._get_full_register(reg)] = var
+        return var
+
+    def make_visible(self, instruction):
+        if isinstance(instruction, SetValueOperation):
+            if instruction.visible:
+                return # TODO fix loop
+            instruction.visible = True
+        for inst in instruction.get_childrens():
+            if isinstance(inst, RegisterVariable):
+                for i in inst.instructions:
+                    self.make_visible(i)
+
+
 def get_handler(function):
-    return get_handler_block(function.start_block, State())[1]
-    #return instructions
+    state, instructions = get_handler_block(function.start_block, State())
+    return instructions
             
-        
-        
 def get_handler_block(block, state):
     instructions = []
     state = State(state)
@@ -299,6 +345,9 @@ def get_handler_block(block, state):
                 value = get_operand_value(inst.operand2)
                 lvalue = get_operand_value(inst.operand1)
                 if inst.operand1.is_reg():
+                    for k, v in state.registers.iteritems():
+                        if v.contains(state.get_register_variable(inst.operand1.value)):
+                            state.registers[k] = state.get_register_variable(k)
                     if inst.opcode == "add":
                         if type(lvalue) == VMStruct:
                             value = VMStructFieldOffset(value)
@@ -325,16 +374,16 @@ def get_handler_block(block, state):
                     else:
                         assert False
                     state.set_register(inst.operand1.value, value)
+                    op = SetValue(state.new_register_variable(inst.operand1.value), value)
+                    op.lvalue.instructions.append(op)
+                    instructions.append(op)
                 elif inst.operand1.is_memory():
                     # TODO: check for changed values and move them to temporary variables instead
                     assert inst.operand1.index == None and inst.operand1.displacement == 0 and inst.operand1.scale == 0  # TODO (in case of unobfuscation)
                     if isinstance(lvalue, ValueOf):                    
                         for k, v in state.registers.iteritems():
                             if v.contains(lvalue):
-                                var = Variable("v%d" % state.vars_index, v)
-                                state.registers[k] = var
-                                state.vars_index += 1
-                                instructions.append(SetValue(var, v))
+                                state.registers[k] = state.get_register_variable(k)
                     if inst.opcode == "add":
                         value = AddValue(lvalue, value)
                     elif inst.opcode == "sub":
@@ -356,10 +405,12 @@ def get_handler_block(block, state):
                     else:
                         assert False
                     instructions.append(value)
+                    state.make_visible(value)
                 else:
                     assert False
             elif inst.opcode == "jmp":
                 instructions.append(Jump(get_operand_value(inst.operand1)))
+                state.make_visible(instructions[-1])
                 break
             elif inst.opcode in ("cmp", "test"):
                 value = get_operand_value(inst.operand2)
@@ -385,6 +436,7 @@ def get_handler_block(block, state):
                         assert False                    
                 else:
                     assert False # TODO others?
+                state.make_visible(cond)
                 if next_block == block.next_cond:
                     # Only if
                     new_state, new_instructions = get_handler_block(block.next, state)
@@ -404,11 +456,15 @@ def get_handler_block(block, state):
                 block = next_block                
                 new_block = True
                 break
+            else:
+                print inst
+                assert false
     return state, instructions
     
 def print_instructions(instructions, pre=''):
     for inst in instructions:
-        print pre + repr(inst)
+        if not isinstance(inst, SetValueOperation) or inst.visible:
+            print pre + repr(inst)
         if isinstance(inst, ConditionBlock):
             print_instructions(inst.instructions, pre + ' ' * 4)
         

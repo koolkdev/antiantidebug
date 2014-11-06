@@ -123,7 +123,7 @@ class JunkSkipper(object):
     def _clean_instruction(self, inst):
         if inst.opcode == "jmp" and inst.operand1.is_immediate():
             return self.get_next_real_instruction(inst.operand1.value)
-        elif inst.opcode in ("ja", "jnb", "jc", "jbe", "jz", "jg", "jge", "jl", "jle", "jnz", "jno", "jnp", "jns", "jo", "jp", "js"):
+        elif inst.opcode in ("ja", "jnb", "jc", "jbe", "jz", "jg", "jge", "jl", "jle", "jnz", "jno", "jpo", "jns", "jo", "jp", "js"):
             next1 = self.get_next_real_instruction(inst.next)
             next2 = self.get_next_real_instruction(inst.operand1.value)
             if next1.address != next2.address:

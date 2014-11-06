@@ -3,6 +3,7 @@ from themida import cleaner
 from vms import vminstruction
 from vms import templates
 from vms.codevirtualizer import fishhandlers
+import instruction
 import Queue
 
 import os
@@ -202,7 +203,9 @@ class VMHandlers(object):
             if fix_handlers:
                 handler_address = handler_address + vm_info.init_handler.base_address
             print hex(handler_address)
-            self.handlers[i] = VMOpcodeHandler(executable.get_reader(handler_address))
+            func = fishhandlers.get_handler(instruction.Function(exe,handler_address))
+            fishhandlers.print_instructions(func)
+            #self.handlers[i] = VMOpcodeHandler(executable.get_reader(handler_address))
             #handlers_to_process.put(self.handlers[i])
         assert False
         variables = {}
