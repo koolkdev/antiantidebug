@@ -348,6 +348,7 @@ class FunctionBlock(object):
         self.next = None
         self.next_cond = None
         self.froms = []
+        self.blocks_cache = None
         
     def __str__(self):
         s = ""
@@ -357,9 +358,13 @@ class FunctionBlock(object):
             s += str(inst)
         return s
 
-def get_common_block(block1, block2):
+def get_common_block(block1, block2, blocks = None, loop_p = []):
     blocks_visited = []
     blocks_visited2 = []
+    if blocks == None:
+        blocks = block1.blocks_cache
+    loop_p_1 = list(loop_p)
+    loop_p_2 = list(loop_p)
     while block1 != None or block2 != None:
         if block1 != None:
             if blocks_visited2.count(block1) > 0:
@@ -367,29 +372,42 @@ def get_common_block(block1, block2):
             if blocks_visited.count(block1) > 0:
                 break
             blocks_visited.append(block1)
-            if block1.next_cond != None:
-                block1 = get_common_block(block1.next, block1.next_cond)
+            add = block1.address
+            if loop_p_1.count(add):
+                raise Exception("loop") # TODO: support loops
+            loop_p_1.append(add)
+            if blocks.has_key(add):
+                block1 = blocks[add]
             else:
-                block1 = block1.next
+                if block1.next_cond != None:
+                    block1 = get_common_block(block1.next, block1.next_cond, blocks, loop_p_1)
+                else:
+                    block1 = block1.next
+                blocks[add] = block1
         if block2 != None:
             if blocks_visited.count(block2) > 0:
                 return block2
             if blocks_visited2.count(block2) > 0:
                 break
             blocks_visited2.append(block2)
-            if block2.next_cond != None:
-                block2 = get_common_block(block2.next, block2.next_cond)
+            add = block2.address
+            if loop_p_2.count(add):
+                raise Exception("loop") # TODO: support loops
+            loop_p_2.append(add)
+            if blocks.has_key(add):
+                block2 = blocks[add]
             else:
-                block2 = block2.next
+                if block2.next_cond != None:
+                    block2 = get_common_block(block2.next, block2.next_cond, blocks, loop_p_2)
+                else:
+                    block2 = block2.next
+                blocks[add] = block2
     return None
-        
-        
-            
-        
         
 CONDITIONAL_JUMPS = "jz jnz".split(" ") # TODO more
 class Function(object):
     def __init__(self, executable, address):
+        self.blocks_cache = {}
         instructions_blocks = {}
         self.blocks = {}
         blocks_to_explores = deque()
@@ -397,6 +415,7 @@ class Function(object):
             if self.blocks.has_key(address):
                 return self.blocks[address]
             block = FunctionBlock(address)
+            block.blocks_cache = self.blocks_cache
             self.blocks[address] = block
             blocks_to_explores.append(block)
             return block
@@ -427,6 +446,7 @@ class Function(object):
                 if instructions_blocks.has_key(address):
                     if instructions_blocks[address].address != address:
                         nblock = FunctionBlock(address)
+                        nblock.blocks_cache = self.blocks_cache
                         self.blocks[address] = nblock
                         old_block = instructions_blocks[address]
                         index = None
