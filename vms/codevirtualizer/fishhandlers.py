@@ -4,6 +4,9 @@ import instruction
 class Expression(object):
     def __init__(self):
         pass
+
+    def get_value(self):
+        return self
         
     def get_childrens(self):
         return [self]
@@ -217,37 +220,76 @@ class Else(ConditionBlock):
     def __repr__(self):
         return "Else"
         
-class Variable(UnaryExpression):
-    def __init__(self, name, value):
-        UnaryExpression.__init__(self, value)
+class Variable(Expression):
+    def __init__(self, name):
         self.name = name
-        
-    def __repr__(self):
-        return "%s" % self.name
-        
-class RegisterVariable(Expression):
-    def __init__(self, reg):
-        self.reg = reg
         self.instructions = []
+        self.proxies = set()
+        self.hidden_vars = []
 
     def equals(self, other):
-        return Expression.equals(self, other) and self.reg == other.reg
+        return Expression.equals(self, other) and self.name== other.name
 
     def __repr__(self):
-        return "var_%s"  % self.reg
+        return "var_%s"  % self.name
 
-class PushFlags(Expression):
+class VariableProxy(UnaryExpression):
+    def __init__(self, reg_var, value):
+        UnaryExpression.__init__(self, value)
+        self.reg_var = reg_var
+        self.show_reg = False
+
+    def get_value(self):
+        if self.show_reg:
+            return self.reg_var
+        else:
+            return self.value.get_value()
+
+    def equals(self, other):
+        return self.get_value().equals(other.get_value())
+
     def __repr__(self):
-        return "PushFlags"
+        return repr(self.get_value())
+
+class Esp(Expression):
+    def __repr__(self):
+        return "ESP"
+
+class Flags(Expression):
+    def __repr__(self):
+        return "flags"
+
+class Register(Expression):
+    def __init__(self, value):
+        self.value = value
+
+    def equals(self, other):
+        return Expression.equals(self, other) and self.value == other.value
+
+    def __repr__(self):
+        return "%s" % self.value
+
+class Pop(Expression):
+    def __repr__(self):
+        return "Pop()"
+
+class Return(Expression):
+    def __init__(self, value):
+        self.value = value
+
+    def equals(self, other):
+        return Expression.equals(self, other) and self.value == other.value
+
+    def __repr__(self):
+        return "Return(%x)" % self.value
         
 class State(object):
     def __init__(self, copy_state = None):
         if copy_state:
             self.registers = dict(copy_state.registers)
             self.registers_variables = dict(copy_state.registers_variables)
-            self.vars = dict(copy_state.vars)
-            self.vars_index = copy_state.vars_index
-            self.stack = deque(copy_state.stack)
+            self.stack = list(copy_state.stack)
+            self.stack_variables = list(copy_state.stack_variables)
             self.flags = copy_state.flags
         else:
             self.registers = {"eax": Invalid(),
@@ -256,26 +298,39 @@ class State(object):
                              "ebx": Invalid(),
                              "ebp": VMStruct(),
                              "esi": Invalid(),
-                             "edi": Invalid()}
-            self.registers_variables = {"eax": RegisterVariable("eax"),
-                                                     "ecx": RegisterVariable("ecx"),
-                                                     "edx": RegisterVariable("edx"),
-                                                     "ebx": RegisterVariable("ebx"),
-                                                     "ebp": RegisterVariable("ebp"),
-                                                     "esi": RegisterVariable("esi"),
-                                                     "edi": RegisterVariable("edi")}
-            self.vars = {}
-            self.vars_index = 1
-            self.stack = deque()
+                             "edi": Invalid(),
+                             "esp": Esp()}
+            self.registers_variables = {"eax": Variable("eax"),
+                                                     "ecx": Variable("ecx"),
+                                                     "edx": Variable("edx"),
+                                                     "ebx": Variable("ebx"),
+                                                     "ebp": Variable("ebp"),
+                                                     "esi": Variable("esi"),
+                                                     "edi": Variable("edi"),
+                                                     "esp": Variable("esp")} # esp shouldn't be used from here
+            self.stack = list()
+            self.stack_variables = list()
             self.flags = Invalid()
+
     def invalidate_diff(self, other):
         for k, v in self.registers.iteritems():
             # TODO is it the right condition?
-            if not v.equals(other.registers[k]) or self.registers_variables[k].instructions != other.registers_variables[k].instructions:
+            #if not v.equals(other.registers[k]) or self.registers_variables[k].instructions != other.registers_variables[k].instructions:
+            if self.registers_variables[k] != other.registers_variables[k]:
                 self.registers_variables[k].instructions += other.registers_variables[k].instructions
+                self.registers_variables[k].proxies.update(other.registers_variables[k].proxies)
+                self.registers_variables[k].hidden_vars += other.registers_variables[k].hidden_vars
                 self.registers[k] = self.registers_variables[k]
             # TODO vars
-            # TODO stack
+            assert len(self.stack) <= len(other.stack)
+            for i in xrange(len(self.stack)):
+                if self.stack_variables[i] != other.stack_variables[i]:
+                    self.stack_variables[i].instructions += other.stack_variables[i].instructions
+                    self.stack_variables[i].proxies.update(other.stack_variables[i].proxies)
+                    self.stack_variables[i].hidden_vars += other.stack_variables[i].hidden_vars
+                if len(self.stack) != len(other.stack):
+                    # TODO
+                    pass
             if not self.flags.equals(other.flags):
                 self.flags = Invalid()
                 
@@ -292,7 +347,7 @@ class State(object):
         return None
         
     def get_register(self, reg):
-        return self.registers[self._get_full_register(reg)]
+        return VariableProxy(self.registers_variables[self._get_full_register(reg)], self.registers[self._get_full_register(reg)])
         
     def set_register(self, reg, value):
         self.registers[self._get_full_register(reg)] = value
@@ -301,17 +356,31 @@ class State(object):
         return self.registers_variables[self._get_full_register(reg)]
 
     def new_register_variable(self, reg):
-        var =  RegisterVariable(self._get_full_register(reg))
+        var =  Variable(self._get_full_register(reg))
         self.registers_variables[self._get_full_register(reg)] = var
         return var
 
     def make_visible(self, instruction):
         if isinstance(instruction, SetValueOperation):
+            if isinstance(instruction.lvalue, Variable):
+                for p in instruction.lvalue.proxies:
+                    p.show_reg = True
             if instruction.visible:
                 return # TODO fix loop
             instruction.visible = True
+            if isinstance(instruction.lvalue, Variable):
+                for var in instruction.lvalue.hidden_vars:
+                    for i in var.instructions:
+                        self.make_visible(i)
         for inst in instruction.get_childrens():
-            if isinstance(inst, RegisterVariable):
+            if isinstance(inst, VariableProxy) and not isinstance(inst.value.get_value(), Variable):
+                inst.reg_var.proxies.update(set([inst]))
+                if len(inst.reg_var.proxies) == 2:
+                    for i in list(inst.reg_var.proxies):
+                        self.make_visible(i.reg_var) # In case it is linked to a different reg val
+                elif len(inst.reg_var.proxies) > 2:
+                    self.make_visible(inst.reg_var)
+            if isinstance(inst, Variable):
                 for i in inst.instructions:
                     self.make_visible(i)
 
@@ -320,7 +389,7 @@ def get_handler(function):
     state, instructions = get_handler_block(function.start_block, State())
     return instructions
             
-def get_handler_block(block, state):
+def get_handler_block(block, state, end = None):
     instructions = []
     state = State(state)
     def get_operand_value(op):
@@ -331,11 +400,33 @@ def get_handler_block(block, state):
         elif op.is_memory():
             assert op.index == None and op.displacement == 0 and op.scale == 0  # TODO (in case of unobfuscation)
             offset = state.get_register(op.base)
-            if isinstance(offset, VMStructFieldOffset):
-                return VMStructField(offset.value, op.size)
+            if isinstance(offset.get_value(), VMStructFieldOffset):
+                return VMStructField(offset.get_value().value, op.size)
             return ValueOf(offset, op.size)
         return None
-      
+
+    def set_register_value(reg, value):
+        hidden_vars = []
+        for k, v in state.registers.iteritems():
+            if v.contains(state.get_register_variable(reg)):
+                hidden_vars.append(state.get_register_variable(k))
+        state.set_register(reg, value)
+        op = SetValue(state.new_register_variable(reg), value)
+        op.lvalue.instructions.append(op)
+        op.lvalue.hidden_vars = hidden_vars
+        instructions.append(op)
+
+    def set_value(lvalue, value):
+        if isinstance(lvalue, ValueOf):                    
+            for k, v in state.registers.iteritems():
+                if v.contains(lvalue):
+                    state.registers[k] = state.get_register_variable(k)
+            for i in xrange(len(state.stack)):
+                if state.stack[i].contains(lvalue):
+                    state.stack[i] = state.stack_variables[i]
+            instructions.append(value)
+            state.make_visible(value)
+
     new_block = True
     while new_block:
         new_block = False
@@ -344,15 +435,12 @@ def get_handler_block(block, state):
                 flags = None
                 value = get_operand_value(inst.operand2)
                 lvalue = get_operand_value(inst.operand1)
-                if inst.operand1.is_reg():
-                    for k, v in state.registers.iteritems():
-                        if v.contains(state.get_register_variable(inst.operand1.value)):
-                            state.registers[k] = state.get_register_variable(k)
+                if inst.operand1.is_reg() and not inst.operand1.is_reg("esp"):
                     if inst.opcode == "add":
-                        if type(lvalue) == VMStruct:
-                            value = VMStructFieldOffset(value)
-                        elif type(value) == VMStruct:
-                            value = VMStructFieldOffset(lvalue)
+                        if type(lvalue.get_value()) == VMStruct:
+                            value = VMStructFieldOffset(value.get_value())
+                        elif type(value.get_value()) == VMStruct:
+                            value = VMStructFieldOffset(lvalue.get_value())
                         else:
                             value = Add(lvalue, value)
                     elif inst.opcode == "sub":
@@ -373,17 +461,8 @@ def get_handler_block(block, state):
                         pass
                     else:
                         assert False
-                    state.set_register(inst.operand1.value, value)
-                    op = SetValue(state.new_register_variable(inst.operand1.value), value)
-                    op.lvalue.instructions.append(op)
-                    instructions.append(op)
-                elif inst.operand1.is_memory():
-                    # TODO: check for changed values and move them to temporary variables instead
-                    assert inst.operand1.index == None and inst.operand1.displacement == 0 and inst.operand1.scale == 0  # TODO (in case of unobfuscation)
-                    if isinstance(lvalue, ValueOf):                    
-                        for k, v in state.registers.iteritems():
-                            if v.contains(lvalue):
-                                state.registers[k] = state.get_register_variable(k)
+                    set_register_value(inst.operand1.value, value)
+                else:
                     if inst.opcode == "add":
                         value = AddValue(lvalue, value)
                     elif inst.opcode == "sub":
@@ -404,10 +483,7 @@ def get_handler_block(block, state):
                         value = SetValue(lvalue, value)
                     else:
                         assert False
-                    instructions.append(value)
-                    state.make_visible(value)
-                else:
-                    assert False
+                    set_value(lvalue, value)
             elif inst.opcode == "jmp":
                 instructions.append(Jump(get_operand_value(inst.operand1)))
                 state.make_visible(instructions[-1])
@@ -439,26 +515,68 @@ def get_handler_block(block, state):
                 state.make_visible(cond)
                 if next_block == block.next_cond:
                     # Only if
-                    new_state, new_instructions = get_handler_block(block.next, state)
+                    new_state, new_instructions = get_handler_block(block.next, state, next_block)
                     instructions.append(If(cond, new_instructions))
                     state.invalidate_diff(new_state)
                 else:
                     # If else
-                    state1, instructions1 = get_handler_block(block.next, state)
-                    state2, instructions2 = get_handler_block(block.next_cond, state)
+                    state1, instructions1 = get_handler_block(block.next, state, next_block)
+                    state2, instructions2 = get_handler_block(block.next_cond, state, next_block)
                     instructions.append(If(cond, instructions1))
                     instructions.append(Else(instructions2))
-                    if next_block == None:
+                    if next_block == None or next_block == end:
                         break
                     state2.invalidate_diff(state1)
                     # Update state
                     state = state2
+                if next_block == None or next_block == end:
+                    break
                 block = next_block                
                 new_block = True
                 break
+            elif inst.opcode in ("push", "pushf"):
+                if inst.opcode == "pushf":
+                    value = state.flags
+                else:
+                    value = get_operand_value(inst.operand1)
+                    assert inst.operand1.size == 4
+                state.stack.append(value)
+                state.stack_variables.append(Variable(str(len(state.stack))))
+                op = SetValue(state.stack_variables[-1], value)
+                op.lvalue.instructions.append(op)
+                instructions.append(op)
+            elif inst.opcode in ("pop", "popf"):
+                if len(state.stack) > 0:
+                    value = state.stack.pop()
+                    state.stack_variables.pop()
+                    pop = False
+                else:
+                    value = Pop()
+                    pop = True
+
+                if inst.operand1.is_reg() and not inst.operand1.is_reg("esp"):
+                    assert inst.operand1.size == 4
+                    if pop:
+                        instructions.append(SetValue(Register(inst.operand1.value), value))
+                        state.make_visible(instructions[-1])
+                        set_register_value(inst.operand1.value, Invalid())
+                    else:
+                        set_register_value(inst.operand1.value, value)
+                else:
+                    if inst.opcode == "popf":
+                        lvalue = Flags()
+                    else:
+                        lvalue = get_operand_value(inst.operand1)
+                        assert inst.operand1.size == 4
+                    value = SetValue(lvalue, value)
+                    set_value(lvalue, value)
+            elif inst.opcode == "retn":
+                instructions.append(Return(inst.operand1.value))
+            elif inst.opcode == "call":
+                return state, instructions 
             else:
                 print inst
-                assert false
+                assert False
     return state, instructions
     
 def print_instructions(instructions, pre=''):
