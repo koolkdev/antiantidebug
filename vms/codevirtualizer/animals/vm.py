@@ -205,11 +205,14 @@ class VMHandlers(object):
             handler_address = executable.read_dword(vm_info.init_handler.handlers_address + i * 4)
             if fix_handlers:
                 handler_address = handler_address + vm_info.init_handler.base_address
-            print "---------------------------------------------------"
-            print hex(handler_address)
-            func = handlers_decompiler.get_handler(instruction.Function(executable,handler_address))
-            handlers_parser.parse_handler(func)
-            handlers_decompiler.print_instructions(func)
+            if handler_address == 0x40a6fbL:
+                print "---------------------------------------------------"
+                print hex(handler_address)
+                func = handlers_decompiler.Handler(instruction.Function(executable,handler_address))
+                #func.make_unvisible(func.get_instructions()[11])
+                #func.clean_instructions()
+                handlers_parser.parse_handler(func)
+                func.print_instructions()
             #self.handlers[i] = VMOpcodeHandler(executable.get_reader(handler_address))
             #handlers_to_process.put(self.handlers[i])
         assert False

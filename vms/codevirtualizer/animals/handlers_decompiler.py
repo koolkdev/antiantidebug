@@ -361,7 +361,8 @@ class Variable(Expression):
         self.instructions = []
         self.proxies = set()
         self.hidden_vars = []
-        self.visible_if_used = False
+        self.used_instructions = []
+        self.visible_if_used = []
 
     def equals(self, other):
         return Expression.equals(self, other) and self.name== other.name
@@ -480,7 +481,8 @@ def merge_variables(var1, var2):
     var.proxies.update(var1.proxies)
     var.proxies.update(var2.proxies)
     var.hidden_vars = var1.hidden_vars + var2.hidden_vars
-    var.visible_if_used = var1.visible_if_used or var2.visible_if_used
+    var.used_instructions = var1.used_instructions + var2.used_instructions
+    var.visible_if_used = var1.visible_if_used + var2.visible_if_used
     return var
 
 class State(object):
@@ -582,6 +584,17 @@ class State(object):
         self.registers_variables[self._get_full_register(reg)] = var
         return var
 
+class Handler(object):
+    def __init__(self, function):
+        state = State()
+        nstate, instructions = self._get_handler_block(function.start_block, state)
+        state.invalidate_diff(nstate) # For push instructions taking effect
+        self.instructions = instructions
+        self.clean_instructions()
+
+    def get_instructions(self):
+         return self.instructions
+
     def make_visible(self, instruction):
         #if isinstance(instruction, SetValueOperation):
         #    def print_childs(inst, pad=''):
@@ -603,7 +616,7 @@ class State(object):
                     for i in var.instructions:
                         #self.make_visible(i)
                         assert isinstance(i.lvalue, Variable)
-                        i.lvalue.visible_if_used = True
+                        i.lvalue.visible_if_used.append(instruction)
                         for proxy in list(i.lvalue.proxies):
                             if proxy.visible and proxy.show_reg:
                                 self.make_visible(proxy.reg_var)
@@ -623,331 +636,361 @@ class State(object):
                     elif len(inst.reg_var.proxies) > 2:
                         self.make_visible(inst.reg_var)
                 for i in list(inst.reg_var.proxies):
-                    if i.reg_var.visible_if_used:
+                    if len(i.reg_var.visible_if_used) > 0:
                         self.make_visible(i.reg_var)
 
             if isinstance(inst, Variable):
+                inst.used_instructions.append(instruction)
                 self.make_visible(inst)
 
+    def make_unvisible(self, instruction):
+        if isinstance(instruction, SetValueOperation):
+            if isinstance(instruction.lvalue, Variable):
+                for p in instruction.lvalue.proxies:
+                    p.show_reg = False
+        if isinstance(instruction, NonVisible):
+            if not instruction.visible:
+                return
+            instruction.visible = False
+        if isinstance(instruction, SetValueOperation):
+            if isinstance(instruction.lvalue, Variable):
+                for var in instruction.lvalue.hidden_vars:
+                    for i in var.instructions:
+                        assert isinstance(i.lvalue, Variable)
+                        i.lvalue.visible_if_used.remove(instruction)
+                        if len(i.lvalue.visible_if_used) == 0:
+                            for proxy in list(i.lvalue.proxies):
+                                if proxy.visible and proxy.show_reg:
+                                    self.make_unvisible(proxy.reg_var)
 
-def get_handler(function):
-    state = State()
-    nstate, instructions = get_handler_block(function.start_block, state)
-    state.invalidate_diff(nstate) # For push instructions taking effect
-    return clean_instructions(instructions)
+        if isinstance(instruction, Variable):
+            for i in instruction.instructions:
+                self.make_unvisible(i)
 
-def get_handler_block(block, state, end = None, one_block = False):
-    instructions = []
-    state = State(state)
-    def get_operand_value(op):
-        if op.is_reg():
-            return state.get_register(op.value)
-        elif op.is_immediate():
-            return Immediate(op.value)
-        elif op.is_memory():
-            assert op.index == None and op.displacement == 0 and op.scale == 0  # TODO (in case of unobfuscation)
-            offset = state.get_register(op.base)
-            #if isinstance(offset.get_value(), VMStructFieldOffset):
-            #    return VMStructField(offset.get_value().value, op.size)
-            return ValueOf(offset, op.size)
-        return None
+        for inst in instruction.get_all_children():
+            if isinstance(inst, VariableProxy):
+                if inst.visible:
+                    inst.visible = False
+                    inst.reg_var.proxies.remove(inst)
+                for i in list(inst.reg_var.proxies):
+                    if len(i.reg_var.visible_if_used) == 0 and len(inst.reg_var.proxies) < 2:
+                        self.make_unvisible(i.reg_var)
 
-    def set_register_value(reg, value):
-        hidden_vars = []
-        for k, v in state.registers.iteritems():
-            if state._get_full_register(reg) != k and v.contains(state.get_register_variable(reg)):
-                hidden_vars.append(state.get_register_variable(k))
-        state.set_register(reg, value)
-        op = SetValue(state.new_register_variable(reg), value)
-        op.lvalue.instructions.append(op)
-        op.lvalue.hidden_vars = hidden_vars
-        instructions.append(op)
+            if isinstance(inst, Variable):
+                inst.used_instructions.remove(instruction)
+                if len(inst.used_instructions) == 0:
+                    self.make_unvisible(inst)
 
-    def set_value(lvalue, value):
-        if isinstance(lvalue, ValueOf):
+    def _get_handler_block(self, block, state, end = None, one_block = False):
+        instructions = []
+        state = State(state)
+        def get_operand_value(op):
+            if op.is_reg():
+                return state.get_register(op.value)
+            elif op.is_immediate():
+                return Immediate(op.value)
+            elif op.is_memory():
+                assert op.index == None and op.displacement == 0 and op.scale == 0  # TODO (in case of unobfuscation)
+                offset = state.get_register(op.base)
+                return ValueOf(offset, op.size)
+            return None
+
+        def set_register_value(reg, value):
+            hidden_vars = []
             for k, v in state.registers.iteritems():
-                if v.contains(lvalue):
-                    state.registers[k] = state.get_register_variable(k)
-            for i in xrange(len(state.stack)):
-                if state.stack[i].contains(lvalue):
-                    state.stack[i] = state.stack_variables[i]
-            instructions.append(value)
-            state.make_visible(value)
+                if state._get_full_register(reg) != k and v.contains(state.get_register_variable(reg)):
+                    hidden_vars.append(state.get_register_variable(k))
+            state.set_register(reg, value)
+            op = SetValue(state.new_register_variable(reg), value)
+            op.lvalue.instructions.append(op)
+            op.lvalue.hidden_vars = hidden_vars
+            instructions.append(op)
 
-    new_block = True
-    while new_block:
-        new_block = False
-        for inst in block.instructions:
-            if inst.opcode in ("mov", "movzx", "movsx", "add", "sub", "xor", "and", "or", "shl", "shr", "rcl", "rcr", "rol", "ror", "imul", "inc", "dec", "not", "neg"):
-                state.flags = Invalid()
-                lvalue = get_operand_value(inst.operand1)
-                if inst.opcode in ("inc", "dec", "not", "neg"):
-                    value = lvalue
-                else:
-                    value = get_operand_value(inst.operand2)
-                if inst.operand1.is_reg() and not inst.operand1.is_reg("esp"):
-                    if inst.opcode == "add":
-                        #if type(lvalue.get_value()) == VMStruct:
-                        #    value = VMStructFieldOffset(value.get_value())
-                        #elif type(value.get_value()) == VMStruct:
-                        #    value = VMStructFieldOffset(lvalue.get_value())
-                        #else:
-                        value = Add(lvalue, value)
-                    elif inst.opcode == "sub":
-                        value = Sub(lvalue, value)
-                    elif inst.opcode == "xor":
-                        value = Xor(lvalue, value)
-                    elif inst.opcode == "and":
-                        value = And(lvalue, value)
-                    elif inst.opcode == "and":
-                        value = Add(lvalue, value)
-                    elif inst.opcode == "or":
-                        value = Or(lvalue, value)
-                    elif inst.opcode == "shl":
-                        value = Shl(lvalue, value)
-                    elif inst.opcode == "shr":
-                        value = Shr(lvalue, value)
-                    elif inst.opcode == "rcr":
-                        value = Rcr(lvalue, value)
-                    elif inst.opcode == "rcl":
-                        value = Rcl(lvalue, value)
-                    elif inst.opcode == "rol":
-                        value = Rol(lvalue, value)
-                    elif inst.opcode == "ror":
-                        value = Ror(lvalue, value)
-                    elif inst.opcode == "imul":
-                        value = Mul(lvalue, value)
-                    elif inst.opcode == "inc":
-                        value = Inc(value)
-                    elif inst.opcode == "dec":
-                        value = Dec(value)
-                    elif inst.opcode == "not":
-                        value = Not(value)
-                    elif inst.opcode == "neg":
-                        value = Neg(value)
-                    elif inst.opcode == "mov":
-                        pass
-                    elif inst.opcode =="movzx":
-                        if inst.operand2.is_reg():
-                            value = UnsignedConversion(value, inst.operand2.size)
-                    elif inst.opcode == "movsx":
-                        assert inst.operand2.is_reg()
-                        value = SignedConversion(value, inst.operand2.size)
-                    else:
-                        assert False
-                    if not inst.opcode.startswith("mov"):
-                        # TODO: line appear twice right now
-                        state.flags = FlagsOf(value)
-                    set_register_value(inst.operand1.value, value)
-                else:
-                    if inst.opcode == "add":
-                        value = AddValue(lvalue, value)
-                    elif inst.opcode == "sub":
-                        value = SubValue(lvalue, value)
-                    elif inst.opcode == "xor":
-                        value = XorValue(lvalue, value)
-                    elif inst.opcode == "and":
-                        value = AndValue(lvalue, value)
-                    elif inst.opcode == "and":
-                        value = AddValue(lvalue, value)
-                    elif inst.opcode == "or":
-                        value = OrValue(lvalue, value)
-                    elif inst.opcode == "shl":
-                        value = ShlValue(lvalue, value)
-                    elif inst.opcode == "shr":
-                        value = ShrValue(lvalue, value)
-                    elif inst.opcode == "rcr":
-                        value = RcrValue(lvalue, value)
-                    elif inst.opcode == "rcl":
-                        value = RclValue(lvalue, value)
-                    elif inst.opcode == "rol":
-                        value = RolValue(lvalue, value)
-                    elif inst.opcode == "ror":
-                        value = RorValue(lvalue, value)
-                    elif inst.opcode == "imul":
-                        value = MulValue(lvalue, value)
-                    elif inst.opcode == "inc":
-                        value = IncValue(value)
-                    elif inst.opcode == "dec":
-                        value = DecValue(value)
-                    elif inst.opcode == "not":
-                        value = NotValue(value)
-                    elif inst.opcode == "neg":
-                        value = NegValue(value)
-                    elif inst.opcode == "mov":
-                        value = SetValue(lvalue, value)
-                    else:
-                        assert False
-                    if not inst.opcode.startswith("mov"):
-                        # TODO: line appear twice right now
-                        state.flags = FlagsOf(value)
-                    set_value(lvalue, value)
-            elif inst.opcode == "jmp":
-                instructions.append(Jump(get_operand_value(inst.operand1)))
-                state.make_visible(instructions[-1])
-                break
-            elif inst.opcode in ("cmp", "test"):
-                value = get_operand_value(inst.operand2)
-                lvalue = get_operand_value(inst.operand1)
-                if inst.opcode == "cmp":
-                    state.flags = FlagsOf(Cmp(lvalue, value))
-                elif inst.opcode == "test":
-                    state.flags = FlagsOf(Test(lvalue, value))
-            elif inst.opcode in ("jz", "jnz"):
-                # Determine if it is an If/Else or If
-                # If both have common block, than it is a. If one of the next blocks is the common block (or after an empty one), than it is a If.
-                # Else it is a If/Else
-                # Most of the time the condition link skip on the condition
-                try:
-                    next_block = instruction.get_common_block(block.next, block.next_cond)
-                except:
-                    return state, instructions # TODO: loop
-                assert next_block != block.next
-                cond = None
-                if isinstance(state.flags.value, Cmp):
-                    if inst.opcode == "jz":
-                        cond = NotEqual(state.flags.value.lvalue, state.flags.value.rvalue)
-                    elif inst.opcode == "jnz":
-                        cond = Equal(state.flags.value.lvalue, state.flags.value.rvalue)
-                    else:
-                        assert False
-                elif isinstance(state.flags.value, And):
-                    # TODO: it is litle bit hacked right now
-                    assert isinstance(instructions[-1], SetValue)
-                    reg_var = instructions[-1].lvalue
-                    var = state.get_register(reg_var.name)
-                    if inst.opcode == "jz":
-                        cond = var
-                    elif inst.opcode == "jnz":
-                        cond = NotCond(var)
-                    else:
-                        assert False
-                else:
-                    assert False # TODO others? for most of them should be same as for and
+        def set_value(lvalue, value):
+            if isinstance(lvalue, ValueOf):
+                for k, v in state.registers.iteritems():
+                    if v.contains(lvalue):
+                        state.registers[k] = state.get_register_variable(k)
+                for i in xrange(len(state.stack)):
+                    if state.stack[i].contains(lvalue):
+                        state.stack[i] = state.stack_variables[i]
+                instructions.append(value)
+                self.make_visible(value)
 
-                state.make_visible(cond)
-                if one_block:
-                    instructions.append(If(cond, []))
-                    break
-
-                if next_block == block.next_cond:
-                    # Only if
-                    new_state, new_instructions = get_handler_block(block.next, state, next_block)
-                    instructions.append(If(cond, new_instructions))
-                    state.invalidate_diff(new_state)
-                else:
-                    # If else
-                    if_block = block.next
-                    else_block = block.next_cond
-                    if len(block.next_cond.froms) > 1:
-                        # hack for Ors
-                        if_block = block.next_cond
-                        condition_blocks = []
-                        b = block.next
-                        while b != next_block:
-                            if b.next_cond == block.next_cond:
-                                condition_blocks.append(b)
-                            else:
-                                assert b.next == next_block and b.next_cond is None
-                                else_block = b
-                            b = b.next
-                        assert len(block.next_cond.froms) == len(condition_blocks) + 1
-                        cond = cond.invert()
-                        for b in condition_blocks:
-                            new_state, new_instructions = get_handler_block(b, state, one_block = True)
-                            state.invalidate_diff(new_state)
-                            assert len(new_instructions) == 1
-                            assert isinstance(new_instructions[0], If)
-                            cond = OrCond(cond, new_instructions[-1].value.invert())
-
-                    state1, instructions1 = get_handler_block(if_block, state, next_block)
-                    state2, instructions2 = get_handler_block(else_block, state, next_block)
-                    instructions.append(If(cond, instructions1))
-                    # TODO check for visibile instructions
-                    if len(instructions2) > 0:
-                        instructions.append(Else(instructions2))
-                    if next_block == None:
-                        break
-                    state2.invalidate_diff(state1)
-                    # Update state
-                    state = state2
-                if next_block == end:
-                    break
-                block = next_block
-                new_block = True
-                break
-            elif inst.opcode in ("push", "pushf"):
-                if inst.opcode == "pushf":
-                    value = state.flags
-                    state.has_flags = True
-                    nop = Push(Flags())
-                else:
-                    value = get_operand_value(inst.operand1)
-                    if inst.operand1.size == 4:
-                        nop = Push(value)
+        new_block = True
+        while new_block:
+            new_block = False
+            for inst in block.instructions:
+                if inst.opcode in ("mov", "movzx", "movsx", "add", "sub", "xor", "and", "or", "shl", "shr", "rcl", "rcr", "rol", "ror", "imul", "inc", "dec", "not", "neg"):
+                    state.flags = Invalid()
+                    lvalue = get_operand_value(inst.operand1)
+                    if inst.opcode in ("inc", "dec", "not", "neg"):
+                        value = lvalue
                     else:
-                        nop = PushWord(value)
-
-                state.stack.append(value)
-                state.stack_variables.append(Variable(str(len(state.stack))))
-                state.stack_instructions.append([nop])
-                op = SetValue(state.stack_variables[-1], value)
-                op.lvalue.instructions.append(op)
-                instructions.append(op)
-                instructions.append(nop)
-            elif inst.opcode in ("pop", "popf"):
-                if len(state.stack) > 0:
-                    value = state.stack.pop()
-                    state.stack_variables.pop()
-                    state.stack_instructions.pop()
-                    pop = False
-                else:
-                    if inst.operand1.size == 4:
-                        value = Pop()
-                    else:
-                        value = PopWord()
-                    pop = True
-
-                if inst.operand1.is_reg() and not inst.operand1.is_reg("esp"):
-                    assert inst.operand1.size == 4
-                    if pop:
-                        instructions.append(SetValue(Register(inst.operand1.value), value))
-                        state.make_visible(instructions[-1])
-                        set_register_value(inst.operand1.value, Invalid())
-                    else:
+                        value = get_operand_value(inst.operand2)
+                    if inst.operand1.is_reg() and not inst.operand1.is_reg("esp"):
+                        if inst.opcode == "add":
+                            value = Add(lvalue, value)
+                        elif inst.opcode == "sub":
+                            value = Sub(lvalue, value)
+                        elif inst.opcode == "xor":
+                            value = Xor(lvalue, value)
+                        elif inst.opcode == "and":
+                            value = And(lvalue, value)
+                        elif inst.opcode == "and":
+                            value = Add(lvalue, value)
+                        elif inst.opcode == "or":
+                            value = Or(lvalue, value)
+                        elif inst.opcode == "shl":
+                            value = Shl(lvalue, value)
+                        elif inst.opcode == "shr":
+                            value = Shr(lvalue, value)
+                        elif inst.opcode == "rcr":
+                            value = Rcr(lvalue, value)
+                        elif inst.opcode == "rcl":
+                            value = Rcl(lvalue, value)
+                        elif inst.opcode == "rol":
+                            value = Rol(lvalue, value)
+                        elif inst.opcode == "ror":
+                            value = Ror(lvalue, value)
+                        elif inst.opcode == "imul":
+                            value = Mul(lvalue, value)
+                        elif inst.opcode == "inc":
+                            value = Inc(value)
+                        elif inst.opcode == "dec":
+                            value = Dec(value)
+                        elif inst.opcode == "not":
+                            value = Not(value)
+                        elif inst.opcode == "neg":
+                            value = Neg(value)
+                        elif inst.opcode == "mov":
+                            pass
+                        elif inst.opcode =="movzx":
+                            if inst.operand2.is_reg():
+                                value = UnsignedConversion(value, inst.operand2.size)
+                        elif inst.opcode == "movsx":
+                            assert inst.operand2.is_reg()
+                            value = SignedConversion(value, inst.operand2.size)
+                        else:
+                            assert False
+                        if not inst.opcode.startswith("mov"):
+                            # TODO: line appear twice right now
+                            state.flags = FlagsOf(value)
                         set_register_value(inst.operand1.value, value)
-                else:
-                    if inst.opcode == "popf":
-                        state.has_flags = True
-                        lvalue = Flags()
                     else:
-                        lvalue = get_operand_value(inst.operand1)
-                        if not pop:
-                            assert inst.operand1.size == 4
-                    value = SetValue(lvalue, value)
-                    set_value(lvalue, value)
-            elif inst.opcode == "retn":
-                instructions.append(Return(inst.operand1.value))
-            elif inst.opcode == "call":
-                return state, instructions
-            elif inst.opcode == "std":
-                instructions.append(Std())
-            else:
-                print inst
-                assert False
-    return state, instructions
+                        if inst.opcode == "add":
+                            value = AddValue(lvalue, value)
+                        elif inst.opcode == "sub":
+                            value = SubValue(lvalue, value)
+                        elif inst.opcode == "xor":
+                            value = XorValue(lvalue, value)
+                        elif inst.opcode == "and":
+                            value = AndValue(lvalue, value)
+                        elif inst.opcode == "and":
+                            value = AddValue(lvalue, value)
+                        elif inst.opcode == "or":
+                            value = OrValue(lvalue, value)
+                        elif inst.opcode == "shl":
+                            value = ShlValue(lvalue, value)
+                        elif inst.opcode == "shr":
+                            value = ShrValue(lvalue, value)
+                        elif inst.opcode == "rcr":
+                            value = RcrValue(lvalue, value)
+                        elif inst.opcode == "rcl":
+                            value = RclValue(lvalue, value)
+                        elif inst.opcode == "rol":
+                            value = RolValue(lvalue, value)
+                        elif inst.opcode == "ror":
+                            value = RorValue(lvalue, value)
+                        elif inst.opcode == "imul":
+                            value = MulValue(lvalue, value)
+                        elif inst.opcode == "inc":
+                            value = IncValue(value)
+                        elif inst.opcode == "dec":
+                            value = DecValue(value)
+                        elif inst.opcode == "not":
+                            value = NotValue(value)
+                        elif inst.opcode == "neg":
+                            value = NegValue(value)
+                        elif inst.opcode == "mov":
+                            value = SetValue(lvalue, value)
+                        else:
+                            assert False
+                        if not inst.opcode.startswith("mov"):
+                            # TODO: line appear twice right now
+                            state.flags = FlagsOf(value)
+                        set_value(lvalue, value)
+                elif inst.opcode == "jmp":
+                    instructions.append(Jump(get_operand_value(inst.operand1)))
+                    self.make_visible(instructions[-1])
+                    break
+                elif inst.opcode in ("cmp", "test"):
+                    value = get_operand_value(inst.operand2)
+                    lvalue = get_operand_value(inst.operand1)
+                    if inst.opcode == "cmp":
+                        state.flags = FlagsOf(Cmp(lvalue, value))
+                    elif inst.opcode == "test":
+                        state.flags = FlagsOf(Test(lvalue, value))
+                elif inst.opcode in ("jz", "jnz"):
+                    # Determine if it is an If/Else or If
+                    # If both have common block, than it is a. If one of the next blocks is the common block (or after an empty one), than it is a If.
+                    # Else it is a If/Else
+                    # Most of the time the condition link skip on the condition
+                    try:
+                        next_block = instruction.get_common_block(block.next, block.next_cond)
+                    except:
+                        return state, instructions # TODO: loop
+                    assert next_block != block.next
+                    cond = None
+                    if isinstance(state.flags.value, Cmp):
+                        if inst.opcode == "jz":
+                            cond = NotEqual(state.flags.value.lvalue, state.flags.value.rvalue)
+                        elif inst.opcode == "jnz":
+                            cond = Equal(state.flags.value.lvalue, state.flags.value.rvalue)
+                        else:
+                            assert False
+                    elif isinstance(state.flags.value, And):
+                        # TODO: it is litle bit hacked right now
+                        assert isinstance(instructions[-1], SetValue)
+                        reg_var = instructions[-1].lvalue
+                        var = state.get_register(reg_var.name)
+                        if inst.opcode == "jz":
+                            cond = var
+                        elif inst.opcode == "jnz":
+                            cond = NotCond(var)
+                        else:
+                            assert False
+                    else:
+                        assert False # TODO others? for most of them should be same as for and
 
-def clean_instructions(instructions):
-    for inst in instructions:
-        if isinstance(inst, ConditionBlock):
-            inst.instructions = clean_instructions(inst.instructions)
-    return [x for x in instructions if not isinstance(x, NonVisible) or x.visible]
+                    self.make_visible(cond)
+                    if one_block:
+                        instructions.append(If(cond, []))
+                        break
 
-def print_instructions(instructions, pre=''):
-    for inst in instructions:
-        #if not isinstance(inst, NonVisible) or inst.visible:
-        print pre + str(inst)
-        if isinstance(inst, ConditionBlock):
-            print_instructions(inst.instructions, pre + ' ' * 4)
+                    if next_block == block.next_cond:
+                        # Only if
+                        new_state, new_instructions = self._get_handler_block(block.next, state, next_block)
+                        instructions.append(If(cond, new_instructions))
+                        state.invalidate_diff(new_state)
+                    else:
+                        # If else
+                        if_block = block.next
+                        else_block = block.next_cond
+                        if len(block.next_cond.froms) > 1:
+                            # hack for Ors
+                            if_block = block.next_cond
+                            condition_blocks = []
+                            b = block.next
+                            while b != next_block:
+                                if b.next_cond == block.next_cond:
+                                    condition_blocks.append(b)
+                                else:
+                                    assert b.next == next_block and b.next_cond is None
+                                    else_block = b
+                                b = b.next
+                            assert len(block.next_cond.froms) == len(condition_blocks) + 1
+                            cond = cond.invert()
+                            for b in condition_blocks:
+                                new_state, new_instructions = self._get_handler_block(b, state, one_block = True)
+                                state.invalidate_diff(new_state)
+                                assert len(new_instructions) == 1
+                                assert isinstance(new_instructions[0], If)
+                                cond = OrCond(cond, new_instructions[-1].value.invert())
+
+                        state1, instructions1 = self._get_handler_block(if_block, state, next_block)
+                        state2, instructions2 = self._get_handler_block(else_block, state, next_block)
+                        instructions.append(If(cond, instructions1))
+                        # TODO check for visibile instructions
+                        if len(instructions2) > 0:
+                            instructions.append(Else(instructions2))
+                        if next_block == None:
+                            break
+                        state2.invalidate_diff(state1)
+                        # Update state
+                        state = state2
+                    if next_block == end:
+                        break
+                    block = next_block
+                    new_block = True
+                    break
+                elif inst.opcode in ("push", "pushf"):
+                    if inst.opcode == "pushf":
+                        value = state.flags
+                        state.has_flags = True
+                        nop = Push(Flags())
+                    else:
+                        value = get_operand_value(inst.operand1)
+                        if inst.operand1.size == 4:
+                            nop = Push(value)
+                        else:
+                            nop = PushWord(value)
+
+                    state.stack.append(value)
+                    state.stack_variables.append(Variable(str(len(state.stack))))
+                    state.stack_instructions.append([nop])
+                    op = SetValue(state.stack_variables[-1], value)
+                    op.lvalue.instructions.append(op)
+                    instructions.append(op)
+                    instructions.append(nop)
+                elif inst.opcode in ("pop", "popf"):
+                    if len(state.stack) > 0:
+                        value = state.stack.pop()
+                        state.stack_variables.pop()
+                        state.stack_instructions.pop()
+                        pop = False
+                    else:
+                        if inst.operand1.size == 4:
+                            value = Pop()
+                        else:
+                            value = PopWord()
+                        pop = True
+
+                    if inst.operand1.is_reg() and not inst.operand1.is_reg("esp"):
+                        assert inst.operand1.size == 4
+                        if pop:
+                            instructions.append(SetValue(Register(inst.operand1.value), value))
+                            self.make_visible(instructions[-1])
+                            set_register_value(inst.operand1.value, Invalid())
+                        else:
+                            set_register_value(inst.operand1.value, value)
+                    else:
+                        if inst.opcode == "popf":
+                            state.has_flags = True
+                            lvalue = Flags()
+                        else:
+                            lvalue = get_operand_value(inst.operand1)
+                            if not pop:
+                                assert inst.operand1.size == 4
+                        value = SetValue(lvalue, value)
+                        set_value(lvalue, value)
+                elif inst.opcode == "retn":
+                    instructions.append(Return(inst.operand1.value))
+                elif inst.opcode == "call":
+                    return state, instructions
+                elif inst.opcode == "std":
+                    instructions.append(Std())
+                else:
+                    print inst
+                    assert False
+        return state, instructions
+
+    def clean_instructions(self):
+        self.instructions = self._clean_instructions(self.instructions)
+
+    def _clean_instructions(self, instructions):
+        for inst in instructions:
+            if isinstance(inst, ConditionBlock):
+                inst.instructions = self._clean_instructions(inst.instructions)
+        return [x for x in instructions if not isinstance(x, NonVisible) or x.visible]
+
+    def print_instructions(self, instructions = None, pre=''):
+        if instructions == None:
+            instructions = self.instructions
+        for inst in instructions:
+            #if not isinstance(inst, NonVisible) or inst.visible:
+            print pre + str(inst)
+            if isinstance(inst, ConditionBlock):
+                self.print_instructions(inst.instructions, pre + ' ' * 4)
 
 
