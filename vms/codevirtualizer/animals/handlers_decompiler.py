@@ -583,6 +583,12 @@ class State(object):
         return var
 
     def make_visible(self, instruction):
+        #if isinstance(instruction, SetValueOperation):
+        #    def print_childs(inst, pad=''):
+        #        print pad + str(inst) + ", " + repr(inst)
+        #        for child in inst.get_children():
+        #            print_childs(child, pad + '    ')
+        #    print_childs(instruction)
         if isinstance(instruction, SetValueOperation):
             if isinstance(instruction.lvalue, Variable):
                 for p in instruction.lvalue.proxies:
@@ -599,7 +605,7 @@ class State(object):
                         assert isinstance(i.lvalue, Variable)
                         i.lvalue.visible_if_used = True
                         for proxy in list(i.lvalue.proxies):
-                            if proxy.visible:
+                            if proxy.visible and proxy.show_reg:
                                 self.make_visible(proxy.reg_var)
 
         if isinstance(instruction, Variable):
