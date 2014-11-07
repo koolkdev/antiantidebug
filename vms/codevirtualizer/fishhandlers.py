@@ -8,8 +8,11 @@ class Expression(object):
     def get_value(self):
         return self
         
-    def get_childrens(self):
-        return [self]
+    def get_all_children(self):
+        return self.get_children() + sum([x.get_all_children() for x in self.get_children()], [])
+        
+    def get_children(self):
+        return []
 
     def equals(self, expression):
         return type(self) == type(expression)
@@ -17,15 +20,15 @@ class Expression(object):
     def contains(self, expression):
         return self.equals(expression)
         
-    def __repr__(self):
+    def __str__(self):
         return ""
             
 class UnaryExpression(Expression):
     def __init__(self, value):
         self.value = value
         
-    def get_childrens(self):
-        return Expression.get_childrens(self) + self.value.get_childrens()
+    def get_children(self):
+        return [self.value]
         
     def equals(self, expression):
         return Expression.equals(self, expression) and self.value.equals(expression.value)
@@ -38,16 +41,16 @@ class UnaryOperationExpression(UnaryExpression):
         UnaryExpression.__init__(self, value)
         self.op_str = op_str
 
-    def __repr__(self):
-        return "(%s%s)" % (self.op_str, repr(self.value))
+    def __str__(self):
+        return "(%s%s)" % (self.op_str, str(self.value))
             
 class BinaryExpression(Expression):
     def __init__(self, lvalue, rvalue):
         self.lvalue = lvalue
         self.rvalue = rvalue
         
-    def get_childrens(self):
-        return Expression.get_childrens(self) + self.lvalue.get_childrens() + self.rvalue.get_childrens()
+    def get_children(self):
+        return [self.lvalue, self.rvalue]
         
     def equals(self, expression):
         return Expression.equals(self, expression) and (self.lvalue.equals(expression.lvalue) and self.rvalue.equals(expression.rvalue)) 
@@ -64,11 +67,11 @@ class BinaryOperationExpression(BinaryExpression):
     def equals(self, expression):
         return Expression.equals(self, expression) and ((self.lvalue.equals(expression.lvalue) and self.rvalue.equals(expression.rvalue)) or (self.swappable and self.rvalue.equals(expression.lvalue) and self.lvalue.equals(expression.rvalue)))
         
-    def __repr__(self):
-        return "(%s %s %s)" % (repr(self.lvalue), self.op_str, repr(self.rvalue))
+    def __str__(self):
+        return "(%s %s %s)" % (str(self.lvalue), self.op_str, str(self.rvalue))
 
 class Invalid(Expression):
-    def __repr__(self):
+    def __str__(self):
         return "Invalid"
         
 class Immediate(Expression):   
@@ -78,7 +81,7 @@ class Immediate(Expression):
     def equals(self, expression):
         return Expression.equals(self, expression) and self.value == expression.value
         
-    def __repr__(self):
+    def __str__(self):
         return "0x%X" % self.value
 
 class ValueOf(UnaryExpression):
@@ -89,14 +92,14 @@ class ValueOf(UnaryExpression):
     def equals(self, expression):
         return UnaryExpression.equals(self, expression) and self.size == expression.size
         
-    def __repr__(self):
+    def __str__(self):
         if self.size == 1:
             s = "BYTE"
         if self.size == 2:
             s = "WORD"
         if self.size == 4:
             s = "DWORD"
-        return "*(%s*)%s" % (s, repr(self.value))
+        return "*(%s*)%s" % (s, str(self.value))
         
 class NonVisible(object):
     def __init__(self):
@@ -108,8 +111,8 @@ class SetValueOperation(BinaryExpression, NonVisible):
         NonVisible.__init__(self)
         self.op_str = op_str
         
-    def __repr__(self):
-        return "%s %s= %s" % (repr(self.lvalue), self.op_str, repr(self.rvalue))
+    def __str__(self):
+        return "%s %s= %s" % (str(self.lvalue), self.op_str, str(self.rvalue))
         
 class SetValue(SetValueOperation):       
     def __init__(self, lvalue, rvalue):
@@ -167,8 +170,8 @@ class SetValueUnaryOperation(SetValueOperation):
     def __init__(self, value, op_str):
         SetValueOperation.__init__(self, value, value, op_str)
 
-    def __repr__(self):
-        return "%s = %s%s" % (repr(self.lvalue), self.op_str, repr(self.rvalue))
+    def __str__(self):
+        return "%s = %s%s" % (str(self.lvalue), self.op_str, str(self.rvalue))
 
 class NotValue(SetValueUnaryOperation):
     def __init__(self, value):
@@ -182,33 +185,33 @@ class IncValue(SetValueUnaryOperation):
     def __init__(self, value):
         SetValueUnaryOperation.__init__(self, value, "++")
 
-    def __repr__(self):
-        return "%s++" % repr(self.lvalue)
+    def __str__(self):
+        return "%s++" % str(self.lvalue)
 
 class DecValue(SetValueUnaryOperation):
     def __init__(self, value):
         SetValueUnaryOperation.__init__(self, value, "--")
 
-    def __repr__(self):
-        return "%s--" % repr(self.lvalue)
+    def __str__(self):
+        return "%s--" % str(self.lvalue)
     
 class VMStruct(Expression):
-    def __repr__(self):
+    def __str__(self):
         return "VMStruct"
         
 class VMStructFieldOffset(UnaryExpression):   
-    def __repr__(self):
-        return "VMStructFieldOffset(%s)" % repr(self.value)
+    def __str__(self):
+        return "VMStructFieldOffset(%s)" % str(self.value)
         
 class VMStructField(ValueOf):   
-    def __repr__(self):
+    def __str__(self):
         if self.size == 1:
             s = "Byte"
         if self.size == 2:
             s = "Word"
         if self.size == 4:
             s = "Dword"
-        return "VMStructField%s(%s)" % (s, repr(self.value))
+        return "VMStructField%s(%s)" % (s, str(self.value))
 
 class Add(BinaryOperationExpression):
     def __init__(self, lvalue, rvalue):
@@ -278,8 +281,8 @@ class BinaryCompressionExpression(BinaryOperationExpression):
     def __init__(self, lvalue, rvalue, op_str, swappable = False):
         BinaryOperationExpression.__init__(self, lvalue, rvalue, op_str, swappable)
         
-    def __repr__(self):
-        return "%s(%s, %s)" % (self.op_str, repr(self.lvalue), repr(self.rvalue))
+    def __str__(self):
+        return "%s(%s, %s)" % (self.op_str, str(self.lvalue), str(self.rvalue))
 
 class Cmp(BinaryCompressionExpression):
     def __init__(self, lvalue, rvalue):
@@ -329,8 +332,8 @@ class NotCond(UnaryOperationExpression, ConditionExpression):
         return self.value
 
 class Jump(UnaryExpression):
-    def __repr__(self):
-        return "JUMP(%s)" % (repr(self.value))
+    def __str__(self):
+        return "JUMP(%s)" % (str(self.value))
         
 class ConditionBlock(UnaryExpression):
     def __init__(self, value, instructions):
@@ -338,14 +341,14 @@ class ConditionBlock(UnaryExpression):
         self.instructions = instructions
 
 class If(ConditionBlock):
-    def __repr__(self):
-        return "If(%s)" % (repr(self.value))
+    def __str__(self):
+        return "If(%s)" % (str(self.value))
 
 class Else(ConditionBlock):
     def __init__(self, instructions):
         ConditionBlock.__init__(self, None, instructions)
         
-    def __repr__(self):
+    def __str__(self):
         return "Else"
         
 class Variable(Expression):
@@ -359,7 +362,7 @@ class Variable(Expression):
     def equals(self, other):
         return Expression.equals(self, other) and self.name== other.name
 
-    def __repr__(self):
+    def __str__(self):
         return "var_%s"  % self.name
 
 class VariableProxy(UnaryExpression):
@@ -375,23 +378,26 @@ class VariableProxy(UnaryExpression):
         else:
             return self.value.get_value()
 
+    #def get_children(self):
+    #    return [self.get_value()]
+
     def equals(self, other):
         return self.get_value().equals(other.get_value())
 
-    def __repr__(self):
-        return repr(self.get_value())
+    def __str__(self):
+        return str(self.get_value())
 
 class Esp(Expression):
-    def __repr__(self):
+    def __str__(self):
         return "ESP"
 
 class Flags(Expression):
-    def __repr__(self):
+    def __str__(self):
         return "flags"
 
 class FlagsOf(UnaryExpression):
-    def __repr__(self):
-        return "Flags(%s)" % repr(self.value)
+    def __str__(self):
+        return "Flags(%s)" % str(self.value)
 
 class Register(Expression):
     def __init__(self, value):
@@ -400,15 +406,15 @@ class Register(Expression):
     def equals(self, other):
         return Expression.equals(self, other) and self.value == other.value
 
-    def __repr__(self):
+    def __str__(self):
         return "%s" % self.value
 
 class Pop(Expression):
-    def __repr__(self):
+    def __str__(self):
         return "Pop()"
 
 class PopWord(Expression):
-    def __repr__(self):
+    def __str__(self):
         return "PopWord()"
 
 class Push(UnaryExpression, NonVisible):
@@ -416,16 +422,16 @@ class Push(UnaryExpression, NonVisible):
         UnaryExpression.__init__(self, value)
         NonVisible.__init__(self)
 
-    def __repr__(self):
-        return "Push(%s)" % repr(self.value)
+    def __str__(self):
+        return "Push(%s)" % str(self.value)
 
 class PushWord(UnaryExpression, NonVisible):
     def __init__(self, value):
         UnaryExpression.__init__(self, value)
         NonVisible.__init__(self)
 
-    def __repr__(self):
-        return "PushWord(%s)" % repr(self.value)
+    def __str__(self):
+        return "PushWord(%s)" % str(self.value)
 
 class Return(Expression):
     def __init__(self, value):
@@ -434,7 +440,7 @@ class Return(Expression):
     def equals(self, other):
         return Expression.equals(self, other) and self.value == other.value
 
-    def __repr__(self):
+    def __str__(self):
         return "Return(%x)" % self.value
 
 class Conversion(UnaryExpression):
@@ -450,20 +456,29 @@ class Conversion(UnaryExpression):
         if self.size == 4:
             return "DWORD"
 
-    def __repr__(self):
-        return "(%s)%s" % (self._get_size_name(), repr(self.value))
+    def __str__(self):
+        return "(%s)%s" % (self._get_size_name(), str(self.value))
 
 class UnsignedConversion(Conversion):
     pass
 
 class SignedConversion(Conversion):
-    def __repr__(self):
-        return "(S%s)%s" % (self._get_size_name(), repr(self.value))
+    def __str__(self):
+        return "(S%s)%s" % (self._get_size_name(), str(self.value))
 
 class Std(Expression):
-    def __repr__(self):
+    def __str__(self):
         return "Std()"
         
+def merge_variables(var1, var2):
+    var = Variable(var1.name)
+    var.instructions = var1.instructions + var2.instructions
+    var.proxies.update(var1.proxies)
+    var.proxies.update(var2.proxies)
+    var.hidden_vars = var1.hidden_vars + var2.hidden_vars
+    var.visible_if_used = var1.visible_if_used or var2.visible_if_used
+    return var
+
 class State(object):
     def __init__(self, copy_state = None):
         if copy_state:
@@ -502,16 +517,12 @@ class State(object):
             # TODO is it the right condition?
             #if not v.equals(other.registers[k]) or self.registers_variables[k].instructions != other.registers_variables[k].instructions:
             if self.registers_variables[k] != other.registers_variables[k]:
-                self.registers_variables[k].instructions += other.registers_variables[k].instructions
-                self.registers_variables[k].proxies.update(other.registers_variables[k].proxies)
-                self.registers_variables[k].hidden_vars += other.registers_variables[k].hidden_vars
+                self.registers_variables[k] = merge_variables(self.registers_variables[k], other.registers_variables[k])
                 self.registers[k] = self.registers_variables[k]
         assert len(self.stack) <= len(other.stack)
         for i in xrange(len(self.stack)):
             if self.stack_variables[i] != other.stack_variables[i]:
-                self.stack_variables[i].instructions += other.stack_variables[i].instructions
-                self.stack_variables[i].proxies.update(other.stack_variables[i].proxies)
-                self.stack_variables[i].hidden_vars += other.stack_variables[i].hidden_vars
+                self.stack_variables[i] = merge_variables(self.stack_variables[i], other.stack_variables[i])
                 self.stack_instructions[i] += other.stack_instructions[i]
                 self.stack[i] = self.stack_variables[i]
         self.has_flags = self.has_flags or other.has_flags
@@ -531,9 +542,7 @@ class State(object):
                     self.stack_variables.append(other.stack_variables[0])
                     self.stack_instructions.append(other.stack_instructions[0])
                 else:
-                    self.stack_variables[0].instructions += other.stack_variables[1].instructions
-                    self.stack_variables[0].proxies.update(other.stack_variables[1].proxies)
-                    self.stack_variables[0].hidden_vars += other.stack_variables[1].hidden_vars
+                    self.stack_variables[0] = merge_variables(self.stack_variables[0], other.stack_variables[1])
                     self.stack_instructions[0] += other.stack_instructions[1]
                     self.stack[0] = self.stack_variables[0]
             else:
@@ -569,7 +578,7 @@ class State(object):
         self.registers_variables[self._get_full_register(reg)] = var
         return var
 
-    def make_visible(self, instruction):
+    def make_visible(self, instruction):)
         if isinstance(instruction, SetValueOperation):
             if isinstance(instruction.lvalue, Variable):
                 for p in instruction.lvalue.proxies:
@@ -589,14 +598,18 @@ class State(object):
                             if proxy.visible:
                                 self.make_visible(proxy.reg_var)
 
-        for inst in instruction.get_childrens():
+        if isinstance(instruction, Variable):
+            for i in instruction.instructions:
+                self.make_visible(i)
+
+        for inst in instruction.get_all_children():
             if isinstance(inst, VariableProxy):
                 inst.visible = True
                 inst.reg_var.proxies.update(set([inst]))
                 if not isinstance(inst.value.get_value(), Variable):
                     if len(inst.reg_var.proxies) == 2:
                         for i in list(inst.reg_var.proxies):
-                            self.make_visible(i.reg_var) # In case it is linked to a different reg val
+                            self.make_visible(i.reg_var) # In case it is linked to a different reg val TODO: think about it
                     elif len(inst.reg_var.proxies) > 2:
                         self.make_visible(inst.reg_var)
                 for i in list(inst.reg_var.proxies):
@@ -604,8 +617,7 @@ class State(object):
                         self.make_visible(i.reg_var)
 
             if isinstance(inst, Variable):
-                for i in inst.instructions:
-                    self.make_visible(i)
+                self.make_visible(inst)
 
 
 def get_handler(function):
@@ -625,8 +637,8 @@ def get_handler_block(block, state, end = None, one_block = False):
         elif op.is_memory():
             assert op.index == None and op.displacement == 0 and op.scale == 0  # TODO (in case of unobfuscation)
             offset = state.get_register(op.base)
-            if isinstance(offset.get_value(), VMStructFieldOffset):
-                return VMStructField(offset.get_value().value, op.size)
+            #if isinstance(offset.get_value(), VMStructFieldOffset):
+            #    return VMStructField(offset.get_value().value, op.size)
             return ValueOf(offset, op.size)
         return None
 
@@ -665,12 +677,12 @@ def get_handler_block(block, state, end = None, one_block = False):
                     value = get_operand_value(inst.operand2)
                 if inst.operand1.is_reg() and not inst.operand1.is_reg("esp"):
                     if inst.opcode == "add":
-                        if type(lvalue.get_value()) == VMStruct:
-                            value = VMStructFieldOffset(value.get_value())
-                        elif type(value.get_value()) == VMStruct:
-                            value = VMStructFieldOffset(lvalue.get_value())
-                        else:
-                            value = Add(lvalue, value)
+                        #if type(lvalue.get_value()) == VMStruct:
+                        #    value = VMStructFieldOffset(value.get_value())
+                        #elif type(value.get_value()) == VMStruct:
+                        #    value = VMStructFieldOffset(lvalue.get_value())
+                        #else:
+                        value = Add(lvalue, value)
                     elif inst.opcode == "sub":
                         value = Sub(lvalue, value)
                     elif inst.opcode == "xor":
@@ -918,7 +930,7 @@ def get_handler_block(block, state, end = None, one_block = False):
 def print_instructions(instructions, pre=''):
     for inst in instructions:
         if not isinstance(inst, NonVisible) or inst.visible:
-            print pre + repr(inst)
+            print pre + str(inst)
         if isinstance(inst, ConditionBlock):
             print_instructions(inst.instructions, pre + ' ' * 4)
         

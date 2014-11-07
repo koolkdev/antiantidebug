@@ -202,6 +202,7 @@ class VMHandlers(object):
             handler_address = executable.read_dword(vm_info.init_handler.handlers_address + i * 4)
             if fix_handlers:
                 handler_address = handler_address + vm_info.init_handler.base_address
+            print "---------------------------------------------------"
             print hex(handler_address)
             func = fishhandlers.get_handler(instruction.Function(exe,handler_address))
             fishhandlers.print_instructions(func)

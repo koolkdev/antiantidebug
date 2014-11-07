@@ -47,8 +47,19 @@ class PEFileExecutable(Executable):
 
     def write(self, address, data):
         return self.pefile.set_bytes_at_rva(address - self.pefile.OPTIONAL_HEADER.ImageBase, data)
-        
-        
+
+class BytesMemory(Executable):
+    def __init__(self, bytes, address = 0):
+        self.bytes = list(bytes)
+        self.address = address
+
+    def read(self, address, length):
+        return "".join(self.bytes[address-self.address:address-self.address+length])
+
+    def write(self, address, data):
+        self.bytes[address-self.address:address-self.address+len(data)] = list(data)
+
+               
 def ToExecutable(obj):
     if isinstance(obj, debugger.Debugger):
         return DebuggedExecutable(obj)
