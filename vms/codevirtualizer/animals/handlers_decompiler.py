@@ -7,32 +7,39 @@ class Expression(object):
 
     def get_value(self):
         return self
-        
+
     def get_all_children(self):
         return self.get_children() + sum([x.get_all_children() for x in self.get_children()], [])
-        
+
     def get_children(self):
         return []
 
+    def replace_child(self, child, new_child):
+        pass
+
     def equals(self, expression):
         return type(self) == type(expression)
-    
+
     def contains(self, expression):
         return self.equals(expression)
-        
+
     def __str__(self):
         return ""
-            
+
 class UnaryExpression(Expression):
     def __init__(self, value):
         self.value = value
-        
+
     def get_children(self):
         return [self.value]
-        
+
+    def replace_child(self, child, new_child):
+        if self.value == child:
+            self.value = new_child
+
     def equals(self, expression):
         return Expression.equals(self, expression) and self.value.equals(expression.value)
-        
+
     def contains(self, expression):
         return Expression.contains(self, expression) or self.value.contains(expression)
 
@@ -43,44 +50,52 @@ class UnaryOperationExpression(UnaryExpression):
 
     def __str__(self):
         return "(%s%s)" % (self.op_str, str(self.value))
-            
+
 class BinaryExpression(Expression):
     def __init__(self, lvalue, rvalue):
         self.lvalue = lvalue
         self.rvalue = rvalue
-        
+
     def get_children(self):
         return [self.lvalue, self.rvalue]
-        
+
+    def replace_child(self, child, new_child):
+        if self.lvalue == child:
+            self.lvalue = new_child
+        if self.rvalue == child:
+            self.rvalue = new_child
+
     def equals(self, expression):
-        return Expression.equals(self, expression) and (self.lvalue.equals(expression.lvalue) and self.rvalue.equals(expression.rvalue)) 
-        
+        return Expression.equals(self, expression) and (self.lvalue.equals(expression.lvalue) and self.rvalue.equals(expression.rvalue))
+
     def contains(self, expression):
         return Expression.contains(self, expression) or self.lvalue.contains(expression) or self.rvalue.contains(expression)
-            
+
 class BinaryOperationExpression(BinaryExpression):
     def __init__(self, lvalue, rvalue, op_str, swappable = False):
         BinaryExpression.__init__(self, lvalue, rvalue)
         self.op_str = op_str
         self.swappable = swappable
-        
+
     def equals(self, expression):
-        return Expression.equals(self, expression) and ((self.lvalue.equals(expression.lvalue) and self.rvalue.equals(expression.rvalue)) or (self.swappable and self.rvalue.equals(expression.lvalue) and self.lvalue.equals(expression.rvalue)))
-        
+        return Expression.equals(self, expression) and \
+            ((self.lvalue.equals(expression.lvalue) and self.rvalue.equals(expression.rvalue)) or \
+             (self.swappable and self.rvalue.equals(expression.lvalue) and self.lvalue.equals(expression.rvalue)))
+
     def __str__(self):
         return "(%s %s %s)" % (str(self.lvalue), self.op_str, str(self.rvalue))
 
 class Invalid(Expression):
     def __str__(self):
         return "Invalid"
-        
-class Immediate(Expression):   
+
+class Immediate(Expression):
     def __init__(self, value):
         self.value = value
-        
+
     def equals(self, expression):
         return Expression.equals(self, expression) and self.value == expression.value
-        
+
     def __str__(self):
         return "0x%X" % self.value
 
@@ -88,10 +103,10 @@ class ValueOf(UnaryExpression):
     def __init__(self, value, size):
         UnaryExpression.__init__(self, value)
         self.size = size
-        
+
     def equals(self, expression):
         return UnaryExpression.equals(self, expression) and self.size == expression.size
-        
+
     def __str__(self):
         if self.size == 1:
             s = "BYTE"
@@ -100,7 +115,7 @@ class ValueOf(UnaryExpression):
         if self.size == 4:
             s = "DWORD"
         return "*(%s*)%s" % (s, str(self.value))
-        
+
 class NonVisible(object):
     def __init__(self):
         self.visible = False
@@ -110,14 +125,14 @@ class SetValueOperation(BinaryExpression, NonVisible):
         BinaryExpression.__init__(self, lvalue, rvalue)
         NonVisible.__init__(self)
         self.op_str = op_str
-        
+
     def __str__(self):
         return "%s %s= %s" % (str(self.lvalue), self.op_str, str(self.rvalue))
-        
-class SetValue(SetValueOperation):       
+
+class SetValue(SetValueOperation):
     def __init__(self, lvalue, rvalue):
-        SetValueOperation.__init__(self, lvalue, rvalue, "") 
-        
+        SetValueOperation.__init__(self, lvalue, rvalue, "")
+
 class AddValue(SetValueOperation):
     def __init__(self, lvalue, rvalue):
         SetValueOperation.__init__(self, lvalue, rvalue, "+")
@@ -194,24 +209,10 @@ class DecValue(SetValueUnaryOperation):
 
     def __str__(self):
         return "%s--" % str(self.lvalue)
-    
+
 class VMStruct(Expression):
     def __str__(self):
         return "VMStruct"
-        
-class VMStructFieldOffset(UnaryExpression):   
-    def __str__(self):
-        return "VMStructFieldOffset(%s)" % str(self.value)
-        
-class VMStructField(ValueOf):   
-    def __str__(self):
-        if self.size == 1:
-            s = "Byte"
-        if self.size == 2:
-            s = "Word"
-        if self.size == 4:
-            s = "Dword"
-        return "VMStructField%s(%s)" % (s, str(self.value))
 
 class Add(BinaryOperationExpression):
     def __init__(self, lvalue, rvalue):
@@ -276,11 +277,11 @@ class Inc(UnaryOperationExpression):
 class Dec(UnaryOperationExpression):
     def __init__(self, value):
         UnaryOperationExpression.__init__(self, value, "--")
-        
+
 class BinaryCompressionExpression(BinaryOperationExpression):
     def __init__(self, lvalue, rvalue, op_str, swappable = False):
         BinaryOperationExpression.__init__(self, lvalue, rvalue, op_str, swappable)
-        
+
     def __str__(self):
         return "%s(%s, %s)" % (self.op_str, str(self.lvalue), str(self.rvalue))
 
@@ -334,23 +335,26 @@ class NotCond(UnaryOperationExpression, ConditionExpression):
 class Jump(UnaryExpression):
     def __str__(self):
         return "JUMP(%s)" % (str(self.value))
-        
-class ConditionBlock(UnaryExpression):
-    def __init__(self, value, instructions):
-        self.value = value
+
+class ConditionBlock(object):
+    def __init__(self, instructions):
         self.instructions = instructions
 
-class If(ConditionBlock):
+class If(UnaryExpression, ConditionBlock):
+    def __init__(self, value, instructions):
+        UnaryExpression.__init__(self, value)
+        ConditionBlock.__init__(self, instructions)
+
     def __str__(self):
         return "If(%s)" % (str(self.value))
 
-class Else(ConditionBlock):
+class Else(Expression, ConditionBlock):
     def __init__(self, instructions):
-        ConditionBlock.__init__(self, None, instructions)
-        
+        ConditionBlock.__init__(self, instructions)
+
     def __str__(self):
         return "Else"
-        
+
 class Variable(Expression):
     def __init__(self, name):
         self.name = name
@@ -469,7 +473,7 @@ class SignedConversion(Conversion):
 class Std(Expression):
     def __str__(self):
         return "Std()"
-        
+
 def merge_variables(var1, var2):
     var = Variable(var1.name)
     var.instructions = var1.instructions + var2.instructions
@@ -551,7 +555,7 @@ class State(object):
                         self.make_visible(i)
         if not self.flags.equals(other.flags):
             self.flags = Invalid()
-                
+
     def _get_full_register(self, reg):
         if instruction.REGS["REG_DWORD"].count(reg) > 0:
             return reg
@@ -563,10 +567,10 @@ class State(object):
                 return None
             return instruction.REGS["REG_DWORD"][index]
         return None
-        
+
     def get_register(self, reg):
         return VariableProxy(self.registers_variables[self._get_full_register(reg)], self.registers[self._get_full_register(reg)])
-        
+
     def set_register(self, reg, value):
         self.registers[self._get_full_register(reg)] = value
 
@@ -578,7 +582,7 @@ class State(object):
         self.registers_variables[self._get_full_register(reg)] = var
         return var
 
-    def make_visible(self, instruction):)
+    def make_visible(self, instruction):
         if isinstance(instruction, SetValueOperation):
             if isinstance(instruction.lvalue, Variable):
                 for p in instruction.lvalue.proxies:
@@ -609,7 +613,7 @@ class State(object):
                 if not isinstance(inst.value.get_value(), Variable):
                     if len(inst.reg_var.proxies) == 2:
                         for i in list(inst.reg_var.proxies):
-                            self.make_visible(i.reg_var) # In case it is linked to a different reg val TODO: think about it
+                            self.make_visible(i.reg_var) # In case it is linked to a different reg val
                     elif len(inst.reg_var.proxies) > 2:
                         self.make_visible(inst.reg_var)
                 for i in list(inst.reg_var.proxies):
@@ -624,8 +628,8 @@ def get_handler(function):
     state = State()
     nstate, instructions = get_handler_block(function.start_block, state)
     state.invalidate_diff(nstate) # For push instructions taking effect
-    return instructions
-            
+    return clean_instructions(instructions)
+
 def get_handler_block(block, state, end = None, one_block = False):
     instructions = []
     state = State(state)
@@ -654,7 +658,7 @@ def get_handler_block(block, state, end = None, one_block = False):
         instructions.append(op)
 
     def set_value(lvalue, value):
-        if isinstance(lvalue, ValueOf):                    
+        if isinstance(lvalue, ValueOf):
             for k, v in state.registers.iteritems():
                 if v.contains(lvalue):
                     state.registers[k] = state.get_register_variable(k)
@@ -789,7 +793,7 @@ def get_handler_block(block, state, end = None, one_block = False):
                 # Else it is a If/Else
                 # Most of the time the condition link skip on the condition
                 try:
-                    next_block = instruction.get_common_block(block.next, block.next_cond) 
+                    next_block = instruction.get_common_block(block.next, block.next_cond)
                 except:
                     return state, instructions # TODO: loop
                 assert next_block != block.next
@@ -863,7 +867,7 @@ def get_handler_block(block, state, end = None, one_block = False):
                     state = state2
                 if next_block == end:
                     break
-                block = next_block                
+                block = next_block
                 new_block = True
                 break
             elif inst.opcode in ("push", "pushf"):
@@ -926,12 +930,18 @@ def get_handler_block(block, state, end = None, one_block = False):
                 print inst
                 assert False
     return state, instructions
-    
+
+def clean_instructions(instructions):
+    for inst in instructions:
+        if isinstance(inst, ConditionBlock):
+            inst.instructions = clean_instructions(inst.instructions)
+    return [x for x in instructions if not isinstance(x, NonVisible) or x.visible]
+
 def print_instructions(instructions, pre=''):
     for inst in instructions:
-        if not isinstance(inst, NonVisible) or inst.visible:
-            print pre + str(inst)
+        #if not isinstance(inst, NonVisible) or inst.visible:
+        print pre + str(inst)
         if isinstance(inst, ConditionBlock):
             print_instructions(inst.instructions, pre + ' ' * 4)
-        
-    
+
+

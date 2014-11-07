@@ -2,7 +2,10 @@ import utils
 from themida import cleaner
 from vms import vminstruction
 from vms import templates
-from vms.codevirtualizer import fishhandlers
+
+import handlers_decompiler
+import handlers_parser
+
 import instruction
 import Queue
 
@@ -13,12 +16,12 @@ import subprocess
 class VMHandler(object):
     def __init__(self, reader):
         pass
-        
+
 class VMStructField(object):
     def __init__(self, name, size):
         self.name = name
         self.size = size
-        
+
 class VMStructFieldDword(VMStructField):
     def __init__(self, name):
         VMStructField.__init__(self, name, 4)
@@ -26,20 +29,20 @@ class VMStructFieldDword(VMStructField):
 class VMStruct(object):
     def __init__(self):
         self.fields = {}
-        
+
     def add_field(self, offset, field):
         # TODO: verify
         self.fields[offset] = field
-        
+
     def get_field(self, offset):
         return self.fields.get(offset)
-        
+
     def get_field_offset_by_name(self, name):
         for offset, field in self.fields.iteritems():
             if field.name == name:
                 return offset
         return None
-        
+
 class VMInit(VMHandler):
     cache = {}
     def __init__(self, vm_info, executable, address):
@@ -70,7 +73,7 @@ class VMInit(VMHandler):
         self.vm_struct = self.base_address + reader.get_cond(lambda x: x.opcode == "mov" and x.operand1.is_reg("ebp") and x.operand2.is_immediate()).operand2.value
         # add ebp, ecx
         reader.get_cond(lambda x: x.opcode == "add" and x.operand1.is_reg("ebp") and x.operand2.is_reg("ecx")) # Get the address of the start of main handler
-        
+
         # push ecx
         reader.get_cond(lambda x: x.opcode == "push" and x.operand1.is_reg("ecx"))
         # mov ecx, 1
@@ -89,17 +92,17 @@ class VMInit(VMHandler):
         reader.get_cond(lambda x: x.opcode == "jmp" and x.operand1.is_immediate(lock_loop_start))
         # pop ecx
         reader.get_cond(lambda x: x.address == lock_loop_end and x.opcode == "pop" and x.operand1.is_reg("ecx"))
-        
+
         # mov ebx, X
         vm_info.struct.add_field(reader.get_cond(lambda x: x.opcode == "mov" and x.operand1.is_reg("ebx") and x.operand2.is_immediate()).operand2.value, VMStructFieldDword("BASE_ADDRESS"))
         # mov [ebp+ebx], ecx
         reader.get_cond(lambda x: x.opcode == "mov" and x.operand2.is_reg("ecx") and x.operand1.is_memory() and x.operand1.base == "ebp" and x.operand1.index == "ebx" and x.operand1.displacement == 0 and x.operand1.scale == 0)
-        
+
         # mov ebx, X
         vm_info.struct.add_field(reader.get_cond(lambda x: x.opcode == "mov" and x.operand1.is_reg("ebx") and x.operand2.is_immediate()).operand2.value, VMStructFieldDword("BASE_ADDRESS"))
         # mov [ebp+ebx], X
         self.original_base_address = reader.get_cond(lambda x: x.opcode == "mov" and x.operand2.is_immediate() and x.operand1.is_memory() and x.operand1.base == "ebp" and x.operand1.index == "ebx" and x.operand1.displacement == 0 and x.operand1.scale == 0).operand2.value
-        
+
         # mov ebx, X
         vm_info.struct.add_field(reader.get_cond(lambda x: x.opcode == "mov" and x.operand1.is_reg("ebx") and x.operand2.is_immediate()).operand2.value, VMStructFieldDword("EIP"))
         # mov eax, [esp+0x28]
@@ -108,8 +111,8 @@ class VMInit(VMHandler):
         reader.get_cond(lambda x: x.opcode == "add" and x.operand1.is_reg("eax") and x.operand2.is_reg("ecx"))
         # mov [ebp+ebx], eax
         reader.get_cond(lambda x: x.opcode == "mov" and x.operand2.is_reg("eax") and x.operand1.is_memory() and x.operand1.base == "ebp" and x.operand1.index == "ebx" and x.operand1.displacement == 0 and x.operand1.scale == 0)
-        
-        
+
+
         # mov eax, X
         self.handlers_address = self.base_address + reader.get_cond(lambda x: x.opcode == "mov" and x.operand1.is_reg("eax") and x.operand2.is_immediate()).operand2.value
         # add eax ecx
@@ -122,22 +125,22 @@ class VMInit(VMHandler):
         reader.get_cond(lambda x: x.opcode == "cmp" and x.operand1.is_reg("edx") and x.operand2.is_reg("eax"))
         # jz after_handlers_init
         after_handlers_init = reader.get_cond(lambda x: x.opcode == "jz").operand1.value
-        
-        
+
+
         # push ebx
-        reader.get_cond(lambda x: x.opcode == "push" and x.operand1.is_reg("ebx"))        
+        reader.get_cond(lambda x: x.opcode == "push" and x.operand1.is_reg("ebx"))
         # mov ebx, X
         self.handlers_count = reader.get_cond(lambda x: x.opcode == "mov" and x.operand1.is_reg("ebx") and x.operand2.is_immediate() and (x.operand2.value % 4) == 0).operand2.value >> 2
         # shr ebx, 2
         reader.get_cond(lambda x: x.opcode == "shr" and x.operand1.is_reg("ebx") and x.operand2.is_immediate(2))
         # push eax
-        reader.get_cond(lambda x: x.opcode == "push" and x.operand1.is_reg("eax")) 
-        
+        reader.get_cond(lambda x: x.opcode == "push" and x.operand1.is_reg("eax"))
+
         # test ebx, ebx
         init_next_handler = reader.get_cond(lambda x: x.opcode == "test" and x.operand1.is_reg("ebx") and x.operand2.is_reg("ebx")).address
         # jz handlers_init_end
         handlers_init_end = reader.get_cond(lambda x: x.opcode == "jz").operand1.value
-        
+
         # add [eax], ecx
         reader.get_cond(lambda x: x.opcode == "add" and x.operand2.is_reg("ecx") and x.operand1.is_memory() and x.operand1.base == "eax" and x.operand1.index == None and x.operand1.displacement == 0 and x.operand1.scale == 0)
         # add eax, 4
@@ -160,7 +163,7 @@ class VMInit(VMHandler):
         # add eax, ebx
         init_next_handler = reader.get_cond(lambda x: x.opcode == "add" and x.operand1.is_reg("eax") and x.operand2.is_reg("ebx")).address
         # jmp [eax]
-        reader.get_cond(lambda x: x.opcode == "jmp" and x.operand1.is_memory() and x.operand1.base == "eax" and x.operand1.index == None and x.operand1.displacement == 0 and x.operand1.scale == 0)        
+        reader.get_cond(lambda x: x.opcode == "jmp" and x.operand1.is_memory() and x.operand1.base == "eax" and x.operand1.index == None and x.operand1.displacement == 0 and x.operand1.scale == 0)
 
 
 
@@ -170,9 +173,9 @@ class VMOpcodeHandler(VMHandler):
             self.read = VMReadInfo(reader)
         except cleaner.CleanerException, e:
             self.read = None
-            
+
         self.insts = []
-        
+
         while True:
             inst = reader.get()
             if inst.opcode == "lodsb":
@@ -189,7 +192,7 @@ class VMOpcodeHandler(VMHandler):
         if self.read != None:
             return vminstruction.VMInstruction(self.name, self.read.decode(bytes_reader, key))
         return vminstruction.VMInstruction(self.name)
-        
+
 class VMHandlers(object):
     def __init__(self, executable, vm_info):
         #clean = cleaner.Cleaner(executable)
@@ -204,8 +207,9 @@ class VMHandlers(object):
                 handler_address = handler_address + vm_info.init_handler.base_address
             print "---------------------------------------------------"
             print hex(handler_address)
-            func = fishhandlers.get_handler(instruction.Function(exe,handler_address))
-            fishhandlers.print_instructions(func)
+            func = handlers_decompiler.get_handler(instruction.Function(executable,handler_address))
+            handlers_parser.parse_handler(func)
+            handlers_decompiler.print_instructions(func)
             #self.handlers[i] = VMOpcodeHandler(executable.get_reader(handler_address))
             #handlers_to_process.put(self.handlers[i])
         assert False
@@ -249,7 +253,7 @@ class VMHandlers(object):
                 handler.assign_name(operation_name)
 
         # Good, we have handlers now
-        
+
 class VMInfo(object):
     cache = {}
     def __init__(self, executable, vm_address):
@@ -265,16 +269,16 @@ class VMInfo(object):
         res = cls(executable, address)
         #except cleaner.CleanerException, e:
         #    res = None
-            
+
         cls.cache[address] = res
         return res
-    
+
 class VMFunctionSection(object):
     def __init__(self, address):
         self.address = address
         self.start = False
         self.end = False
-        self.instructions = [] 
+        self.instructions = []
 
 
 class VMFunctionJumper(object):
@@ -301,7 +305,7 @@ class VMFunctionJumper(object):
         reader.get_cond(lambda x: str(x) == "pop eax")
         self.vm_address = reader.get_cond(lambda x: x.opcode == "jmp" and x.operand1.is_immediate()).operand1.value
         self.end = reader.address
-      
+
 class VMFunction(object):
     def __init__(self, executable, jumper):
         self.executable = executable
@@ -314,12 +318,12 @@ class VMFunction(object):
         self.vm_info = VMInfo.get_vm_info(executable, vm_address)
         assert self.vm_info != None
         assert False
-        
+
         addresses_to_explore = Queue.Queue()
         starts = []
         instructions = {}
         instructions_size = {}
-        
+
         # Kinda hackish, but we are looking for the start, and the code is layout like this:
         # jmp label
         # push adress2
@@ -340,7 +344,7 @@ class VMFunction(object):
         # Start address is the address of push address2/jmp and end address is the address of vmcode
         real_vm_code_address = long(vm_code_address + self.vm_info.init_handler.encode)
         self.code_address = real_vm_code_address
-        vm_code_end = push_inst.address 
+        vm_code_end = push_inst.address
         start_address = real_vm_code_address
         i = 0
         end_address = start_address
@@ -388,15 +392,15 @@ class VMFunction(object):
                 if self.vm_info.handlers.handlers[func].read != None:
                     instructions_size[address] += self.vm_info.handlers.handlers[func].read.size
                 inst = self.vm_info.handlers.handlers[func].get_vm_instruction(bytes_reader, key)
-                
+
                 inst.address = address
                 inst.set_info("labled", next_labled)
-                next_labled = False                    
+                next_labled = False
 
                 if inst.name in ("JMP", "JMPIF"):
                     inst.args[0] += bytes_reader.address
                     inst.args[0] &= 0xffffffff
-                    
+
                 if inst.name == "JMP":
                     next_labled = True
                     bytes_reader.address = inst.args[0]
@@ -404,7 +408,7 @@ class VMFunction(object):
                 elif inst.name == "JMPIF":
                     addresses_to_explore.put((inst.args[0], 0))
                 elif inst.name == "RESETKEY":
-                    key.reset()                
+                    key.reset()
 
                 instructions[inst.address] = inst
 
@@ -471,7 +475,7 @@ class VMFunction(object):
             elif inst.name == "LABEL":
                 section = VMFunctionSection(inst.args[0])
                 sections[section.address] = section
-                section.instructions.append(inst)                
+                section.instructions.append(inst)
             else:
                 section.instructions.append(inst)
         section.end = True
@@ -506,7 +510,7 @@ class VMFunction(object):
                 # For older version
                 #reader.get_cond(lambda x: x.name == "POPF") # flags
                 #assert regs.pop() == "flags"
-                
+
                 # Check reg
                 for i in xrange(4):
                     registers[reader.get_cond(lambda x: x.name == "POPDWORDREG").args[0]] = regs.pop()
@@ -516,7 +520,7 @@ class VMFunction(object):
 
                 reader.get_cond(lambda x: x.name == "POPF") # flags
                 assert regs.pop() == "flags"
-                
+
                 reader.get_cond(lambda x: x.name == "ADDDWORDESP" and x.args[0] == 4)
             elif section.end:
                 continue
@@ -539,7 +543,7 @@ class VMFunction(object):
                     next = reader.get()
                     if next.name == "JMP":
                         assert sections[next.args[0]].end
-                        asminst = self.executable.get_instruction(long(inst.args[0] + self.vm_info.init_handler.encode))                    
+                        asminst = self.executable.get_instruction(long(inst.args[0] + self.vm_info.init_handler.encode))
                         asminst_after = self.executable.get_instruction(asminst.next)
                         assert asminst_after.opcode == "push"
                         assert asminst_after.operand1.is_immediate()
@@ -560,7 +564,7 @@ class VMFunction(object):
                 elif inst.name in vminstruction.CONDITIONAL_JUMPS:
                     inst = vminstruction.VMInstruction(inst.name + "LABEL", inst.args[0])
                 elif inst.name.endswith("ADDRESS") and inst.name[:-len("ADDRESS")] in vminstruction.CONDITIONAL_JUMPS:
-                    assert sections[inst.args[1]].end 
+                    assert sections[inst.args[1]].end
                     inst = vminstruction.VMInstruction(inst.name[:-len("ADDRESS")], inst.args[0])
                 if inst.name == "SETRETN":
                     next = reader.get_cond(lambda x: x.name == "JMP" and sections[x.args[0]].end)
@@ -573,7 +577,7 @@ class VMFunction(object):
                     sectioncode += inst.to_asm(registers) + "\n"
                 inst = reader.get()
             code += sectioncode
-            
+
         if section_counter == 1:
             index = max(max(code.rfind("add esp, 0x"), code.rfind("pop esp")), code.rfind("mov esp, dword [esp]"))
             # Deal with anti-debugging
@@ -607,12 +611,12 @@ class VMFunction(object):
         #print fasm.stdout.read()
         compiled_code = open(output.name, "rb").read()
         os.unlink(output.name)
-        os.unlink(source.name)  
-        
-        return address, compiled_code        
-        
-    
-        
+        os.unlink(source.name)
+
+        return address, compiled_code
+
+
+
     def printfunc(self):
         for inst in self.instructions:
             print inst
@@ -621,7 +625,7 @@ def get_vm(executable, address):
     vm = VMFunction(executable, VMFunctionJumper(executable, address))
     #vm.clean()
     return vm
-        
+
 def get_vm_code(executable, push_inst, jmp_inst):
     vm = VMFunction(executable, push_inst, jmp_inst)
     #print "Cleaning vm.."
@@ -633,7 +637,7 @@ def get_vm_code(executable, push_inst, jmp_inst):
     except:
         vm.printfunc()
         raise
-    
+
 def get_compiled_vm_code(executable, push_inst, jmp_inst, address = None):
     vm = VMFunction(executable, push_inst, jmp_inst)
     vm.clean()
@@ -658,8 +662,8 @@ def get_compiled_vm_code(executable, push_inst, jmp_inst, address = None):
     print fasm.stdout.read()
     compiled_code = open(output.name, "rb").read()
     os.unlink(output.name)
-    os.unlink(source.name)  
-    
+    os.unlink(source.name)
+
     return address, compiled_code
 
 def fix_vms(pe, code_section = 0, vms_section = 3):
@@ -693,4 +697,4 @@ def fix_vms(pe, code_section = 0, vms_section = 3):
                 exe.write(address, "\xeb\x10")
                 exe.write(code_address, compiled_code)
                 #addressd, compil vm.compile_code(address + 0x12)
-                
+
