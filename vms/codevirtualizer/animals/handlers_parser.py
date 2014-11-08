@@ -1,4 +1,5 @@
 from handlers_decompiler import *
+import fish_handlers
 import re
 
 EXPRESSIONS_MACROS = [
@@ -60,7 +61,47 @@ MACROS = [
         ],
         "UpdateEipAndJump(&X, &Y)"
     ),
+    (
+        [
+        "^VAR_1 = ((ReadParameterWord(#NEXT_HANDLER) !SIMPLE_MATH_1 VMStructFieldDword(@KEY1)) !SIMPLE_MATH_2 ^IMM_1)",
+        "VMStructFieldDword(@KEY1) !UPDATE_MATH_3= ^VAR_1",
+        "UpdateEipAndJump(^VAR_1, ^IMM_2)"
+        ],
+        "UpdateEipAndJump(DecodeNextHandler(ReadParameterWord(#NEXT_HANDLER), ^SIMPLE_MATH_1, SimpleOperation(^SIMPLE_MATH_2, ^IMM_1), ^UPDATE_MATH_3), ^IMM_2)"
+    ),
+    (
+        [
+        "^VAR_1 = (ReadParameterWord(#NEXT_HANDLER) !SIMPLE_MATH_1 VMStructFieldDword(@KEY1))",
+        "VMStructFieldDword(@KEY1) !UPDATE_MATH_3= ^VAR_1",
+        "UpdateEipAndJump(^VAR_1, ^IMM_2)"
+        ],
+        "UpdateEipAndJump(DecodeNextHandler(ReadParameterWord(#NEXT_HANDLER), ^SIMPLE_MATH_1, None, ^UPDATE_MATH_3), ^IMM_2)"
+    ),
+    (
+        [
+        "UpdateEipAndJump(((ReadParameterWord(#NEXT_HANDLER) !SIMPLE_MATH_1 VMStructFieldDword(@KEY1)) !SIMPLE_MATH_2 ^IMM_1), ^IMM_2)"
+        ],
+        "UpdateEipAndJump(DecodeNextHandler(ReadParameterWord(#NEXT_HANDLER), ^SIMPLE_MATH_1, SimpleOperation(^SIMPLE_MATH_2, ^IMM_1), ^UPDATE_MATH_3), ^IMM_2)"
+    ),
+    (
+        [
+        "UpdateEipAndJump((ReadParameterWord(#NEXT_HANDLER) !SIMPLE_MATH_1 VMStructFieldDword(@KEY1)), ^IMM_2)",
+        ],
+        "UpdateEipAndJump(DecodeNextHandler(ReadParameterWord(#NEXT_HANDLER), ^SIMPLE_MATH_1, None, ^UPDATE_MATH_3), ^IMM_2)"
+    ),
+
 ]
+
+class NoneExpression(Expression):
+    def get_format(self):
+        return "None"
+
+class Operation(Expression):
+    def __init__(self, op):
+        self.op = op
+
+    def get_format(self):
+        return "Operation(%s)" % self.op
 
 class Macro(Expression):
     def __init__(self, name, parameters):
@@ -135,6 +176,7 @@ def is_constant(string):
     return string[2:].isdigit()
 
 def match_expression(expression, match, params):
+    #print expression, match
     if is_var_name(match):
         var_type, name = match[0], match[1:]
         if var_type == "@" or var_type == "#" or var_type == "$":
@@ -166,6 +208,7 @@ def match_expression(expression, match, params):
         return int(match,16) == expression.value
     else:
         fmt = expression.get_format()
+        #print fmt
         # Try to match the expression with the format
         match_index = 0
         fmt_index = 0
@@ -180,6 +223,7 @@ def match_expression(expression, match, params):
                 assert fmt[fmt_index] == "}"
                 fmt_index += 1
                 child = expression.get_children()[int(n)]
+                #print "Child: " + str(child)
                 if fmt_index == len(fmt):
                     if match_expression(child.get_value(), match[match_index:], nparams):
                         params.update(nparams)
@@ -200,6 +244,29 @@ def match_expression(expression, match, params):
                             return False
                     if not match_expression(child.get_value(), match[start:match_index], nparams):
                         return False
+            elif match[match_index] == "!" and fmt[fmt_index] != match[match_index]:
+                match_index += 1
+                operation_name = ""
+                while ("A" <= match[match_index] <= "Z") or ("0" <= match[match_index] <= "9") or match[match_index] == "_":
+                    operation_name += match[match_index]
+                    match_index += 1
+                # TODO: do dict for those
+                if operation_name.startswith("SIMPLE_MATH_"):
+                    if fmt[fmt_index] in "+-^":
+                        if not nparams.set_specific_var_value(operation_name, Operation(fmt[fmt_index])):
+                            return False
+                        fmt_index += 1
+                    else:
+                        return False
+                elif operation_name.startswith("UPDATE_MATH_"):
+                    if fmt[fmt_index] in "+-^&|":
+                        if not nparams.set_specific_var_value(operation_name, Operation(fmt[fmt_index])):
+                            return False
+                        fmt_index += 1
+                    else:
+                        return False
+                else:
+                    return False
             else:
                 if fmt[fmt_index] != match[match_index]:
                     return False
@@ -211,27 +278,52 @@ def match_expression(expression, match, params):
         return False
 
 def create_macro_result(result_line, params):
-    macro_name = result_line[:result_line.index("(")]
-    macro_params = result_line[result_line.index("(")+1:-1].split(", ")
-    parameters = []
-    for param in macro_params:
-        if is_var_name(param):
-            var_type, name = param[0], param[1:]
+    if result_line.find(" = ") != -1:
+        lvalue, rvalue = result_line.split(" = ")
+        return SetValue(create_macro_result(lvalue, params), create_macro_result(rvalue, params))
+    else:
+        if is_var_name(result_line):
+            var_type, name = result_line[0], result_line[1:]
             if var_type == "@" or var_type == "#" or var_type == "$":
                 if var_type == "@" or var_type == "$":
                     int_val = params.fields[name]
                 else:
                     int_val = params.parameters[name]
-                parameters.append(Immediate(int_val))
+                return Immediate(int_val)
             elif var_type == "&":
-                parameters.append(params.vars[name])
+                if params.vars.has_key(name):
+                    return params.vars[name]
+                else:
+                    return NoneExpression()
             elif var_type == "^":
-                parameters.append(params.specific_vars[name])
-        elif is_constant(param):
-            parameters.append(Immediate(int(param, 16)))
+                if params.specific_vars.has_key(name):
+                    return params.specific_vars[name]
+                else:
+                    return NoneExpression()
+        elif is_constant(result_line):
+            return Immediate(int(result_line, 16))
+        elif result_line == "None":
+            return NoneExpression()
         else:
-            assert False
-    return Macro(macro_name, parameters)
+            macro_name = result_line[:result_line.index("(")]
+            index = result_line.index("(") + 1
+            parameters = []
+            while result_line[index] != ")":
+                # Find end
+                depth = 0
+                param = ''
+                while depth > 0 or (result_line[index:index+2] != ", " and result_line[index] !=")"):
+                    param += result_line[index]
+                    if result_line[index] == "(":
+                        depth += 1
+                    elif result_line[index] == ")":
+                        depth -= 1
+                        assert depth >= 0
+                    index += 1
+                parameters.append(create_macro_result(param, params))
+                if result_line[index:index+2] == ", ":
+                    index += 2
+            return Macro(macro_name, parameters)
 
 def replace_macros_in_expression(expression, params):
     changed = False
@@ -255,20 +347,48 @@ def replace_macros_in_instructions(instructions, params):
             changed |= replace_macros_in_instructions(instruction.instructions, params)
     return changed
 
-def replace_instructions_macros(instructions, index, params):
+def match_instructions(instructions, index, lines, lines_index, params, pad = ''):
+    nparams = params.copy()
+    while index < len(instructions) and lines_index < len(lines):
+        if not lines[lines_index].startswith(pad):
+            return False, index, lines_index
+        # Now, If we still in the wrong indentation, we will return error because the line will starts with padding
+        line = lines[lines_index][len(pad):]
+        optional_line = False
+        if line.startswith("["):
+            optional_line = True
+            line = line[1:-1]
+        if not match_expression(instructions[index], line, nparams):
+            if optional_line:
+                lines_index += 1
+                continue
+            return False, index, lines_index
+        index += 1
+        lines_index += 1
+        if isinstance(instructions[index-1], ConditionBlock):
+            match, index, lines_index = match_instructions(instructions, index, lines, lines_index, nparams, pad + ' '*4)
+            if not match:
+                return False, index, lines_index
+    params.update(nparams)
+    return True, index, lines_index
+
+def replace_instructions_macros(handler, index, params):
     changed = False
+    instructions = handler.get_instructions()
     # TODO: if and else conditions
     for lines, result in MACROS:
         if len(lines) + index > len(instructions):
             continue
         nparams = params.copy()
-        match = True
-        for i in xrange(len(lines)):
-            if not match_expression(instructions[index+i], lines[i], nparams):
-                match = False
-                break
+        match, end_index, lines_end_index = match_instructions(instructions, index, lines, 0, nparams)
+        if lines_end_index != len(lines):
+            continue
         if match:
+            for line in instructions[index:index+len(lines)]:
+                handler.make_unvisible(line)
             instructions[index:index+len(lines)] = [create_macro_result(result, nparams)]
+            handler.update_instruction(instructions[index])
+            handler.clean_instructions()
             params.update_global(nparams)
             changed = True
     return changed
@@ -281,7 +401,7 @@ def parse_handler(handler, fields, parameters):
     while nchanged:
         nchanged = False
         for i in xrange(len(handler.get_instructions())):
-            if replace_instructions_macros(handler.get_instructions(), i, params):
+            if replace_instructions_macros(handler, i, params):
                 nchanged = True
                 changed = True
                 break # We changed the lines count
@@ -291,6 +411,15 @@ def parse_handler(handler, fields, parameters):
     return changed
 
 def parse_fish_handler(handler, fields, parameters):
+    instructions = handler.get_instructions()
+    for name, lines in fish_handlers.HANDLERS.iteritems():
+        params = Params(fields, parameters)
+        match, index, lines_index = match_instructions(instructions, 0, lines, 0, params)
+        if match and index == len(instructions) and lines_index == len(lines):
+            fields.update(params.fields)
+            parameters.update(params.parameters)
+            # TODO return more stutfs (parameters read cases etc..)
+            return name
     return None
 
 

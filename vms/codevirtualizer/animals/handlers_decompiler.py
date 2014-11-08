@@ -632,11 +632,11 @@ class Handler(object):
                 inst.visible = True
                 inst.reg_var.proxies.update(set([inst]))
                 if not isinstance(inst.value.get_value(), Variable):
-                    if len(inst.reg_var.proxies) == 2:
+                    if len(inst.reg_var.proxies) >= 2:
                         for i in list(inst.reg_var.proxies):
                             self.make_visible(i.reg_var) # In case it is linked to a different reg val
-                    elif len(inst.reg_var.proxies) > 2:
-                        self.make_visible(inst.reg_var)
+                    #elif len(inst.reg_var.proxies) > 2:
+                    #    self.make_visible(inst.reg_var)
                 for i in list(inst.reg_var.proxies):
                     if len(i.reg_var.visible_if_used) > 0:
                         self.make_visible(i.reg_var)
@@ -646,6 +646,19 @@ class Handler(object):
                     continue
                 inst.used_instructions.append(instruction)
                 self.make_visible(inst)
+
+    def update_instruction(self, instruction):
+        if isinstance(instruction, SetValueOperation) and isinstance(instruction.lvalue, Variable):
+            # TODO: kinda hackish right now. Does it always work as expected?
+            for proxy in instruction.lvalue.proxies:
+                proxy.value = instruction.rvalue
+            if len(instruction.lvalue.visible_if_used) or len(instruction.lvalue.proxies) >= 2:
+                self.make_visible(instruction.lvalue)
+            else:
+                self.make_unvisible(instruction.lvalue)
+        else:
+            self.make_visible(instruction)
+
 
     def make_unvisible(self, instruction):
         if isinstance(instruction, SetValueOperation):

@@ -160,7 +160,7 @@ class VMHandlers(object):
             if fix_handlers:
                 handler_address = handler_address + vm_info.init_handler.base_address
             #if handler_address == 0x407c06:
-            #if handler_address == 0x40d0ccL:
+            #if handler_address in (0x40D054, 0x040983E):
             func = handlers_decompiler.Handler(instruction.Function(executable,handler_address))
             self.handlers[i] = VMOpcodeHandler(func)
         print "Finish decompiling handles"
@@ -175,10 +175,13 @@ class VMHandlers(object):
                     changed |= handlers_parser.parse_handler(handler.handler, fields, handler.parameters)
                     handler_info = handlers_parser.parse_fish_handler(handler.handler, fields, handler.parameters)
                     if handler_info != None:
-                        fields.name = handler_info.name
+                        handler.name = handler_info
 
         for handler in self.handlers.itervalues():
             print "---------------------------------------------------"
+            if handler.name:
+                print handler.name
+                print "@@@@@@@@@@@@@@@@@@@@@"
             handler.handler.print_instructions()
         assert False
 
