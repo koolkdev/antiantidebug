@@ -1,5 +1,8 @@
 from handlers_decompiler import *
 
+class VMStruct(Expression): # Not used right now
+    def __str__(self):
+        return "VMStruct"
 
 class VMStructFieldOffset(UnaryExpression):
     def __str__(self):
@@ -18,9 +21,9 @@ class VMStructField(ValueOf):
 def vm_struct_field_offset(expression):
     if not isinstance(expression, Add):
         return None
-    if type(expression.lvalue.get_value()) == VMStruct:
+    if expression.lvalue.get_value().equals(Register("ebp")):
         return VMStructFieldOffset(expression.rvalue.get_value())
-    if type(expression.rvalue.get_value()) == VMStruct:
+    if expression.rvalue.get_value().equals(Register("ebp")):
         return VMStructFieldOffset(expression.lvalue.get_value())
     return None
 

@@ -210,10 +210,6 @@ class DecValue(SetValueUnaryOperation):
     def __str__(self):
         return "%s--" % str(self.lvalue)
 
-class VMStruct(Expression):
-    def __str__(self):
-        return "VMStruct"
-
 class Add(BinaryOperationExpression):
     def __init__(self, lvalue, rvalue):
         BinaryOperationExpression.__init__(self, lvalue, rvalue, "+", True)
@@ -495,14 +491,15 @@ class State(object):
             self.stack_instructions = list(copy_state.stack_instructions)
             self.flags = copy_state.flags
             self.has_flags = copy_state.has_flags
+            self.handler = copy_state.handler
         else:
             self.registers = {"eax": Invalid(),
-                             "ecx": Invalid(),
-                             "edx": Invalid(),
-                             "ebx": Invalid(),
-                             "ebp": VMStruct(),
-                             "esi": Invalid(),
-                             "edi": Invalid(),
+                             "ecx": Register("ecx"),
+                             "edx": Register("edx"),
+                             "ebx": Register("ebx"),
+                             "ebp": Register("ebp"),
+                             "esi": Register("esi"),
+                             "edi": Register("edi"),
                              "esp": Esp()}
             self.registers_variables = {"eax": Variable("eax"),
                                                      "ecx": Variable("ecx"),
@@ -517,6 +514,7 @@ class State(object):
             self.stack_instructions = list()
             self.flags = Invalid()
             self.has_flags = False
+            self.handler = None
 
     def invalidate_diff(self, other):
         for k, v in self.registers.iteritems():
@@ -537,7 +535,7 @@ class State(object):
             if self.has_flags:
                 assert len(self.stack) + 1 == len(other.stack)
                 assert len(self.stack) == 0 or len(self.stack) == 1
-                self.make_visible(other.stack[-1])
+                self.handler.make_visible(other.stack[-1])
                 assert isinstance(other.stack[-1], FlagsOf) or isinstance(other.stack[-1], Variable)
                 #other.stack_variables[-1].name = 1
                 for i in other.stack_variables[-1].instructions:
@@ -554,7 +552,7 @@ class State(object):
             else:
                 for insts in other.stack_instructions[len(self.stack):]:
                     for i in insts:
-                        self.make_visible(i)
+                        self.handler.make_visible(i)
         if not self.flags.equals(other.flags):
             self.flags = Invalid()
 
@@ -587,6 +585,7 @@ class State(object):
 class Handler(object):
     def __init__(self, function):
         state = State()
+        state.handler = self
         nstate, instructions = self._get_handler_block(function.start_block, state)
         state.invalidate_diff(nstate) # For push instructions taking effect
         self.instructions = instructions
@@ -640,6 +639,8 @@ class Handler(object):
                         self.make_visible(i.reg_var)
 
             if isinstance(inst, Variable):
+                if isinstance(instruction, SetValueOperation) and instruction.lvalue == inst:
+                    continue
                 inst.used_instructions.append(instruction)
                 self.make_visible(inst)
 
@@ -677,6 +678,8 @@ class Handler(object):
                         self.make_unvisible(i.reg_var)
 
             if isinstance(inst, Variable):
+                if isinstance(instruction, SetValueOperation) and instruction.lvalue == inst:
+                    continue
                 inst.used_instructions.remove(instruction)
                 if len(inst.used_instructions) == 0:
                     self.make_unvisible(inst)
