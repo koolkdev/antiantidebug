@@ -17,32 +17,6 @@ class VMHandler(object):
     def __init__(self, reader):
         pass
 
-class VMStructField(object):
-    def __init__(self, name, size):
-        self.name = name
-        self.size = size
-
-class VMStructFieldDword(VMStructField):
-    def __init__(self, name):
-        VMStructField.__init__(self, name, 4)
-
-class VMStruct(object):
-    def __init__(self):
-        self.fields = {}
-
-    def add_field(self, offset, field):
-        # TODO: verify
-        self.fields[offset] = field
-
-    def get_field(self, offset):
-        return self.fields.get(offset)
-
-    def get_field_offset_by_name(self, name):
-        for offset, field in self.fields.iteritems():
-            if field.name == name:
-                return offset
-        return None
-
 class VMInit(VMHandler):
     cache = {}
     def __init__(self, vm_info, executable, address):
@@ -79,7 +53,7 @@ class VMInit(VMHandler):
         # mov ecx, 1
         reader.get_cond(lambda x: x.opcode == "mov" and x.operand1.is_reg("ecx") and x.operand2.is_immediate(1))
         # mov ebx, X
-        vm_info.struct.add_field(reader.get_cond(lambda x: x.opcode == "mov" and x.operand1.is_reg("ebx") and x.operand2.is_immediate()).operand2.value, VMStructFieldDword("LOCK"))
+        vm_info.struct_fields["LOCK"] = reader.get_cond(lambda x: x.opcode == "mov" and x.operand1.is_reg("ebx") and x.operand2.is_immediate()).operand2.value
         # xor eax, eax
         lock_loop_start = reader.get_cond(lambda x: x.opcode == "xor" and x.operand1.is_reg("eax") and x.operand2.is_reg("eax")).address
         # cmpxchg [ebp+ebx], ecx
@@ -94,17 +68,17 @@ class VMInit(VMHandler):
         reader.get_cond(lambda x: x.address == lock_loop_end and x.opcode == "pop" and x.operand1.is_reg("ecx"))
 
         # mov ebx, X
-        vm_info.struct.add_field(reader.get_cond(lambda x: x.opcode == "mov" and x.operand1.is_reg("ebx") and x.operand2.is_immediate()).operand2.value, VMStructFieldDword("BASE_ADDRESS"))
+        vm_info.struct_fields["BASE_ADDRESS"] = reader.get_cond(lambda x: x.opcode == "mov" and x.operand1.is_reg("ebx") and x.operand2.is_immediate()).operand2.value
         # mov [ebp+ebx], ecx
         reader.get_cond(lambda x: x.opcode == "mov" and x.operand2.is_reg("ecx") and x.operand1.is_memory() and x.operand1.base == "ebp" and x.operand1.index == "ebx" and x.operand1.displacement == 0 and x.operand1.scale == 0)
 
         # mov ebx, X
-        vm_info.struct.add_field(reader.get_cond(lambda x: x.opcode == "mov" and x.operand1.is_reg("ebx") and x.operand2.is_immediate()).operand2.value, VMStructFieldDword("BASE_ADDRESS"))
+        vm_info.struct_fields["ORIGINAL_BASE_ADDRESS"] = reader.get_cond(lambda x: x.opcode == "mov" and x.operand1.is_reg("ebx") and x.operand2.is_immediate()).operand2.value
         # mov [ebp+ebx], X
         self.original_base_address = reader.get_cond(lambda x: x.opcode == "mov" and x.operand2.is_immediate() and x.operand1.is_memory() and x.operand1.base == "ebp" and x.operand1.index == "ebx" and x.operand1.displacement == 0 and x.operand1.scale == 0).operand2.value
 
         # mov ebx, X
-        vm_info.struct.add_field(reader.get_cond(lambda x: x.opcode == "mov" and x.operand1.is_reg("ebx") and x.operand2.is_immediate()).operand2.value, VMStructFieldDword("EIP"))
+        vm_info.struct_fields["EIP"] = reader.get_cond(lambda x: x.opcode == "mov" and x.operand1.is_reg("ebx") and x.operand2.is_immediate()).operand2.value
         # mov eax, [esp+0x28]
         reader.get_cond(lambda x: x.opcode == "mov" and x.operand1.is_reg("eax") and x.operand2.is_memory() and x.operand2.base == "esp" and x.operand2.index == None and x.operand2.displacement == 0x28 and x.operand2.scale == 0)
         # add eax, ecx
@@ -118,7 +92,7 @@ class VMInit(VMHandler):
         # add eax ecx
         reader.get_cond(lambda x: x.opcode == "add" and x.operand1.is_reg("eax") and x.operand2.is_reg("ecx"))
         # mov ebx, X
-        vm_info.struct.add_field(reader.get_cond(lambda x: x.opcode == "mov" and x.operand1.is_reg("ebx") and x.operand2.is_immediate()).operand2.value, VMStructFieldDword("HANDLERS_ADDRESS"))
+        vm_info.struct_fields["HANDLERS"] = reader.get_cond(lambda x: x.opcode == "mov" and x.operand1.is_reg("ebx") and x.operand2.is_immediate()).operand2.value
         # mov edx, [ebp+ebx]
         reader.get_cond(lambda x: x.opcode == "mov" and x.operand1.is_reg("edx") and x.operand2.is_memory() and x.operand2.base == "ebp" and x.operand2.index == "ebx" and x.operand2.displacement == 0 and x.operand2.scale == 0)
         # cmp edx, eax
@@ -168,35 +142,15 @@ class VMInit(VMHandler):
 
 
 class VMOpcodeHandler(VMHandler):
-    def __init__(self, reader):
-        try:
-            self.read = VMReadInfo(reader)
-        except cleaner.CleanerException, e:
-            self.read = None
-
-        self.insts = []
-
-        while True:
-            inst = reader.get()
-            if inst.opcode == "lodsb":
-                break
-            self.insts.append(inst)
-            if inst.opcode == "ret":
-                break
-
-    def assign_name(self, name):
-        self.name = name
-        #del self.insts
-
-    def get_vm_instruction(self, bytes_reader, key):
-        if self.read != None:
-            return vminstruction.VMInstruction(self.name, self.read.decode(bytes_reader, key))
-        return vminstruction.VMInstruction(self.name)
+    def __init__(self, handler):
+        self.handler = handler
+        self.parameters = {}
+        self.name = None
 
 class VMHandlers(object):
     def __init__(self, executable, vm_info):
         #clean = cleaner.Cleaner(executable)
-        fix_handlers = executable.read_dword(vm_info.init_handler.vm_struct + vm_info.struct.get_field_offset_by_name("HANDLERS_ADDRESS")) != vm_info.init_handler.handlers_address
+        fix_handlers = executable.read_dword(vm_info.init_handler.vm_struct + vm_info.struct_fields["HANDLERS"]) != vm_info.init_handler.handlers_address
 
         self.handlers = {}
         handlers_to_process = Queue.Queue()
@@ -205,62 +159,35 @@ class VMHandlers(object):
             handler_address = executable.read_dword(vm_info.init_handler.handlers_address + i * 4)
             if fix_handlers:
                 handler_address = handler_address + vm_info.init_handler.base_address
-            if handler_address == 0x40a6fbL:
-                print "---------------------------------------------------"
-                print hex(handler_address)
-                func = handlers_decompiler.Handler(instruction.Function(executable,handler_address))
-                #func.make_unvisible(func.get_instructions()[11])
-                #func.clean_instructions()
-                handlers_parser.parse_handler(func)
-                func.print_instructions()
-            #self.handlers[i] = VMOpcodeHandler(executable.get_reader(handler_address))
-            #handlers_to_process.put(self.handlers[i])
-        assert False
-        variables = {}
-        processed = []
-        while not handlers_to_process.empty():
-            handler = handlers_to_process.get()
-            # Try to match with HANDLERS
-            matches = cischandlers.find_matches(handler, variables)
-            if matches:
-                if len(matches) == 1:
-                    handler.assign_name(matches[0][0])
-                    variables = matches[0][1]
-                else:
-                    if processed.count(handler) > 10:
-                        raise Exception("Couldn't determine handler")
-                    processed.append(handler)
-                    handlers_to_process.put(handler)
-            else:
-                # So it is math operation, let's find it
-                if handler.read != None:
-                    if len(handler.insts) == 148:
-                        handler.assign_name("UKNOWNCHECK")
-                        continue
-                    elif len(handler.insts) == 150:
-                        handler.assign_name("UKNOWNCHECK")
-                        continue
-                    else:
-                        print handler.insts
-                        raise Exception("Undetected handler")
-                # Detect math operation
-                operation_name = cischandlers.find_math_operation(handler)
+            #if handler_address == 0x407c06:
+            #if handler_address == 0x40d0ccL:
+            func = handlers_decompiler.Handler(instruction.Function(executable,handler_address))
+            self.handlers[i] = VMOpcodeHandler(func)
+        print "Finish decompiling handles"
 
-                try:
-                    assert operation_name != None
-                except:
-                    for inst in handler.insts:
-                        print hex(inst.address)
-                        print inst
-                    raise
-                handler.assign_name(operation_name)
+        fields = dict(vm_info.struct_fields)
+
+        changed = True
+        while changed:
+            changed = False
+            for handler in self.handlers.itervalues():
+                if handler.name == None:
+                    changed |= handlers_parser.parse_handler(handler.handler, fields, handler.parameters)
+                    handler_info = handlers_parser.parse_fish_handler(handler.handler, fields, handler.parameters)
+                    if handler_info != None:
+                        fields.name = handler_info.name
+
+        for handler in self.handlers.itervalues():
+            print "---------------------------------------------------"
+            handler.handler.print_instructions()
+        assert False
 
         # Good, we have handlers now
 
 class VMInfo(object):
     cache = {}
     def __init__(self, executable, vm_address):
-        self.struct = VMStruct()
+        self.struct_fields = {}
         self.init_handler = VMInit(self, executable, vm_address)
         self.handlers = VMHandlers(executable, self)
 

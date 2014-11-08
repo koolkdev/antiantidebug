@@ -23,8 +23,11 @@ class Expression(object):
     def contains(self, expression):
         return self.equals(expression)
 
-    def __str__(self):
+    def get_format(self):
         return ""
+
+    def __str__(self):
+        return self.get_format().format(*[str(x) for x in self.get_children()])
 
 class UnaryExpression(Expression):
     def __init__(self, value):
@@ -48,8 +51,8 @@ class UnaryOperationExpression(UnaryExpression):
         UnaryExpression.__init__(self, value)
         self.op_str = op_str
 
-    def __str__(self):
-        return "(%s%s)" % (self.op_str, str(self.value))
+    def get_format(self):
+        return "(%s{0})" % self.op_str
 
 class BinaryExpression(Expression):
     def __init__(self, lvalue, rvalue):
@@ -82,8 +85,8 @@ class BinaryOperationExpression(BinaryExpression):
             ((self.lvalue.equals(expression.lvalue) and self.rvalue.equals(expression.rvalue)) or \
              (self.swappable and self.rvalue.equals(expression.lvalue) and self.lvalue.equals(expression.rvalue)))
 
-    def __str__(self):
-        return "(%s %s %s)" % (str(self.lvalue), self.op_str, str(self.rvalue))
+    def get_format(self):
+        return "({0} %s {1})" % self.op_str
 
 class Invalid(Expression):
     def __str__(self):
@@ -96,7 +99,7 @@ class Immediate(Expression):
     def equals(self, expression):
         return Expression.equals(self, expression) and self.value == expression.value
 
-    def __str__(self):
+    def get_format(self):
         return "0x%X" % self.value
 
 class ValueOf(UnaryExpression):
@@ -107,14 +110,14 @@ class ValueOf(UnaryExpression):
     def equals(self, expression):
         return UnaryExpression.equals(self, expression) and self.size == expression.size
 
-    def __str__(self):
+    def get_format(self):
         if self.size == 1:
             s = "BYTE"
         if self.size == 2:
             s = "WORD"
         if self.size == 4:
             s = "DWORD"
-        return "*(%s*)%s" % (s, str(self.value))
+        return "*(%s*){0}" % s
 
 class NonVisible(object):
     def __init__(self):
@@ -126,8 +129,8 @@ class SetValueOperation(BinaryExpression, NonVisible):
         NonVisible.__init__(self)
         self.op_str = op_str
 
-    def __str__(self):
-        return "%s %s= %s" % (str(self.lvalue), self.op_str, str(self.rvalue))
+    def get_format(self):
+        return "{0} %s= {1}" % self.op_str
 
 class SetValue(SetValueOperation):
     def __init__(self, lvalue, rvalue):
@@ -185,8 +188,8 @@ class SetValueUnaryOperation(SetValueOperation):
     def __init__(self, value, op_str):
         SetValueOperation.__init__(self, value, value, op_str)
 
-    def __str__(self):
-        return "%s = %s%s" % (str(self.lvalue), self.op_str, str(self.rvalue))
+    def get_format(self):
+        return "{0} = %s{1}" % self.op_str
 
 class NotValue(SetValueUnaryOperation):
     def __init__(self, value):
@@ -200,15 +203,15 @@ class IncValue(SetValueUnaryOperation):
     def __init__(self, value):
         SetValueUnaryOperation.__init__(self, value, "++")
 
-    def __str__(self):
-        return "%s++" % str(self.lvalue)
+    def get_format(self):
+        return "{0}++"
 
 class DecValue(SetValueUnaryOperation):
     def __init__(self, value):
         SetValueUnaryOperation.__init__(self, value, "--")
 
-    def __str__(self):
-        return "%s--" % str(self.lvalue)
+    def get_format(self):
+        return "{0}--"
 
 class Add(BinaryOperationExpression):
     def __init__(self, lvalue, rvalue):
@@ -278,8 +281,8 @@ class BinaryCompressionExpression(BinaryOperationExpression):
     def __init__(self, lvalue, rvalue, op_str, swappable = False):
         BinaryOperationExpression.__init__(self, lvalue, rvalue, op_str, swappable)
 
-    def __str__(self):
-        return "%s(%s, %s)" % (self.op_str, str(self.lvalue), str(self.rvalue))
+    def get_format(self):
+        return "%s({0}, {1})" % self.op_str
 
 class Cmp(BinaryCompressionExpression):
     def __init__(self, lvalue, rvalue):
@@ -329,8 +332,8 @@ class NotCond(UnaryOperationExpression, ConditionExpression):
         return self.value
 
 class Jump(UnaryExpression):
-    def __str__(self):
-        return "JUMP(%s)" % (str(self.value))
+    def get_format(self):
+        return "Jump({0})"
 
 class ConditionBlock(object):
     def __init__(self, instructions):
@@ -341,8 +344,8 @@ class If(UnaryExpression, ConditionBlock):
         UnaryExpression.__init__(self, value)
         ConditionBlock.__init__(self, instructions)
 
-    def __str__(self):
-        return "If(%s)" % (str(self.value))
+    def get_format(self):
+        return "If({0})"
 
 class Else(Expression, ConditionBlock):
     def __init__(self, instructions):
@@ -363,7 +366,7 @@ class Variable(Expression):
     def equals(self, other):
         return Expression.equals(self, other) and self.name== other.name
 
-    def __str__(self):
+    def get_format(self):
         return "var_%s"  % self.name
 
 class VariableProxy(UnaryExpression):
@@ -389,16 +392,16 @@ class VariableProxy(UnaryExpression):
         return str(self.get_value())
 
 class Esp(Expression):
-    def __str__(self):
+    def get_format(self):
         return "ESP"
 
 class Flags(Expression):
-    def __str__(self):
+    def get_format(self):
         return "flags"
 
 class FlagsOf(UnaryExpression):
-    def __str__(self):
-        return "Flags(%s)" % str(self.value)
+    def get_format(self):
+        return "Flags({0})"
 
 class Register(Expression):
     def __init__(self, value):
@@ -407,15 +410,15 @@ class Register(Expression):
     def equals(self, other):
         return Expression.equals(self, other) and self.value == other.value
 
-    def __str__(self):
+    def get_format(self):
         return "%s" % self.value
 
 class Pop(Expression):
-    def __str__(self):
+    def get_format(self):
         return "Pop()"
 
 class PopWord(Expression):
-    def __str__(self):
+    def get_format(self):
         return "PopWord()"
 
 class Push(UnaryExpression, NonVisible):
@@ -423,16 +426,16 @@ class Push(UnaryExpression, NonVisible):
         UnaryExpression.__init__(self, value)
         NonVisible.__init__(self)
 
-    def __str__(self):
-        return "Push(%s)" % str(self.value)
+    def get_format(self):
+        return "Push({0})"
 
 class PushWord(UnaryExpression, NonVisible):
     def __init__(self, value):
         UnaryExpression.__init__(self, value)
         NonVisible.__init__(self)
 
-    def __str__(self):
-        return "PushWord(%s)" % str(self.value)
+    def get_format(self):
+        return "PushWord({0})"
 
 class Return(Expression):
     def __init__(self, value):
@@ -441,7 +444,7 @@ class Return(Expression):
     def equals(self, other):
         return Expression.equals(self, other) and self.value == other.value
 
-    def __str__(self):
+    def get_format(self):
         return "Return(%x)" % self.value
 
 class Conversion(UnaryExpression):
@@ -457,18 +460,18 @@ class Conversion(UnaryExpression):
         if self.size == 4:
             return "DWORD"
 
-    def __str__(self):
-        return "(%s)%s" % (self._get_size_name(), str(self.value))
+    def get_format(self):
+        return "(%s){0}" % self._get_size_name()
 
 class UnsignedConversion(Conversion):
     pass
 
 class SignedConversion(Conversion):
-    def __str__(self):
-        return "(S%s)%s" % (self._get_size_name(), str(self.value))
+    def get_format(self):
+        return "(S%s){0}" % self._get_size_name()
 
 class Std(Expression):
-    def __str__(self):
+    def get_format(self):
         return "Std()"
 
 def merge_variables(var1, var2):
