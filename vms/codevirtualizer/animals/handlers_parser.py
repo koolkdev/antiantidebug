@@ -277,10 +277,10 @@ def match_expression(expression, match, params):
             return True
         return False
 
-def create_macro_result(result_line, params):
+def create_macro_result(result_line, params, left = False):
     if result_line.find(" = ") != -1:
         lvalue, rvalue = result_line.split(" = ")
-        return SetValue(create_macro_result(lvalue, params), create_macro_result(rvalue, params))
+        return SetValue(create_macro_result(lvalue, params, True), create_macro_result(rvalue, params))
     else:
         if is_var_name(result_line):
             var_type, name = result_line[0], result_line[1:]
@@ -291,12 +291,15 @@ def create_macro_result(result_line, params):
                     int_val = params.parameters[name]
                 return Immediate(int_val)
             elif var_type == "&":
+                # TODO: return variable proxy if needed
                 if params.vars.has_key(name):
                     return params.vars[name]
                 else:
                     return NoneExpression()
             elif var_type == "^":
                 if params.specific_vars.has_key(name):
+                    if not left and name.startswith("VAR_"):
+                        return VariableProxy(params.vars[name], None) # The None should be fixed on handler.update_instruction
                     return params.specific_vars[name]
                 else:
                     return NoneExpression()

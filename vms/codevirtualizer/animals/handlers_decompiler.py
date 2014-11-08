@@ -652,7 +652,7 @@ class Handler(object):
             # TODO: kinda hackish right now. Does it always work as expected?
             for proxy in instruction.lvalue.proxies:
                 proxy.value = instruction.rvalue
-            if len(instruction.lvalue.visible_if_used) or len(instruction.lvalue.proxies) >= 2:
+            if len(instruction.lvalue.visible_if_used) or len(instruction.lvalue.proxies) >= 2 or len(instruction.lvalue.used_instructions):
                 self.make_visible(instruction.lvalue)
             else:
                 self.make_unvisible(instruction.lvalue)
@@ -690,14 +690,14 @@ class Handler(object):
                     inst.visible = False
                     inst.reg_var.proxies.remove(inst)
                 for i in list(inst.reg_var.proxies):
-                    if len(i.reg_var.visible_if_used) == 0 and len(inst.reg_var.proxies) < 2:
+                    if len(i.reg_var.visible_if_used) == 0 and len(i.reg_var.proxies) < 2 and len(i.reg_var.used_instructions) == 0:
                         self.make_unvisible(i.reg_var)
 
             if isinstance(inst, Variable):
                 if isinstance(instruction, SetValueOperation) and instruction.lvalue == inst:
                     continue
                 inst.used_instructions.remove(instruction)
-                if len(inst.used_instructions) == 0:
+                if len(inst.visible_if_used) == 0 and len(inst.proxies) < 2 and len(inst.used_instructions) == 0:
                     self.make_unvisible(inst)
 
     def _get_handler_block(self, block, state, end = None, one_block = False):
