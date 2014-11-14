@@ -2,6 +2,12 @@ from handlers_decompiler import *
 import fish_handlers
 import re
 
+GROUPS = {
+    "SIMPLE_MATH": ["+", "-", "^"],
+    "UPDATE_MATH": ["+", "-", "^", "&", "|"],
+    "READ_PARAMETER": ["ReadParameterByte", "ReadParameterWord", "ReadParameterDword"],
+}
+
 EXPRESSIONS_MACROS = [
     (
         "(ebp + &X)",
@@ -25,19 +31,65 @@ EXPRESSIONS_MACROS = [
     ),
     (
         "*(BYTE*)(VMStructFieldDword(@EIP) + &X)",
-        "ReadParameterByte(&X)"
+        "ReadParameterByte(&X, DecodingInfo(None, None, None, None, None, None, None, None, None))"
     ),
     (
         "*(WORD*)(VMStructFieldDword(@EIP) + &X)",
-        "ReadParameterWord(&X)"
+        "ReadParameterWord(&X, DecodingInfo(None, None, None, None, None, None, None, None, None))"
     ),
     (
         "*(DWORD*)(VMStructFieldDword(@EIP) + &X)",
-        "ReadParameterDword(&X)"
-    )
+        "ReadParameterDword(&X, DecodingInfo(None, None, None, None, None, None, None, None, None))"
+    ),
+
+    (
+        "(!READ_PARAMETER_1(^IMM_1, DecodingInfo(None, None, None, None, None, None, None, None, None)) !SIMPLE_MATH_1 VMStructFieldDword(@KEY1))",
+        "!READ_PARAMETER_1(^IMM_1, DecodingInfo(Operation(!SIMPLE_MATH_1), None, None, None, None, None, None, None, None))"
+    ),
+    (
+        "(!READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, None, None, None, None, None, None, None, None)) !SIMPLE_MATH_1 VMStructFieldDword(@KEY2))",
+        "!READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, Operation(!SIMPLE_MATH_1), None, None, None, None, None, None, None))"
+    ),
+    (
+        "(!READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, &X2, None, None, None, None, None, None, None)) !SIMPLE_MATH_1 VMStructFieldDword(@KEY6))",
+        "!READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, &X2, None, Operation(!SIMPLE_MATH_1), None, None, None, None, None))"
+    ),
+    (
+        "(!READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, None, None, None, None, None, None, None, None)) !SIMPLE_MATH_1 VMStructFieldDword(@KEY4))",
+        "!READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, None, Operation(!SIMPLE_MATH_1), None, None, None, None, None, None))"
+    ),
+    (
+        "(!READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, None, None, None, None, None, None, None, None)) !SIMPLE_MATH_1 ^IMM_1)",
+        "!READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, None, None, None, SimpleOperation(Operation(!SIMPLE_MATH_1), ^IMM_1), None, None, None, None))"
+    ),
+    (
+        "(!READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, &X2, &X3, &X4, &X5, &X6, &X7, None, None)) !SIMPLE_MATH_1 VMStructFieldDword(@KEY3))",
+        "!READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, &X2, &X3, &X4, &X5, &X6, &X7, Operation(!SIMPLE_MATH_1), None))"
+    ),
 ]
 
 MACROS = [
+    (
+        [
+        "^VAR_1 = !READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, &X2, &X3, &X4, &X5, None, None, None, None))",
+        "VMStructFieldDword(@KEY1) !UPDATE_MATH_1= ^VAR_1"
+        ],
+        "^VAR_1 = !READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, &X2, &X3, &X4, &X5, Operation(!UPDATE_MATH_1), None, None, None))"
+    ),
+    (
+        [
+        "^VAR_1 = !READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, &X2, &X3, &X4, &X5, &X6, None, None, None))",
+        "VMStructFieldDword(@KEY2) !UPDATE_MATH_2= ^IMM_2",
+        ],
+        "^VAR_1 = !READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, &X2, &X3, &X4, &X5, &X6, SimpleOperation(Operation(!UPDATE_MATH_2), ^IMM_2), None, None))"
+    ),
+    (
+        [
+        "^VAR_1 = !READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, &X2, &X3, &X4, &X5, &X6, &X7, &X8, None))",
+        "VMStructFieldDword(@KEY3) !UPDATE_MATH_2= ^IMM_2",
+        ],
+        "^VAR_1 = !READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, &X2, &X3, &X4, &X5, &X6, &X7, &X8, SimpleOperation(Operation(!UPDATE_MATH_2), ^IMM_2)))"
+    ),
     (
         [
         "VMStructFieldDword(@EIP) += &Y",
@@ -61,6 +113,9 @@ MACROS = [
         ],
         "UpdateEipAndJump(&X, &Y)"
     ),
+]
+
+"""
     (
         [
         "^VAR_1 = ((ReadParameterWord(#NEXT_HANDLER) !SIMPLE_MATH_1 VMStructFieldDword(@KEY1)) !SIMPLE_MATH_2 ^IMM_1)",
@@ -90,18 +145,18 @@ MACROS = [
         "UpdateEipAndJump(DecodeNextHandler(ReadParameterWord(#NEXT_HANDLER), ^SIMPLE_MATH_1, None, ^UPDATE_MATH_3), ^IMM_2)"
     ),
 
-]
+]"""
 
 class NoneExpression(Expression):
     def get_format(self):
         return "None"
 
-class Operation(Expression):
-    def __init__(self, op):
-        self.op = op
+class Str(Expression):
+    def __init__(self, value):
+        self.value = value
 
     def get_format(self):
-        return "Operation(%s)" % self.op
+        return str(self.value)
 
 class Macro(Expression):
     def __init__(self, name, parameters):
@@ -129,11 +184,13 @@ class Params(object):
         self.parameters = dict(parameters)
         self.vars = {}
         self.specific_vars = {}
+        self.group_vars = {}
 
     def copy(self):
         nparams = Params(self.fields, self.parameters)
         nparams.vars = dict(self.vars)
         nparams.specific_vars = dict(self.specific_vars)
+        nparams.group_vars = dict(self.group_vars)
         return nparams
 
     def update(self, other):
@@ -141,6 +198,7 @@ class Params(object):
         self.parameters.update(other.parameters)
         self.vars.update(other.vars)
         self.specific_vars.update(other.specific_vars)
+        self.group_vars.update(other.group_vars)
 
     def update_global(self, other):
         self.fields.update(other.fields)
@@ -165,8 +223,11 @@ class Params(object):
     def set_specific_var_value(self, name, value):
         return self._set_dict_value(self.specific_vars, name, value, comp = lambda x,y: x.equals(y))
 
+    def set_group_var_value(self, name, value):
+        return self._set_dict_value(self.group_vars, name, value, comp = lambda x,y: x.equals(y))
+
 def is_var_name(string):
-    if string[0] not in "@#$^&":
+    if string[0] not in "!@#$^&":
         return False
     return re.subn("[^_A-Z0-9]","",string[1:])[1] == 0
 
@@ -250,22 +311,18 @@ def match_expression(expression, match, params):
                 while ("A" <= match[match_index] <= "Z") or ("0" <= match[match_index] <= "9") or match[match_index] == "_":
                     operation_name += match[match_index]
                     match_index += 1
-                # TODO: do dict for those
-                if operation_name.startswith("SIMPLE_MATH_"):
-                    if fmt[fmt_index] in "+-^":
-                        if not nparams.set_specific_var_value(operation_name, Operation(fmt[fmt_index])):
-                            return False
-                        fmt_index += 1
-                    else:
-                        return False
-                elif operation_name.startswith("UPDATE_MATH_"):
-                    if fmt[fmt_index] in "+-^&|":
-                        if not nparams.set_specific_var_value(operation_name, Operation(fmt[fmt_index])):
-                            return False
-                        fmt_index += 1
-                    else:
-                        return False
-                else:
+                found = False
+                for group in GROUPS.iterkeys():
+                    if operation_name.startswith(group + "_"):
+                        for value in GROUPS[group]:
+                            if fmt[fmt_index:fmt_index+len(value)] == value:
+                                if not nparams.set_group_var_value(operation_name, value):
+                                    return False
+                                found = True
+                                fmt_index += len(value)
+                            # Should i have break or? or give a chance to multi groups with similiar starts?
+                            # probably the later, because even if we have some groups with common start, and we found a result, it is probably the correct one even if from the wrong group
+                if not found:
                     return False
             else:
                 if fmt[fmt_index] != match[match_index]:
@@ -296,13 +353,17 @@ def create_macro_result(result_line, params, left = False):
                     return params.vars[name]
                 else:
                     return NoneExpression()
+            elif var_type == "!":
+                return Str(params.group_vars[name])
             elif var_type == "^":
                 if params.specific_vars.has_key(name):
+                    # TODO: is it always good?
                     if not left and name.startswith("VAR_"):
                         return VariableProxy(params.vars[name], None) # The None should be fixed on handler.update_instruction
                     return params.specific_vars[name]
                 else:
-                    return NoneExpression()
+                    assert False
+                    #return NoneExpression()
         elif is_constant(result_line):
             return Immediate(int(result_line, 16))
         elif result_line == "None":
@@ -326,9 +387,14 @@ def create_macro_result(result_line, params, left = False):
                 parameters.append(create_macro_result(param, params))
                 if result_line[index:index+2] == ", ":
                     index += 2
+            if is_var_name(macro_name):
+                if macro_name[0] == "!":
+                    macro_name = params.group_vars[macro_name[1:]]
+                else:
+                    assert False
             return Macro(macro_name, parameters)
 
-def replace_macros_in_expression(expression, params):
+def replace_macros_in_expression(handler, expression, params):
     changed = False
     for child in expression.get_children():
         for macro_line, macro_result in EXPRESSIONS_MACROS:
@@ -336,18 +402,20 @@ def replace_macros_in_expression(expression, params):
             if match_expression(child.get_value(), macro_line, nparams):
                 new_child = create_macro_result(macro_result, nparams)
                 params.update_global(nparams)
+                handler.make_unvisible(child.get_value())
+                handler.make_visible(new_child)
                 expression.replace_child(child.get_value(), new_child)
                 changed = True
-        changed |= replace_macros_in_expression(child, params)
+        changed |= replace_macros_in_expression(handler, child, params)
     return changed
 
-def replace_macros_in_instructions(instructions, params):
+def replace_macros_in_instructions(handler, instructions, params):
     changed = False
     for instruction in instructions:
-        while replace_macros_in_expression(instruction, params):
+        while replace_macros_in_expression(handler, instruction, params):
             changed = True
         if isinstance(instruction, ConditionBlock):
-            changed |= replace_macros_in_instructions(instruction.instructions, params)
+            changed |= replace_macros_in_instructions(handler, instruction.instructions, params)
     return changed
 
 def match_instructions(instructions, index, lines, lines_index, params, pad = ''):
@@ -358,9 +426,9 @@ def match_instructions(instructions, index, lines, lines_index, params, pad = ''
         # Now, If we still in the wrong indentation, we will return error because the line will starts with padding
         line = lines[lines_index][len(pad):]
         optional_line = False
-        if line.startswith("["):
-            optional_line = True
-            line = line[1:-1]
+        #if line.startswith("["): # TODO: maybe add support for optional lines. if we add, need to fix instructions replacement code
+        #    optional_line = True
+        #    line = line[1:-1]
         if not match_expression(instructions[index], line, nparams):
             if optional_line:
                 lines_index += 1
@@ -369,15 +437,25 @@ def match_instructions(instructions, index, lines, lines_index, params, pad = ''
         index += 1
         lines_index += 1
         if isinstance(instructions[index-1], ConditionBlock):
-            match, index, lines_index = match_instructions(instructions, index, lines, lines_index, nparams, pad + ' '*4)
-            if not match:
+            match, nindex, lines_index = match_instructions(instructions[index-1].instructions, 0, lines, lines_index, nparams, pad + ' '*4)
+            # Should match all the lines in the condition
+            if not match or nindex != len(instructions[index-1].instructions):
                 return False, index, lines_index
     params.update(nparams)
     return True, index, lines_index
 
-def replace_instructions_macros(handler, index, params):
+def replace_instructions(handler, instructions_container, index, count, new_instructions):
+    for line in instructions_container.instructions[index:index+count]:
+        handler.make_unvisible(line)
+    instructions_container.instructions[index:index+count] = new_instructions
+    for inst in new_instructions:
+        handler.update_instruction(inst)
+    handler.clean_instructions()
+    return instructions_container.instructions
+
+def replace_instructions_macros(handler, instructions_container, index, params):
     changed = False
-    instructions = handler.get_instructions()
+    instructions = instructions_container.instructions
     # TODO: if and else conditions
     for lines, result in MACROS:
         if len(lines) + index > len(instructions):
@@ -387,27 +465,62 @@ def replace_instructions_macros(handler, index, params):
         if lines_end_index != len(lines):
             continue
         if match:
-            for line in instructions[index:index+len(lines)]:
-                handler.make_unvisible(line)
-            instructions[index:index+len(lines)] = [create_macro_result(result, nparams)]
-            handler.update_instruction(instructions[index])
-            handler.clean_instructions()
+            instructions = replace_instructions(handler, handler, index, len(lines), [create_macro_result(result, nparams)])
             params.update_global(nparams)
             changed = True
+    return changed
+
+def replace_instructions_macros_in_instructions(handler, instructions_container, params):
+    changed = False
+    nchanged = True
+    while nchanged:
+        nchanged = False
+        for i in xrange(len(instructions_container.instructions)):
+            if replace_instructions_macros(handler, instructions_container, i, params):
+                nchanged = True
+                changed = True
+                break # We changed the lines count
+    return changed
+
+def remove_unneeded_variable(handler, instructions_container, params):
+    changed = False
+    instructions = instructions_container.instructions
+    i = 0
+    while i < len(instructions) - 1:
+        if isinstance(instructions[i], SetValue) and isinstance(instructions[i].lvalue, Variable) and len(instructions[i].lvalue.used_instructions)  == 1:
+            if len(instructions[i].lvalue.visible_if_used) == 0 and len(instructions[i].lvalue.proxies) == 1 and instructions[i].lvalue.used_instructions[0] == instructions[i + 1]:
+                changed = True
+                handler.make_unvisible(instructions[i+1])
+                handler.make_unvisible(instructions[i])
+                def find_and_replace(obj):
+                    for child in obj.get_children():
+                        if isinstance(instructions[i+1], SetValueOperation) and instructions[i+1].lvalue == child:
+                            continue
+                        if isinstance(child, VariableProxy):
+                            if child.reg_var == instructions[i].lvalue:
+                                child.value = instructions[i].rvalue
+                                child.show_reg = False
+                        find_and_replace(child)
+                find_and_replace(instructions[i+1])
+                handler.make_visible(instructions[i+1])
+                instructions[i:i+1] = []
+        i += 1
+    return changed
+
+def run_on_all_instructions(handler, instructions_container, func, params):
+    changed = False
+    changed |= func(handler, instructions_container, params)
+    for inst in instructions_container.instructions:
+        if isinstance(inst, ConditionBlock):
+            changed |= run_on_all_instructions(handler, inst, func, params)
     return changed
 
 def parse_handler(handler, fields, parameters):
     changed = False
     params = Params(fields, parameters)
-    replace_macros_in_instructions(handler.get_instructions(), params)
-    nchanged = True
-    while nchanged:
-        nchanged = False
-        for i in xrange(len(handler.get_instructions())):
-            if replace_instructions_macros(handler, i, params):
-                nchanged = True
-                changed = True
-                break # We changed the lines count
+    changed |= replace_macros_in_instructions(handler, handler.get_instructions(), params)
+    changed |= run_on_all_instructions(handler, handler, replace_instructions_macros_in_instructions, params)
+    changed |= run_on_all_instructions(handler, handler, remove_unneeded_variable, params)
     if changed:
         fields.update(params.fields)
         parameters.update(params.parameters)

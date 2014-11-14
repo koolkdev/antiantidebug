@@ -650,8 +650,12 @@ class Handler(object):
     def update_instruction(self, instruction):
         if isinstance(instruction, SetValueOperation) and isinstance(instruction.lvalue, Variable):
             # TODO: kinda hackish right now. Does it always work as expected?
+            # TODO: in some cases it will be visible because the result of merge_variables was made visible. We need to track it somehoe. (The visibility of the old variables depends of the visibability of the new variable)
+            # TODO: Remove old instructions on clean?
+            # TODO: Do proper replacement of set instructions
             for proxy in instruction.lvalue.proxies:
                 proxy.value = instruction.rvalue
+            instruction.lvalue.instructions.append(instruction)
             if len(instruction.lvalue.visible_if_used) or len(instruction.lvalue.proxies) >= 2 or len(instruction.lvalue.used_instructions):
                 self.make_visible(instruction.lvalue)
             else:
@@ -729,6 +733,7 @@ class Handler(object):
             if isinstance(lvalue, ValueOf):
                 for k, v in state.registers.iteritems():
                     if v.contains(lvalue):
+                        #state.get_register_variable(k).visible_if_used_always.append(value)
                         state.registers[k] = state.get_register_variable(k)
                 for i in xrange(len(state.stack)):
                     if state.stack[i].contains(lvalue):
