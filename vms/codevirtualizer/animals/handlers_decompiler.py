@@ -631,7 +631,7 @@ class Handler(object):
             if isinstance(inst, VariableProxy):
                 inst.visible = True
                 inst.reg_var.proxies.update(set([inst]))
-                if not isinstance(inst.value.get_value(), Variable):
+                if not isinstance(inst.value.get_value(), Variable) and not isinstance(inst.value.get_value(), Immediate):
                     if len(inst.reg_var.proxies) >= 2:
                         for i in list(inst.reg_var.proxies):
                             self.make_visible(i.reg_var) # In case it is linked to a different reg val
@@ -654,7 +654,9 @@ class Handler(object):
             # TODO: Remove old instructions on clean?
             # TODO: Do proper replacement of set instructions
             for proxy in instruction.lvalue.proxies:
-                proxy.value = instruction.rvalue
+                # Hack to prevent further problem with make_visible/make_unvisible. It should stay variable anyway
+                if not isinstance(proxy.value, Variable):
+                    proxy.value = instruction.rvalue
             instruction.lvalue.instructions.append(instruction)
             if len(instruction.lvalue.visible_if_used) or len(instruction.lvalue.proxies) >= 2 or len(instruction.lvalue.used_instructions):
                 self.make_visible(instruction.lvalue)

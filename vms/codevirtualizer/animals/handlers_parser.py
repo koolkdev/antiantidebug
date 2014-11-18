@@ -6,6 +6,7 @@ GROUPS = {
     "SIMPLE_MATH": ["+", "-", "^"],
     "UPDATE_MATH": ["+", "-", "^", "&", "|"],
     "READ_PARAMETER": ["ReadParameterByte", "ReadParameterWord", "ReadParameterDword"],
+    "STRUCT_FIELD": ["VMStructFieldByte", "VMStructFieldWord", "VMStructFieldDword"],
 }
 
 EXPRESSIONS_MACROS = [
@@ -59,13 +60,21 @@ EXPRESSIONS_MACROS = [
         "!READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, None, Operation(!SIMPLE_MATH_1), None, None, None, None, None, None))"
     ),
     (
-        "(!READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, None, None, None, None, None, None, None, None)) !SIMPLE_MATH_1 ^IMM_1)",
-        "!READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, None, None, None, SimpleOperation(Operation(!SIMPLE_MATH_1), ^IMM_1), None, None, None, None))"
+        "(!READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, None, None, None, None, None, None, None, None)) !SIMPLE_MATH_1 ^IMM_2)",
+        "!READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, None, None, None, SimpleOperation(Operation(!SIMPLE_MATH_1), ^IMM_2), None, None, None, None))"
     ),
     (
         "(!READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, &X2, &X3, &X4, &X5, &X6, &X7, None, None)) !SIMPLE_MATH_1 VMStructFieldDword(@KEY3))",
         "!READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, &X2, &X3, &X4, &X5, &X6, &X7, Operation(!SIMPLE_MATH_1), None))"
     ),
+    (
+        "((&X1 & 0xF0) >> 0x4)",
+        "HIGH_NIBBLE(&X1)"
+    ),
+    (
+        "(&X1 & 0xF)",
+        "LOW_NIBBLE(&X1)"
+    )
 ]
 
 MACROS = [
@@ -77,18 +86,42 @@ MACROS = [
         "^VAR_1 = !READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, &X2, &X3, &X4, &X5, Operation(!UPDATE_MATH_1), None, None, None))"
     ),
     (
+        ["VMStructFieldDword(@KEY*) !UPDATE_MATH_1= ^IMM_2"],
+        "UpdateKey(VMStructFieldDword(@KEY*), SimpleOperation(Operation(!UPDATE_MATH_1), ^IMM_2))"
+    ),
+    (
         [
         "^VAR_1 = !READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, &X2, &X3, &X4, &X5, &X6, None, None, None))",
-        "VMStructFieldDword(@KEY2) !UPDATE_MATH_2= ^IMM_2",
+        "UpdateKey(VMStructFieldDword(@KEY2), &Y1)",
         ],
-        "^VAR_1 = !READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, &X2, &X3, &X4, &X5, &X6, SimpleOperation(Operation(!UPDATE_MATH_2), ^IMM_2), None, None))"
+        "^VAR_1 = !READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, &X2, &X3, &X4, &X5, &X6, &Y1, None, None))"
     ),
     (
         [
         "^VAR_1 = !READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, &X2, &X3, &X4, &X5, &X6, &X7, &X8, None))",
-        "VMStructFieldDword(@KEY3) !UPDATE_MATH_2= ^IMM_2",
+        "UpdateKey(VMStructFieldDword(@KEY3), &Y1)",
         ],
-        "^VAR_1 = !READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, &X2, &X3, &X4, &X5, &X6, &X7, &X8, SimpleOperation(Operation(!UPDATE_MATH_2), ^IMM_2)))"
+        "^VAR_1 = !READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, &X2, &X3, &X4, &X5, &X6, &X7, &X8, &Y1))"
+    ),
+    (
+        ["!STRUCT_FIELD_1($ENCODED_VALUE_) = (&X1 !SIMPLE_MATH_1 ^IMM_1)"],
+        "!STRUCT_FIELD_1($ENCODED_VALUE_) = EncodedValue(&X1, SimpleOperation(Operation(!SIMPLE_MATH_1), ^IMM_1), None)"
+    ),
+    (
+        ["VMStructFieldDword($ENCODED_VALUE_) = ((&X1 !SIMPLE_MATH_1 VMStructFieldDword($JUNK)) !SIMPLE_MATH_2 ^IMM_1)"],
+        "VMStructFieldDword($ENCODED_VALUE_) = EncodedValue(&X1, SimpleOperation(Operation(!SIMPLE_MATH_1), VMStructFieldDword($JUNK)), SimpleOperation(Operation(!SIMPLE_MATH_2), ^IMM_1))"
+    ),
+    (
+        ["VMStructFieldDword($ENCODED_VALUE_) = ((&X1 !SIMPLE_MATH_1 ^IMM_1) !SIMPLE_MATH_2 VMStructFieldDword($JUNK))"],
+        "VMStructFieldDword($ENCODED_VALUE_) = EncodedValue(&X1, SimpleOperation(Operation(!SIMPLE_MATH_1), ^IMM_1), SimpleOperation(Operation(!SIMPLE_MATH_2), VMStructFieldDword($JUNK)))"
+    ),
+    (
+        ["VMStructFieldDword($ENCODED_VALUE_) = (&X1 !SIMPLE_MATH_1 VMStructFieldDword($JUNK))"],
+        "VMStructFieldDword($ENCODED_VALUE_) = EncodedValue(&X1, SimpleOperation(Operation(!SIMPLE_MATH_1), VMStructFieldDword($JUNK)), None)"
+    ),
+    (
+        ["VMStructFieldDword(@JUNK) !UPDATE_MATH_1= &X1"],
+        None
     ),
     (
         [
@@ -181,6 +214,7 @@ class Macro(Expression):
 class Params(object):
     def __init__(self, fields, parameters):
         self.fields = dict(fields)
+        self.real_field_name = dict()
         self.parameters = dict(parameters)
         self.vars = {}
         self.specific_vars = {}
@@ -188,6 +222,7 @@ class Params(object):
 
     def copy(self):
         nparams = Params(self.fields, self.parameters)
+        nparams.real_field_name = dict(self.real_field_name)
         nparams.vars = dict(self.vars)
         nparams.specific_vars = dict(self.specific_vars)
         nparams.group_vars = dict(self.group_vars)
@@ -195,6 +230,7 @@ class Params(object):
 
     def update(self, other):
         self.fields.update(other.fields)
+        self.real_field_name.update(other.real_field_name)
         self.parameters.update(other.parameters)
         self.vars.update(other.vars)
         self.specific_vars.update(other.specific_vars)
@@ -206,13 +242,26 @@ class Params(object):
 
     def _set_dict_value(self, dict, key, value, comp = lambda x,y: x == y):
         if dict.has_key(key):
-            if not comp(dict[key], value):
-                return False
-        dict[key] = value
+            return comp(dict[key], value)
+        else:
+            # We don't want to always update it because of variables
+            # If we have a Variable and VariableProxy, if we met the Varaible first, so we want it to stay variable hen we will create the result
+            # For example setting a value of a variable. We will probably want to set the value of the varibale in the result (and not of the VariableProxy)
+            dict[key] = value
         return True
 
+    def get_field_name(self, value):
+        for n, v in self.fields.iteritems():
+            if v == value:
+                return n
+        return None
+
     def set_field_value(self, name, value):
-        return self._set_dict_value(self.fields, name, value)
+        oname = self.get_field_name(value)
+        if oname is not None:
+            return oname == name
+        else:
+            return self._set_dict_value(self.fields, name, value)
 
     def set_param_value(self, name, value):
         return self._set_dict_value(self.parameters, name, value)
@@ -221,7 +270,8 @@ class Params(object):
         return self._set_dict_value(self.vars, name, value, comp = lambda x,y: x.equals(y))
 
     def set_specific_var_value(self, name, value):
-        return self._set_dict_value(self.specific_vars, name, value, comp = lambda x,y: x.equals(y))
+        # The get value is important for some comprasions with vars (TODO: same for self.vars?)
+        return self._set_dict_value(self.specific_vars, name, value, comp = lambda x,y: x.get_value().equals(y.get_value()))
 
     def set_group_var_value(self, name, value):
         return self._set_dict_value(self.group_vars, name, value, comp = lambda x,y: x.equals(y))
@@ -229,7 +279,7 @@ class Params(object):
 def is_var_name(string):
     if string[0] not in "!@#$^&":
         return False
-    return re.subn("[^_A-Z0-9]","",string[1:])[1] == 0
+    return re.subn("[^_A-Z0-9*]","",string[1:])[1] == 0
 
 def is_constant(string):
     if not string.startswith("0x"):
@@ -238,6 +288,8 @@ def is_constant(string):
 
 def match_expression(expression, match, params):
     #print expression, match
+    parent = expression
+    expression = expression.get_value()
     if is_var_name(match):
         var_type, name = match[0], match[1:]
         if var_type == "@" or var_type == "#" or var_type == "$":
@@ -247,15 +299,27 @@ def match_expression(expression, match, params):
             if var_type == "#":
                 return params.set_param_value(name, int_value)
             elif var_type == "@":
+                if name[-1] == "*":
+                    oname = params.get_field_name(int_value)
+                    if oname is not None and oname.startswith(name[:-1]):
+                        params.real_field_name[name] = oname
+                        return True
+                    return False
                 return params.fields.has_key(name) and params.fields[name] == int_value
             else:
-                return params.set_field_value(name, int_value)
+                if name[-1] == "_":
+                    if params.set_field_value(name + str(int_value), int_value):
+                        params.real_field_name[name] = name + str(int_value)
+                        return True
+                    return False
+                else:
+                    return params.set_field_value(name, int_value)
         elif var_type == "&":
-            return params.set_var_value(name, expression)
+            return params.set_var_value(name, parent)
         elif var_type == "^":
             if name.startswith("VAR_"):
                 if isinstance(expression, Variable):
-                    return params.set_specific_var_value(name, expression)
+                    return params.set_specific_var_value(name, parent)
                 return False
             elif name.startswith("IMM_"):
                 if isinstance(expression, Immediate):
@@ -286,7 +350,7 @@ def match_expression(expression, match, params):
                 child = expression.get_children()[int(n)]
                 #print "Child: " + str(child)
                 if fmt_index == len(fmt):
-                    if match_expression(child.get_value(), match[match_index:], nparams):
+                    if match_expression(child, match[match_index:], nparams):
                         params.update(nparams)
                         return True
                     return False
@@ -303,7 +367,7 @@ def match_expression(expression, match, params):
                         match_index += 1
                         if match_index == len(match):
                             return False
-                    if not match_expression(child.get_value(), match[start:match_index], nparams):
+                    if not match_expression(child, match[start:match_index], nparams):
                         return False
             elif match[match_index] == "!" and fmt[fmt_index] != match[match_index]:
                 match_index += 1
@@ -343,6 +407,8 @@ def create_macro_result(result_line, params, left = False):
             var_type, name = result_line[0], result_line[1:]
             if var_type == "@" or var_type == "#" or var_type == "$":
                 if var_type == "@" or var_type == "$":
+                    if name[-1] in ("_*"):
+                        name = params.real_field_name[name]
                     int_val = params.fields[name]
                 else:
                     int_val = params.parameters[name]
@@ -358,8 +424,8 @@ def create_macro_result(result_line, params, left = False):
             elif var_type == "^":
                 if params.specific_vars.has_key(name):
                     # TODO: is it always good?
-                    if not left and name.startswith("VAR_"):
-                        return VariableProxy(params.vars[name], None) # The None should be fixed on handler.update_instruction
+                    #if not left and name.startswith("VAR_"):
+                    #    return VariableProxy(params.vars[name], None) # The None should be fixed on handler.update_instruction
                     return params.specific_vars[name]
                 else:
                     assert False
@@ -396,14 +462,15 @@ def create_macro_result(result_line, params, left = False):
 
 def replace_macros_in_expression(handler, expression, params):
     changed = False
+
     for child in expression.get_children():
         for macro_line, macro_result in EXPRESSIONS_MACROS:
             nparams = params.copy()
-            if match_expression(child.get_value(), macro_line, nparams):
+            if match_expression(child, macro_line, nparams):
                 new_child = create_macro_result(macro_result, nparams)
                 params.update_global(nparams)
-                handler.make_unvisible(child.get_value())
-                handler.make_visible(new_child)
+                #handler.make_unvisible(child.get_value())
+                #handler.make_visible(new_child)
                 expression.replace_child(child.get_value(), new_child)
                 changed = True
         changed |= replace_macros_in_expression(handler, child, params)
@@ -465,7 +532,11 @@ def replace_instructions_macros(handler, instructions_container, index, params):
         if lines_end_index != len(lines):
             continue
         if match:
-            instructions = replace_instructions(handler, handler, index, len(lines), [create_macro_result(result, nparams)])
+            if result is not None:
+                nlines = [create_macro_result(result, nparams)]
+            else:
+                nlines = []
+            instructions = replace_instructions(handler, instructions_container, index, len(lines), nlines)
             params.update_global(nparams)
             changed = True
     return changed
@@ -487,23 +558,23 @@ def remove_unneeded_variable(handler, instructions_container, params):
     instructions = instructions_container.instructions
     i = 0
     while i < len(instructions) - 1:
-        if isinstance(instructions[i], SetValue) and isinstance(instructions[i].lvalue, Variable) and len(instructions[i].lvalue.used_instructions)  == 1:
-            if len(instructions[i].lvalue.visible_if_used) == 0 and len(instructions[i].lvalue.proxies) == 1 and instructions[i].lvalue.used_instructions[0] == instructions[i + 1]:
-                changed = True
-                handler.make_unvisible(instructions[i+1])
-                handler.make_unvisible(instructions[i])
-                def find_and_replace(obj):
-                    for child in obj.get_children():
-                        if isinstance(instructions[i+1], SetValueOperation) and instructions[i+1].lvalue == child:
-                            continue
-                        if isinstance(child, VariableProxy):
-                            if child.reg_var == instructions[i].lvalue:
-                                child.value = instructions[i].rvalue
-                                child.show_reg = False
-                        find_and_replace(child)
-                find_and_replace(instructions[i+1])
-                handler.make_visible(instructions[i+1])
-                instructions[i:i+1] = []
+        if isinstance(instructions[i], SetValue) and isinstance(instructions[i].lvalue, Variable) and len(instructions[i].lvalue.used_instructions)  == 1 and \
+            len(instructions[i].lvalue.visible_if_used) == 0 and len(instructions[i].lvalue.proxies) == 1 and instructions[i].lvalue.used_instructions[0] == instructions[i + 1]:
+            changed = True
+            handler.make_unvisible(instructions[i+1])
+            handler.make_unvisible(instructions[i])
+            def find_and_replace(obj):
+                for child in obj.get_children():
+                    if isinstance(instructions[i+1], SetValueOperation) and instructions[i+1].lvalue == child:
+                        continue
+                    if isinstance(child, VariableProxy):
+                        if child.reg_var == instructions[i].lvalue:
+                            child.value = instructions[i].rvalue
+                            child.show_reg = False
+                    find_and_replace(child)
+            find_and_replace(instructions[i+1])
+            handler.make_visible(instructions[i+1])
+            instructions[i:i+1] = []
         i += 1
     return changed
 

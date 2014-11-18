@@ -153,6 +153,7 @@ class VMHandlers(object):
         fix_handlers = executable.read_dword(vm_info.init_handler.vm_struct + vm_info.struct_fields["HANDLERS"]) != vm_info.init_handler.handlers_address
 
         self.handlers = {}
+        addrs = {}
         handlers_to_process = Queue.Queue()
         # Let's find all the handlers now
         for i in xrange(vm_info.init_handler.handlers_count):
@@ -160,9 +161,10 @@ class VMHandlers(object):
             if fix_handlers:
                 handler_address = handler_address + vm_info.init_handler.base_address
             #if handler_address == 0x407c06:
-            #if handler_address in (0x40D054, 0x040983E):
+            #if handler_address in (0x4030abL, 0x040983E):
             func = handlers_decompiler.Handler(instruction.Function(executable,handler_address))
             self.handlers[i] = VMOpcodeHandler(func)
+            addrs[i] = handler_address
         print "Finish decompiling handles"
 
         fields = dict(vm_info.struct_fields)
@@ -177,11 +179,13 @@ class VMHandlers(object):
                     if handler_info != None:
                         handler.name = handler_info
 
-        for handler in self.handlers.itervalues():
+        for index, handler in self.handlers.iteritems():
             print "---------------------------------------------------"
             if handler.name:
+
                 print handler.name
                 print "@@@@@@@@@@@@@@@@@@@@@"
+            print hex(addrs[index])
             handler.handler.print_instructions()
         assert False
 
