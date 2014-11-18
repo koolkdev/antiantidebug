@@ -471,7 +471,7 @@ def replace_macros_in_expression(handler, expression, params):
                 params.update_global(nparams)
                 #handler.make_unvisible(child.get_value())
                 #handler.make_visible(new_child)
-                expression.replace_child(child, new_child)
+                expression.replace_child(child.get_value(), new_child)
                 changed = True
         changed |= replace_macros_in_expression(handler, child, params)
     return changed
@@ -553,13 +553,21 @@ def replace_instructions_macros_in_instructions(handler, instructions_container,
                 break # We changed the lines count
     return changed
 
+# Hackish solution for the used instructions bug
+def get_used_instructions(reg):
+    used = []
+    for i in reg.used_instructions:
+        if i.contains(reg):
+            used.append(i)
+    return used
+
 def remove_unneeded_variable(handler, instructions_container, params):
     changed = False
     instructions = instructions_container.instructions
     i = 0
     while i < len(instructions) - 1:
-        if isinstance(instructions[i], SetValue) and isinstance(instructions[i].lvalue, Variable) and len(instructions[i].lvalue.used_instructions)  == 1 and \
-            len(instructions[i].lvalue.visible_if_used) == 0 and len(instructions[i].lvalue.proxies) == 1 and instructions[i].lvalue.used_instructions[0] == instructions[i + 1]:
+        if isinstance(instructions[i], SetValue) and isinstance(instructions[i].lvalue, Variable) and len(get_used_instructions(instructions[i].lvalue))  == 1 and \
+            len(instructions[i].lvalue.visible_if_used) == 0 and len(instructions[i].lvalue.proxies) == 1 and get_used_instructions(instructions[i].lvalue)[0] == instructions[i + 1]:
             changed = True
             handler.make_unvisible(instructions[i+1])
             handler.make_unvisible(instructions[i])
