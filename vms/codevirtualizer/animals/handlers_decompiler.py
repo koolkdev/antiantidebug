@@ -375,6 +375,7 @@ class VariableProxy(UnaryExpression):
         self.reg_var = reg_var
         self.show_reg = False
         self.visible = False
+        self.instruction = None
 
     def get_value(self):
         if self.show_reg:
@@ -382,8 +383,8 @@ class VariableProxy(UnaryExpression):
         else:
             return self.value.get_value()
 
-    #def get_children(self):
-    #    return [self.get_value()]
+    def get_children(self):
+        return [self.get_value()]
 
     def equals(self, other):
         return self.get_value().equals(other.get_value())
@@ -607,6 +608,9 @@ class Handler(object):
         if isinstance(instruction, SetValueOperation):
             if isinstance(instruction.lvalue, Variable):
                 for p in instruction.lvalue.proxies:
+                    if not p.show_reg:
+                        if isinstance(p.value, Variable):
+                            p.value.used_instructions.remove(p.instruction)
                     p.show_reg = True
         if isinstance(instruction, NonVisible):
             if instruction.visible:
@@ -629,6 +633,7 @@ class Handler(object):
 
         for inst in instruction.get_all_children():
             if isinstance(inst, VariableProxy):
+                inst.instruction = instruction
                 inst.visible = True
                 inst.reg_var.proxies.update(set([inst]))
                 if not isinstance(inst.value.get_value(), Variable) and not isinstance(inst.value.get_value(), Immediate):
@@ -670,6 +675,9 @@ class Handler(object):
         if isinstance(instruction, SetValueOperation):
             if isinstance(instruction.lvalue, Variable):
                 for p in instruction.lvalue.proxies:
+                    if p.show_reg:
+                        if isinstance(p.value, Variable):
+                            p.value.used_instructions.append(p.instruction)
                     p.show_reg = False
         if isinstance(instruction, NonVisible):
             if not instruction.visible:
@@ -702,7 +710,10 @@ class Handler(object):
             if isinstance(inst, Variable):
                 if isinstance(instruction, SetValueOperation) and instruction.lvalue == inst:
                     continue
-                inst.used_instructions.remove(instruction)
+                try:
+                    inst.used_instructions.remove(instruction)
+                except: # TODO: fix this
+                    pass
                 if len(inst.visible_if_used) == 0 and len(inst.proxies) < 2 and len(inst.used_instructions) == 0:
                     self.make_unvisible(inst)
 

@@ -471,7 +471,7 @@ def replace_macros_in_expression(handler, expression, params):
                 params.update_global(nparams)
                 #handler.make_unvisible(child.get_value())
                 #handler.make_visible(new_child)
-                expression.replace_child(child.get_value(), new_child)
+                expression.replace_child(child, new_child)
                 changed = True
         changed |= replace_macros_in_expression(handler, child, params)
     return changed
