@@ -466,7 +466,8 @@ def replace_macros_in_expression(handler, expression, params):
     for child in expression.get_children():
         for macro_line, macro_result in EXPRESSIONS_MACROS:
             nparams = params.copy()
-            if match_expression(child, macro_line, nparams):
+            # We call to get_value, because if we are in the VariableProxy right now, we want to keep that container
+            if match_expression(child.get_value(), macro_line, nparams):
                 new_child = create_macro_result(macro_result, nparams)
                 params.update_global(nparams)
                 #handler.make_unvisible(child.get_value())
@@ -557,9 +558,21 @@ def replace_instructions_macros_in_instructions(handler, instructions_container,
 def get_used_instructions(reg):
     used = []
     for i in reg.used_instructions:
-        if i.contains(reg):
+        if is_instruction_contains(i, reg):
             used.append(i)
     return used
+
+def is_instruction_contains(inst, reg):
+    for child in inst.get_children():
+        if child == inst:
+            return True
+        if isinstance(child, VariableProxy) and child.show_reg:
+            if child.reg_var == reg:
+                return True
+        else:
+            if is_instruction_contains(child, reg):
+                return True
+    return False
 
 def remove_unneeded_variable(handler, instructions_container, params):
     changed = False
