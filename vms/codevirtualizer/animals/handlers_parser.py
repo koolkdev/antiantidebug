@@ -464,17 +464,22 @@ def replace_macros_in_expression(handler, expression, params):
     changed = False
 
     for child in expression.get_children():
+        if isinstance(child, VariableProxy) and child.show_reg:
+            # It is an hidden var, so no need to replace macros in it anyway
+            continue
+        changed |= replace_macros_in_expression(handler, child, params)
+        if isinstance(child, VariableProxy):
+            # We don't want to match expressions for proxy, because the expression will match to their child anyway, and we want to keep the proxy wrapper
+            continue
         for macro_line, macro_result in EXPRESSIONS_MACROS:
             nparams = params.copy()
-            # We call to get_value, because if we are in the VariableProxy right now, we want to keep that container
-            if match_expression(child.get_value(), macro_line, nparams):
+            if match_expression(child, macro_line, nparams):
                 new_child = create_macro_result(macro_result, nparams)
                 params.update_global(nparams)
                 #handler.make_unvisible(child.get_value())
                 #handler.make_visible(new_child)
-                expression.replace_child(child.get_value(), new_child)
+                expression.replace_child(child, new_child)
                 changed = True
-        changed |= replace_macros_in_expression(handler, child, params)
     return changed
 
 def replace_macros_in_instructions(handler, instructions, params):
