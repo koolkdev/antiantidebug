@@ -146,6 +146,19 @@ MACROS = [
         ],
         "UpdateEipAndJump(&X, &Y)"
     ),
+    (
+        [
+        "If(((VMStructFieldDword(@KEY2) & 0x1) != 0x0))",
+        ],
+        "UpdateKeyCond(None)"
+    ),
+    (
+        [
+        "If(((VMStructFieldDword(@KEY2) & 0x1) != 0x0))",
+        "    UpdateKey(VMStructFieldDword(@KEY2), &X1)"
+        ],
+        "UpdateKeyCond(&X1)"
+    ),
 ]
 
 """
@@ -498,6 +511,9 @@ def match_instructions(instructions, index, lines, lines_index, params, pad = ''
             return False, index, lines_index
         # Now, If we still in the wrong indentation, we will return error because the line will starts with padding
         line = lines[lines_index][len(pad):]
+        if line.startswith(" "):
+            # Wrong indentation
+            return False, index, lines_index
         optional_line = False
         #if line.startswith("["): # TODO: maybe add support for optional lines. if we add, need to fix instructions replacement code
         #    optional_line = True
