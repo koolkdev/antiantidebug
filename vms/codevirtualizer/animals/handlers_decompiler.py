@@ -665,6 +665,10 @@ class Handler(object):
         else:
             self.make_visible(instruction)
 
+            if isinstance(instruction, ConditionBlock):
+                for inst in instruction.instructions:
+                    self.update_instruction(inst)
+
 
     def make_unvisible(self, instruction):
         if isinstance(instruction, SetValueOperation):
@@ -705,6 +709,10 @@ class Handler(object):
                 inst.used_instructions.remove(instruction)
                 if len(inst.visible_if_used) == 0 and len(inst.proxies) < 2 and len(inst.used_instructions) == 0:
                     self.make_unvisible(inst)
+        # Notice that it isn't the same behaviour as in make_visible, but that is how we are going to use it
+        if isinstance(instruction, ConditionBlock):
+            for inst in instruction.instructions:
+                self.make_unvisible(inst)
 
     def _get_handler_block(self, block, state, end = None, one_block = False):
         instructions = []
