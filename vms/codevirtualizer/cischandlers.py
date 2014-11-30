@@ -2,13 +2,13 @@ HANDLERS = {
 
 "ADDREALLOC":
 """
-mov eax, [edi+{REALLOCOFFSET}]
+mov eax, dword [edi+{REALLOCOFFSET}]
 add dword [esp], eax
 """,
 
 "ADDEDXREALLOC":
 """
-mov eax, [edi+{REALLOCOFFSET}]
+mov eax, dword [edi+{REALLOCOFFSET}]
 add edx, eax
 """,
 
@@ -24,7 +24,7 @@ push dword [edi+{UKNOWNOFFSET}]
 
 "POP2UNKNOWN":
 """
-mov eax, [esp+0x4]
+mov eax, dword [esp+0x4]
 mov dword [edi+{UKNOWNOFFSET}], eax
 pop eax
 add esp, 0x4
@@ -51,7 +51,7 @@ push dword [edi+{ENCODEOFFSET}]
 "PUSHWITHENCODE":
 """
 READ 4 1
-add eax, [edi+{ENCODEOFFSET}]
+add eax, dword [edi+{ENCODEOFFSET}]
 push eax
 """,
 
@@ -87,7 +87,7 @@ ret
 READ 1 1
 movzx eax, al
 jmp dword [edi+eax*4]
-popa
+popad
 ret
 """,
 
@@ -103,7 +103,7 @@ READ 1 1
 movzx eax, al
 cmp eax, 0x7
 jz {ANY}
-mov eax, [edi+eax*4]
+mov eax, dword [edi+eax*4]
 add edx, eax
 """,
 
@@ -234,7 +234,7 @@ pop ax
 mov word fs:[edx], ax
 """,
 
-"POPF":
+"popfd":
 """
 pop dword [edi+0x1c]
 """,
@@ -297,7 +297,7 @@ push dword [edi+eax*4]
 """
 READ 1 1
 movzx eax, al
-mov eax, [edi+eax*4]
+mov eax, dword [edi+eax*4]
 push word [eax]
 """,
 
@@ -305,7 +305,7 @@ push word [eax]
 """
 READ 1 1
 movzx eax, al
-mov eax, [edi+eax*4]
+mov eax, dword [edi+eax*4]
 movzx ax, byte [eax]
 push ax
 """,
@@ -349,7 +349,7 @@ push dword fs:[edx]
 
 "PUSHWORDFSEDXV":
 """
-mov ax, fs:[edx]
+mov ax, word fs:[edx]
 push ax
 """,
 
@@ -396,7 +396,7 @@ and dword [edi+0x1c], 0xfe
 
 "CMC":
 """
-mov eax, [edi+0x1c]
+mov eax, dword [edi+0x1c]
 and eax, 0x1
 or eax, eax
 jz {ANY}
@@ -406,7 +406,7 @@ mov ebx, ebx
 
 "CMCBUG":
 """
-mov eax, [edi+0x1c]
+mov eax, dword [edi+0x1c]
 and eax, 0x1
 or eax, eax
 jz {ANY}
@@ -456,7 +456,7 @@ mov ebx, 0x0
 
 "RETURN":
 """
-mov ecx, [edi+{RETNOFFSET}]
+mov ecx, dword [edi+{RETNOFFSET}]
 mov edx, edi
 or ecx, ecx
 jz {ANY}
@@ -466,16 +466,16 @@ mov edi, esi
 add edi, ecx
 std
 mov ecx, 0xa
-rep
-add esp, [edx+{RETNOFFSET}]
+rep movsd
+add esp, dword [edx+{RETNOFFSET}]
 mov dword [edx+{RETNOFFSET}], 0x0
 cmp dword [edx+{DIRECTIONOFFSET}], 0x0
 jz {ANY}
 or dword [esp+0x20], 0x400
 mov dword [edx+{DIRECTIONOFFSET}], 0x0
 mov dword [edx+{ANY}], 0x0
-popa
-popf
+popad
+popfd
 ret
 """,
 
@@ -495,8 +495,8 @@ ret
 ##add esp, [edx+{RETNOFFSET}]
 ##mov dword [edx+{RETNOFFSET}], 0x0
 ##mov dword [edx+{ANY}], 0x0
-##popa
-##popf
+##popad
+##popfd
 ##ret
 ##"""
 }
@@ -674,7 +674,7 @@ pop cx
 (["rcr", "rcl"], 1, "",
 """
 push dword [edi+0x1c]
-popf
+popfd
 pop cx
 {OPERATIONSIZE:1} [esp], cl
 """),
@@ -682,7 +682,7 @@ pop cx
 (["sbb", "adc"], 1, "",
 """
 push dword [edi+0x1c]
-popf
+popfd
 pop {STACKREG:1:EAX}
 {OPERATIONSIZE:1} [esp], {REG:1:EAX}
 """),
@@ -692,7 +692,7 @@ pop {STACKREG:1:EAX}
 SIZES = {"dword": 4, "word": 2, "byte":1}
 REGS = {"EAX": {"al":1, "ax":2, "eax":4}, "ECX": {"cl":1, "cx":2, "ecx":4}, "EDX": {"dl":1, "dx":2, "edx":4}}
 def find_math_operation(handler):
-    if str(handler.insts[-1]) == "pushf":
+    if str(handler.insts[-1]) == "pushfd":
         push_flags = True
         insts = handler.insts[:-1]
     else:

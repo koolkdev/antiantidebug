@@ -54,19 +54,25 @@ class Debugger(object):
         self.hooks = {}
     
     def start(self, filepath):
-        def thread_task():
-            self.debug = Debug(MyEventHandler(self))
-            self.process = self.debug.execl(filepath)
-            self.debug.loop()
         self.filepath = filepath
         self.breakpoint_tunnel = AsyncOperation()
-        t = threading.Thread(target=thread_task, args=())
+        t = threading.Thread(target=self.thread_task, args=())
+        # TODO: make it stoppable
         t.setDaemon(True)
         t.start()
         res = self.breakpoint_tunnel.wait()
         while self.debug.lastEvent.get_thread().get_pc() != self.create_process_event.get_start_address():
             res = self.go()
         return res
+
+    def thread_task(self):
+        self.debug = Debug(MyEventHandler(self))
+        self.process = self.debug.execl(self.filepath)
+        self.mode = self.process.get_bits()
+        try:
+            self.debug.loop()
+        finally:
+            self.debug.stop()
 
     def go(self, address = None, use_hardware = False):
         if address:
@@ -95,7 +101,7 @@ class Debugger(object):
     def get_instruction(self, address = None):
         if address == None:
             address = self.thread.get_pc()
-        return instruction.Instruction(address, self.process.read(address, 32))
+        return instruction.Instruction(self.process.read(address, 32), address, self.mode)
 
     def step(self):
         # The direct api is slow
@@ -171,4 +177,5 @@ class Debugger(object):
         while True:
             inst = self.stepover()
             print "0x%08X: %s" % (inst.address, str(inst))
+
         

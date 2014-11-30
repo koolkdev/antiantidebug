@@ -21,7 +21,7 @@ class VMInit(VMHandler):
     cache = {}
     def __init__(self, vm_info, executable, address):
         clean = cleaner.Cleaner(executable)
-        clean.set_option("fixOperationConstantThruRegOnStack", True)
+        #clean.set_option("fixOperationConstantThruRegOnStack", True)
         clean.set_option("fixPush_allowConstants", True)
         clean.set_option("ignore_jumps", False)
         reader = clean.get_reader(cleaner.JunkSkipper(executable).get_next_real_instruction(address).address)
@@ -221,7 +221,7 @@ class VMFunctionSection(object):
 class VMFunctionJumper(object):
     def __init__(self, executable, address):
         clean = cleaner.Cleaner(executable)
-        clean.set_option("fixOperationConstantThruRegOnStack", True)
+        #clean.set_option("fixOperationConstantThruRegOnStack", True)
         clean.set_option("fixPush_allowConstants", True)
         clean.set_option("ignore_jumps", False)
         reader = clean.get_reader(cleaner.JunkSkipper(executable).get_next_real_instruction(address).address)

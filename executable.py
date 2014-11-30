@@ -4,11 +4,11 @@ import instruction
 import struct
 
 class Executable(object):
-    def __init__(self):
-        raise NotImplementedError()
+    def __init__(self, mode=32):
+        self.mode = mode
 
     def get_instruction(self, address):
-        return instruction.Instruction(address, self.read(address, 32))
+        return instruction.Instruction(self.read(address, 32), address, self.mode)
         
     def get_reader(self, address):
         return instruction.InstructionReader(self, address)
@@ -30,17 +30,22 @@ class Executable(object):
 
 class DebuggedExecutable(Executable):
     def __init__(self, debugger):
+        Executable.__init__(self, debugger.mode)
         self.debugger = debugger
 
     def read(self, address, length):
         return self.debugger.process.read(address, length)
 
-    def write(self, address, length):
+    def write(self, address, data):
         self.debugger.process.write(address, data)
 
 class PEFileExecutable(Executable):
-    def __init__(self, pefile):
-        self.pefile = pefile
+    def __init__(self, pe):
+        if pe.PE_TYPE == pefile.OPTIONAL_HEADER_MAGIC_PE_PLUS:
+            Executable.__init__(self, 64)
+        else:
+            Executable.__init__(self, 32)
+        self.pefile = pe
 
     def read(self, address, length):
         return self.pefile.get_data(address - self.pefile.OPTIONAL_HEADER.ImageBase, length)
@@ -49,7 +54,8 @@ class PEFileExecutable(Executable):
         return self.pefile.set_bytes_at_rva(address - self.pefile.OPTIONAL_HEADER.ImageBase, data)
 
 class BytesMemory(Executable):
-    def __init__(self, bytes, address = 0):
+    def __init__(self, bytes, address=0, mode=32):
+        Executable.__init__(self, mode)
         self.bytes = list(bytes)
         self.address = address
 
