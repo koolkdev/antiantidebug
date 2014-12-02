@@ -18,6 +18,15 @@ class Executable(object):
         
     def read_dword(self, address):
         return self.read_format(address, "<L")
+
+    def read_pointer(self, address):
+        if self.mode == 32:
+            return self.read_format(address, "<L")
+        else:
+            return self.read_format(address, "<Q")
+
+    def get_arch(self):
+        return instruction.Arch(self.mode)
     
     def read_byte(self, address):
         return self.read_format(address, "<B")

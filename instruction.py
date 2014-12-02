@@ -1,6 +1,140 @@
 from pyx86utils import *
 from collections import deque
+import re
 
+class Arch(object):
+    REGS = [
+        ["al", "ah", "ax", "eax", "rax"],
+        ["bl", "bh", "bx", "ebx", "rbx"],
+        ["cl", "ch", "cx", "ecx", "rcx"],
+        ["dl", "dh", "dx", "edx", "rdx"],
+        ["bpl", None, "bp", "ebp", "rbp"],
+        ["spl", None, "sp", "esp", "rsp"],
+        ["sil", None, "si", "esi", "rsi"],
+        ["dil", None, "di", "edi", "rdi"],
+        ["r8b", None, "r8w", "r8d", "r8q"],
+        ["r9b", None, "r9w", "r9d", "r9q"],
+        ["r10b", None, "r10w", "r10d", "r10q"],
+        ["r11b", None, "r11w", "r11d", "r11q"],
+        ["r12b", None, "r12w", "r12d", "r12q"],
+        ["r13b", None, "r13w", "r13d", "r13q"],
+        ["r14b", None, "r14w", "r14d", "r14q"],
+        ["r15b", None, "r15w", "r15d", "r15q"],
+    ]
+
+    SIZES = {1: "byte", 2: "word", 4: "dword", 8: "qword"}
+
+    def __init__(self, mode):
+        self.mode = mode
+
+    def native_size(self):
+        return self.mode >> 3
+
+    def pointer_size(self):
+        return self.native_size()
+
+    def _get_reg(self, reg, size_index):
+        for r in self.REGS:
+            if reg in r:
+                return r[size_index]
+        return None
+
+    def reg_byte(self, reg):
+        return self._get_reg(reg, 0)
+
+    def reg_byte_high(self, reg):
+        return self._get_reg(reg, 1)
+
+    def reg_word(self, reg):
+        return self._get_reg(reg, 2)
+
+    def reg_dword(self, reg):
+        return self._get_reg(reg, 3)
+
+    def reg_qword(self, reg):
+        return self._get_reg(reg, 4)
+
+    def reg_native(self, reg):
+        if self.mode == 32:
+            return self.reg_dword(reg)
+        else:
+            return self.reg_qword(reg)
+
+    def _translate_var(self, var):
+        fields = var.split(":")
+        if len(fields) == 0:
+            return None
+        type = fields[0]
+        size = self.native_size()
+        special = False
+
+        if type in ("S", "SB", "N"):
+            expected_fields = 1
+        elif type in ("R", "RS"):
+            expected_fields = 2
+        else:
+            raise None
+
+        if not expected_fields <= len(fields) <= expected_fields + 1:
+            raise None
+
+        if len(fields) > expected_fields:
+            if fields[-1] == "1h":
+                size = 1
+                special = True
+            else:
+                size = int(fields[-1])
+
+        if size not in self.SIZES:
+            return None
+
+        if type == "S":
+            return self.SIZES[size]
+        elif type == "SB":
+            return self.SIZES[size][0]
+        elif type == "N":
+            return str(size)
+        elif type in ("R", "RS"):
+            if type == "RS":
+                if size == 1:
+                    size == 2
+                if size == 4 and self.mode == 64:
+                    size = 8
+            reg = fields[1]
+            if size == 1:
+                if special:
+                    return self.reg_byte_high(reg)
+                else:
+                    return self.reg_byte(reg)
+            elif size == 2:
+                return self.reg_word(reg)
+            elif size == 4:
+                return self.reg_dword(reg)
+            elif size == 8:
+                return self.reg_qword(reg)
+        return None
+
+    def translate(self, s):
+        """
+        :param s: the format string. Syntax:
+                    {S} - native size word (dword/qword)
+                    {SB} - native size letter {d/q}
+                    {S:size} - specific size word
+                    {SB:size} - specific size letter {d/q}
+                    {N} - native size number
+                    {N:size} - specific size number (useless, but for the syntax)
+                    {R:reg} - native size register
+                    {R:reg:size} - specific size version of reg (if size = 1h => high byte)
+                    {RS:reg:size} - specific size version of reg upped to stack size
+        :return:
+        """
+        ns = s
+        for var in re.findall("\{([\w:]+)\}", s):
+            nvar = self._translate_var(var)
+            if nvar is None:
+                raise Exception("Invalid var: %s" % var)
+            ns = ns.replace("{%s}" % var, nvar)
+        return ns
 
 class ReaderException(Exception):
     pass

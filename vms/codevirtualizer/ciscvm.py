@@ -1,3 +1,4 @@
+from scipy.stats.mstats_basic import mode
 import utils
 from themida import cleaner
 from vms import vminstruction
@@ -17,42 +18,124 @@ class VMHandler(object):
 
 # TODO, do not just remove MATHF POP, becuase it is real math!
 
+def get_cleaner_reader(executable, address, options=None, unused_regs=None):
+    clean = cleaner.Cleaner(executable)
+    if options:
+        for option, value in options:
+            clean.set_option(option, value)
+    if unused_regs:
+        for reg in unused_regs:
+            clean.set_reg_unused(reg)
+    return clean.get_reader(address)
+
 class VMInit(VMHandler):
     cache = {}
-    def __init__(self, reader):
-        reader.get_cond(lambda x: x.opcode == "pushfd")
-        self.regs = ["flags"]
-        self.regs += [reader.get_cond(lambda x: x.opcode == "push" and x.operands[0].is_reg()).operands[0].reg for i in xrange(8)]
+    def __init__(self, executable, address):
+        mode = executable.get_arch()
+        if executable.mode == 32:
+            reader = get_cleaner_reader(executable, address, [("ignore_jumps", False)])
+            registers = 8
+        else:
+            reader = executable.get_reader(address)
+            registers = 15
+
+        self.regs = []
+        if executable.mode == 32:
+            reader.get_cond(lambda x: x.opcode == "pushfd")
+            self.regs.append("flags")
+        self.regs += [reader.get_cond(lambda x: x.opcode == "push" and x.operands[0].is_reg()).operands[0].reg for i in xrange(registers)]
+        if executable.mode == 64:
+            reader.get_cond(lambda x: x.opcode == "pushfq")
+            self.regs.append("flags")
+
         reader.get_cond(lambda x: x.opcode == "cld")
-        reader.get_cond(lambda x: x.opcode == "mov" and x.operands[0].is_reg("eax") and x.operands[1].is_reg("eax"))
+        if executable.mode == 32:
+            reader.get_cond(lambda x: x.opcode == "mov" and x.operands[0].is_reg("eax") and x.operands[1].is_reg("eax"))
+
         self.encode = utils.uint32(reader.get_cond(lambda x: x.opcode == "call" and x.operands[0].value == x.address + 5).operands[0].value)
-        reader.get_cond(lambda x: x.opcode == "pop" and x.operands[0].is_reg("edi"))
-        self.encode -= reader.get_cond(lambda x: x.opcode == "sub" and x.operands[0].is_reg("edi") and x.operands[1].is_immediate()).operands[1].value
-        reader.get_cond(lambda x: x.opcode == "and" and x.operands[0].is_reg("edi") and x.operands[1].is_immediate(0xFFFFF000))
-        self.encode &= 0xFFFFF000
-        reader.get_cond(lambda x: x.opcode == "add" and x.operands[0].is_reg("edi") and x.operands[1].is_immediate(0x14))
-        self.encode += 0x14
-        reader.get_cond(lambda x: x.opcode == "mov" and x.operands[0].is_reg("eax") and x.operands[1].is_reg("edi"))
-        self.vm_struct = long(self.encode + reader.get_cond(lambda x: x.opcode == "add" and x.operands[0].is_reg("edi") and x.operands[1].is_immediate()).operands[1].value)
-        self.encode_in_vm_struct = reader.get_cond(lambda x: x.opcode == "cmp" and x.operands[0].is_reg("eax") and x.operands[1].is_memory() and (x.operands[1].base == "edi" or x.operands[1].index == "edi") and x.operands[1].scale == 0).operands[1].offset
+        reader.get_cond(lambda x: x.opcode == "pop" and x.operands[0].is_reg(mode.reg_native("di")))
+
+        if executable.mode == 32:
+            self.encode -= reader.get_cond(lambda x: x.opcode == "sub" and x.operands[0].is_reg("edi") and x.operands[1].is_immediate()).operands[1].value
+            reader.get_cond(lambda x: x.opcode == "and" and x.operands[0].is_reg("edi") and x.operands[1].is_immediate(0xFFFFF000))
+            self.encode &= 0xFFFFF000
+            reader.get_cond(lambda x: x.opcode == "add" and x.operands[0].is_reg("edi") and x.operands[1].is_immediate(0x14))
+            self.encode += 0x14
+            reader.get_cond(lambda x: x.opcode == "mov" and x.operands[0].is_reg("eax") and x.operands[1].is_reg("edi"))
+            self.vm_struct = long(self.encode + reader.get_cond(lambda x: x.opcode == "add" and x.operands[0].is_reg("edi") and x.operands[1].is_immediate()).operands[1].value)
+        else:
+            unknown_number = reader.get_cond(lambda x: x.opcode == "mov" and x.operands[0].is_reg("rax") and x.operands[1].is_immediate()).operands[1].value
+            reader.get_cond(lambda x: x.opcode == "mov" and x.operands[0].is_reg("ecx") and x.operands[1].is_reg("eax"))
+            self.unknown_number = (unknown_number & 0xFFFFFFFF)
+            reader.get_cond(lambda x: x.opcode == "sub" and x.operands[0].is_reg("rcx") and x.operands[1].is_reg("rdi"))
+            self.unknown_number -= self.encode
+            reader.get_cond(lambda x: x.opcode == "neg" and x.operands[0].is_reg("rcx"))
+            self.unknown_number = -self.unknown_number
+            self.unknown_number &= (1 << executable.mode) - 1
+            reader.get_cond(lambda x: x.opcode == "sub" and x.operands[0].is_reg("rdi") and x.operands[1].is_reg("rax"))
+            self.encode -= unknown_number
+            reader.get_cond(lambda x: x.opcode == "mov" and x.operands[0].is_reg("rax") and x.operands[1].is_reg("rdi"))
+            self.vm_struct = long(self.encode + reader.get_cond(lambda x: x.opcode == "mov" and x.operands[0].is_reg("rbx") and x.operands[1].is_immediate()).operands[1].value)
+            reader.get_cond(lambda x: x.opcode == "add" and x.operands[0].is_reg("rdi") and x.operands[1].is_reg("rbx"))
+        self.encode &= (1 << executable.mode) - 1
+        self.vm_struct &= (1 << executable.mode) - 1
+
+        self.encode_in_vm_struct = reader.get_cond(lambda x: x.opcode == "cmp" and x.operands[0].is_reg(mode.reg_native("ax")) and x.operands[1].is_memory() and (x.operands[1].base == mode.reg_native("di") or x.operands[1].index == mode.reg_native("di")) and x.operands[1].scale == 0).operands[1].offset
         jnz = reader.get_cond(lambda x: x.opcode == "jnz").operands[0].value
         reader.get_cond(lambda x: x.opcode == "jmp" and x.operands[0].is_immediate())
-        reader.get_cond(lambda x: x.address == jnz and x.opcode == "mov" and x.operands[1].is_reg("eax") and x.operands[0].is_memory() and (x.operands[0].base == "edi" or x.operands[0].index == "edi") and x.operands[0].offset == self.encode_in_vm_struct and x.operands[0].scale == 0)
+        reader.get_cond(lambda x: x.address == jnz and x.opcode == "mov" and x.operands[1].is_reg(mode.reg_native("ax")) and x.operands[0].is_memory() and (x.operands[0].base == mode.reg_native("di") or x.operands[0].index == mode.reg_native("di")) and x.operands[0].offset == self.encode_in_vm_struct and x.operands[0].scale == 0)
+        if executable.mode == 64:
+            self.unknown_number_in_vm_struct = reader.get_cond(lambda x: x.opcode == "mov" and x.operands[1].is_reg(mode.reg_native("cx")) and x.operands[0].is_memory() and (x.operands[0].base == mode.reg_native("di") or x.operands[0].index == mode.reg_native("di")) and x.operands[0].scale == 0).operands[0].offset
+
         self.handlers_count = reader.get_cond(lambda x: x.opcode == "mov" and x.operands[0].is_reg("ecx") and x.operands[1].is_immediate()).operands[1].value
-        reader.get_cond(lambda x: x.opcode == "jmp" and x.operands[0].is_immediate())
-        try:
-            self.handlers_in_vm_struct = reader.get_cond(lambda x: x.opcode == "add" and x.operands[1].is_reg("eax") and x.operands[0].is_memory() and x.operands[0].base == "edi" and x.operands[0].index == "ecx" and x.operands[0].scale == 4).operands[0].offset + 4
-        except cleaner.CleanerException, e:
-            # Are they trying to confuse us?
-            reader.address = reader.get_cond(lambda x: x.opcode == "jmp" and x.operands[0].is_immediate()).operands[0].value
-            self.handlers_in_vm_struct = reader.get_cond(lambda x: x.opcode == "add" and x.operands[1].is_reg("eax") and x.operands[0].is_memory() and x.operands[0].base == "edi" and x.operands[0].index == "ecx" and x.operands[0].scale == 4).operands[0].offset + 4
-            
-        while reader.get().opcode != "jnz":
-            pass    
-        res = reader.get()
-        while res.opcode != "jnz":
-            res = reader.get()
-        self.main_handler_address = res.next
+        if executable.mode == 64:
+            test_address = reader.get_cond(lambda x: x.opcode == "test" and x.operands[0].is_reg("ecx") and x.operands[1].is_reg("ecx")).address
+            after_loop = reader.get_cond(lambda x: x.opcode == "jz" and x.operands[0].is_immediate()).operands[0].value
+        else:
+            reader.get_cond(lambda x: x.opcode == "jmp" and x.operands[0].is_immediate())
+
+        add_address = reader.address
+        self.handlers_in_vm_struct = reader.get_cond(lambda x: x.opcode == "add" and x.operands[1].is_reg(mode.reg_native("ax")) and x.operands[0].is_memory() and x.operands[0].base == mode.reg_native("di") and x.operands[0].index == mode.reg_native("cx") and x.operands[0].scale == mode.pointer_size()).operands[0].offset + mode.pointer_size()
+        reader.get_cond(lambda x: x.opcode == "dec" and x.operands[0].is_reg("ecx"))
+
+        if executable.mode == 64:
+            reader.get_cond(lambda x: x.opcode == "jmp" and x.operands[0].is_immediate(test_address))
+            assert after_loop == reader.address
+        else:
+            reader.get_cond(lambda x: x.opcode == "or" and x.operands[0].is_reg("ecx") and x.operands[1].is_reg("ecx"))
+            reader.get_cond(lambda x: x.opcode == "jnz" and x.operands[0].is_immediate(add_address))
+
+        #try:
+        #    self.handlers_in_vm_struct = reader.get_cond(lambda x: x.opcode == "add" and x.operands[1].is_reg("eax") and x.operands[0].is_memory() and x.operands[0].base == "edi" and x.operands[0].index == "ecx" and x.operands[0].scale == 4).operands[0].offset + 4
+        #except cleaner.CleanerException, e:
+        #    # Are they trying to confuse us?
+        #    reader.address = reader.get_cond(lambda x: x.opcode == "jmp" and x.operands[0].is_immediate()).operands[0].value
+        #    self.handlers_in_vm_struct = reader.get_cond(lambda x: x.opcode == "add" and x.operands[1].is_reg("eax") and x.operands[0].is_memory() and x.operands[0].base == "edi" and x.operands[0].index == "ecx" and x.operands[0].scale == 4).operands[0].offset + 4
+
+        if executable.mode == 64:
+            self.encode_address_high_dword = reader.get_cond(lambda x: x.opcode == "mov" and x.operands[0].is_reg("rdx") and x.operands[1].is_immediate()).operands[1].value
+        else:
+            self.encode_address_high_dword = 0
+
+        # mov esi, [esp+0x24]/[rsp+80h]
+        reader.get_cond(lambda x: x.opcode == "mov" and x.operands[0].is_reg("esi") and x.operands[1].is_memory() and x.operands[1].base == mode.reg_native("sp") and x.operands[1].offset == (registers + 1) * mode.pointer_size())
+        # mov ebx, esi
+        reader.get_cond(lambda x: x.opcode == "mov" and x.operands[0].is_reg("ebx") and x.operands[1].is_reg("esi"))
+        if executable.mode == 64:
+            # add rsi, edx
+            reader.get_cond(lambda x: x.opcode == "add" and x.operands[0].is_reg("rsi") and x.operands[1].is_reg("rdx"))
+        # add rsi, rax
+        reader.get_cond(lambda x: x.opcode == "add" and x.operands[0].is_reg(mode.reg_native("si")) and x.operands[1].is_reg(mode.reg_native("ax")))
+        # mov ecx, 0x1
+        reader.get_cond(lambda x: x.opcode == "mov" and x.operands[0].is_reg("ecx") and x.operands[1].is_immediate(1))
+        # xor eax, eax
+        lock_loop_address = reader.get_cond(lambda x: x.opcode == "xor" and x.operands[0].is_reg("eax") and x.operands[1].is_reg("eax")).address
+        # lock cmpxchg [rdi+lock_offset], rcx
+        self.lock_in_vm_struct = reader.get_cond(lambda x: x.opcode == "cmpxchg" and x.operands[1].is_reg(mode.reg_native("cx")) and x.operands[0].is_memory() and (x.operands[0].base == mode.reg_native("di") or x.operands[0].index == mode.reg_native("di"))).operands[0].offset
+
+        reader.get_cond(lambda x: x.opcode == "jnz" and x.operands[0].is_immediate(lock_loop_address))
+
+        self.main_handler_address = reader.address
 
 ### Old handlers
 ##class VMInit(VMHandler):
@@ -141,12 +224,14 @@ class VMReadInfo(vminstruction.VMReadInfo):
 
 class VMMainHandler(VMHandler):
     cache = {}
-    def __init__(self, reader):
+    def __init__(self, executable, address):
+        reader = get_cleaner_reader(executable, address, unused_regs = ["r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15"])
+        mode = executable.get_arch()
         self.read = VMReadInfo(reader)
         if self.read.size != 1:
             raise cleaner.CleanerException("Invalid size for main handler reader")
-        reader.get_cond(lambda x: str(x) == "movzx eax, al")
-        reader.get_cond(lambda x: str(x) == "jmp dword [edi+eax*4]")
+        reader.get_cond(lambda x: str(x) == mode.translate("movzx {R:ax}, al"))
+        reader.get_cond(lambda x: str(x) == mode.translate("jmp {S} [{R:di}+{R:ax}*{N}]"))
 
 class VMOpcodeHandler(VMHandler):
     def __init__(self, reader):
@@ -159,7 +244,10 @@ class VMOpcodeHandler(VMHandler):
         
         while True:
             inst = reader.get()
-            if inst.opcode == "lodsb":
+            print "0x%x: %s" % (inst.address, str(inst))
+            if inst.opcode == "jmp" and inst.operands[0].is_immediate():
+                # Since we ignore jumps, if we get a jump anyway,
+                # it means that it was a jump to the end, to the main handler
                 break
             self.insts.append(inst)
             if inst.opcode == "ret":
@@ -178,16 +266,22 @@ class VMOpcodeHandler(VMHandler):
 class VMHandlers(object):
     def __init__(self, executable, vm_info):
         clean = cleaner.Cleaner(executable)
+        for reg in ["r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15"]:
+            clean.set_reg_unused(reg)
         fix_handlers = executable.read_dword(vm_info.init_handler.vm_struct + vm_info.init_handler.encode_in_vm_struct) != vm_info.init_handler.encode
+        mode = executable.get_arch()
 
         self.handlers = {}
         handlers_to_process = Queue.Queue()
         # Let's find all the handlers now
-        for i in xrange(vm_info.init_handler.handlers_in_vm_struct / 4, vm_info.init_handler.handlers_in_vm_struct / 4 + vm_info.init_handler.handlers_count):
-            handler_address = executable.read_dword(vm_info.init_handler.vm_struct + i * 4)
+        for i in xrange(vm_info.init_handler.handlers_in_vm_struct / mode.pointer_size(), vm_info.init_handler.handlers_in_vm_struct / mode.pointer_size() + vm_info.init_handler.handlers_count):
+            handler_address = executable.read_pointer(vm_info.init_handler.vm_struct + i * mode.pointer_size())
             if fix_handlers:
                 handler_address = long(handler_address + vm_info.init_handler.encode)
+            clean.set_option("end_address", vm_info.init_handler.main_handler_address)
+            print hex(handler_address)
             self.handlers[i] = VMOpcodeHandler(clean.get_reader(handler_address))
+            clean.set_option("end_address", 0)
             handlers_to_process.put(self.handlers[i])
 
         variables = {}
@@ -237,11 +331,8 @@ class VMHandlers(object):
 class VMInfo(object):
     cache = {}
     def __init__(self, executable, vm_address):
-        clean = cleaner.Cleaner(executable)
-        clean.set_option("ignore_jumps", False)
-        self.init_handler = VMInit(clean.get_reader(vm_address))
-        clean.set_option("ignore_jumps", True)
-        self.main_handler = VMMainHandler(clean.get_reader(self.init_handler.main_handler_address))
+        self.init_handler = VMInit(executable, vm_address)
+        self.main_handler = VMMainHandler(executable, self.init_handler.main_handler_address)
         self.handlers = VMHandlers(executable, self)
 
     @classmethod
