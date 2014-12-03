@@ -101,7 +101,7 @@ class Debugger(object):
     def get_instruction(self, address = None):
         if address == None:
             address = self.thread.get_pc()
-        return instruction.Instruction(self.process.read(address, 32), address, self.mode)
+        return instruction.Instruction(self.process.read(address, 32), address, self.mode, False)
 
     def step(self):
         # The direct api is slow
@@ -115,7 +115,7 @@ class Debugger(object):
         inst = self.get_instruction()
         if inst.opcode.startswith("j") or inst.opcode.startswith("ret"):
             return self.step()
-        return self.go(self.thread.get_pc() + self.get_instruction().length)
+        return self.go(self.thread.get_pc() + self.get_instruction().size)
 
     def pc(self):
         inst = self.step()

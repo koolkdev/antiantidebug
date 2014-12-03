@@ -16,8 +16,8 @@ def find_ret(debugger):
     inst = debugger.get_instruction(current_address)
     while inst.opcode != "ret":
         current_address += inst.length
-        if inst.opcode.startswith("j") and inst.operand1.is_immediate() and inst.operand1.value > current_address:
-            current_address = inst.operand1.value
+        if inst.opcode.startswith("j") and inst.operands[0].is_immediate() and inst.operands[0].value > current_address:
+            current_address = inst.operands[0].value
         inst = debugger.get_instruction(current_address)
     return current_address
 
@@ -25,13 +25,13 @@ def find_cmp_PE(debugger):
     current_address = debugger.thread.get_pc()
     inst = debugger.get_instruction(current_address)
     i = 0
-    while not (inst.opcode == "cmp" and inst.operand2.is_immediate() and inst.operand2.value == 0x4550):
+    while not (inst.opcode == "cmp" and inst.operands[1].is_immediate() and inst.operands[1].value == 0x4550):
         if i > 100:
             return None
         i += 1
         current_address += inst.length
-        if inst.opcode == "jmp" and inst.operand1.is_immediate() and inst.operand1.value > current_address:
-            current_address = inst.operand1.value
+        if inst.opcode == "jmp" and inst.operands[0].is_immediate() and inst.operands[0].value > current_address:
+            current_address = inst.operands[0].value
         inst = debugger.get_instruction(current_address)
     return current_address
     
@@ -42,14 +42,14 @@ def follow_until(debugger, stop, ignore_not_jmps = False, ignore = 0):
         #print "%X: %s" % (inst.address, inst)
         next = inst.next
         if inst.opcode == "jmp":
-            next = inst.operand1.value
+            next = inst.operands[0].value
         elif not ignore_not_jmps and inst.opcode == "call":
-           next = inst.operand1.value
+           next = inst.operands[0].value
         elif inst.opcode == stop:
             if ignore == 0:
                 return inst.address
             ignore -= 1
-#        elif not ignore_not_jmps and inst.operand1.is_immediate() and inst.operand1.is_address and inst.operand1.value != inst.next:
+#        elif not ignore_not_jmps and inst.operands[0].is_immediate() and inst.operands[0].is_address and inst.operands[0].value != inst.next:
 #            print inst
 #            return None
         inst = debugger.get_instruction(next)
@@ -59,12 +59,12 @@ def get_instruction_ignore_jumps(debugger, address):
     while True:
         if inst.opcode != "jmp":
             return inst
-        inst = debugger.get_instruction(inst.operand1.value)
+        inst = debugger.get_instruction(inst.operands[0].value)
 	
 def old_follow(binary):
     d = debugger.Debugger()
     first = d.start(binary)
-    assert first.opcode == "sub" and first.operand1.is_reg() and first.operand1.value == "esp" and isinstance(first.operand2, instruction.ImmediateOperand) and first.operand2.value == 4
+    assert first.opcode == "sub" and first.operands[0].is_reg("esp") and first.operands[1].is_immediate(4)
     
     res = d.go(find_ret(d))
     assert str(d.step()) == "mov eax, 0x0"
@@ -95,11 +95,11 @@ def old_follow(binary):
     d.go(find_cmp_PE(d))
     res = d.step()
     assert res.opcode == "jz"
-    d.go(res.operand1.value)
+    d.go(res.operands[0].value)
     d.go(find_cmp_PE(d))
     res = d.step()
     assert res.opcode == "jz"
-    res = d.go(res.operand1.value)
+    res = d.go(res.operands[0].value)
     assert str(res) == "xchg eax, esi"
     inst = d.step()
     if exceptions:
@@ -145,7 +145,7 @@ def old_follow(binary):
                 else:
                     saw.append(inst.address)
                     inst = d.step()           
-        elif inst.opcode == "call" and inst.operand1.is_immediate():
+        elif inst.opcode == "call" and inst.operands[0].is_immediate():
             inst = d.step()
         else:
             inst = d.stepover()
@@ -164,7 +164,7 @@ def old_follow(binary):
     inst = d.go(value)
     saw = []
     while True:
-        if inst.opcode == "mov" and inst.operand2.is_immediate(0x52) and inst.operand1.is_memory() and inst.operand1.base == "ebp":
+        if inst.opcode == "mov" and inst.operands[1].is_immediate(0x52) and inst.operands[0].is_memory() and inst.operands[0].base == "ebp":
             break
         elif inst.opcode == "jnz":
             if exceptions:
@@ -183,7 +183,7 @@ def old_follow(binary):
                 else:
                     saw.append(inst.address)
                     inst = d.step()           
-        elif inst.opcode == "call" and inst.operand1.is_immediate():
+        elif inst.opcode == "call" and inst.operands[0].is_immediate():
             inst = d.step()
         else:
             inst = d.stepover()
@@ -191,7 +191,7 @@ def old_follow(binary):
     print inst
     while True:
         print inst
-        #if inst.opcode == "mov" and inst.operand2.is_immediate(0x52) and inst.operand1.is_memory() and inst.operand1.base == "ebp":
+        #if inst.opcode == "mov" and inst.operands[1].is_immediate(0x52) and inst.operands[0].is_memory() and inst.operands[0].base == "ebp":
         #    break
         if inst.opcode == "jnz":
             if exceptions:
@@ -210,7 +210,7 @@ def old_follow(binary):
                 else:
                     saw.append(inst.address)
                     inst = d.step()           
-        elif inst.opcode == "call" and inst.operand1.is_immediate():
+        elif inst.opcode == "call" and inst.operands[0].is_immediate():
             inst = d.step()
         else:
             inst = d.stepover()
@@ -218,16 +218,27 @@ def old_follow(binary):
 
 def get_vm(debugger):
     cc = cleaner.Cleaner(executable.ToExecutable(debugger))
-    cc.set_option("fixOperationConstantThruRegOnStack", True)
-    cc.set_option("fixPush_allowConstants", True)
+    #cc.set_option("fixOperationConstantThruRegOnStack", True)
+    #cc.set_option("fixPush_allowConstants", True)
+
+    cc.set_option("ignore_jumps", False)
 
     #clean = cleaner.Cleaner(debugger)
     #reader = clean.get_reader(debugger.thread.get_pc())
     #while True:
     #    print reader.get()
-    
-    res = cc.get_clean_instruction(debugger.thread.get_pc())
-    jmp_to_vm = debugger.get_instruction(res.next)
+
+    reader = cc.get_reader(debugger.thread.get_pc())
+    subesp = reader.get_cond(lambda x: ((x.opcode == "push" and x.operands[0].size == 4) or (x.opcode == "sub" and x.operands[0].is_reg("esp") and x.operands[1].is_immediate(4))))
+    push1 = reader.get_cond(lambda x: x.opcode == "push" and x.operands[0].is_reg())
+    push2 = reader.get_cond(lambda x: x.opcode == "push" and x.operands[0].is_reg())
+    movimm = reader.get_cond(lambda x: x.opcode == "mov" and x.operands[0].is_reg(push1.operands[0].reg) and x.operands[1].is_immediate())
+    movesp = reader.get_cond(lambda x: x.opcode == "mov" and x.operands[0].is_reg(push2.operands[0].reg) and x.operands[1].is_reg("esp"))
+    mov = reader.get_cond(lambda x: x.opcode == "mov" and x.operands[0].is_memory() and (x.operands[0].base == push2.operands[0].reg or x.operands[0].index == push2.operands[0].reg) and (x.operands[0].base is None or x.operands[0].index is None) and x.operands[0].offset == 8 and x.operands[1].is_reg(push1.operands[0].reg))
+    pop2 = reader.get_cond(lambda x: x.opcode == "pop" and x.operands[0].is_reg(push2.operands[0].reg))
+    pop1 = reader.get_cond(lambda x: x.opcode == "pop" and x.operands[0].is_reg(push1.operands[0].reg))
+    jmp_to_vm = reader.get_cond(lambda x: x.opcode == "jmp" and x.operands[0].is_immediate())
+
     #first_vm = ciscvm.get_vm_code(debugger, res, jmp_to_vm)
     #print first_vm
     #assert first_vm.endswith("\njmp eax")
@@ -235,9 +246,11 @@ def get_vm(debugger):
     #first_vm = first_vm[first_vm.rfind("mov eax, dword [ebp+0x"):]
     #add_ebp, xor_with = [int(x, 16) for x in re.match(r"mov eax, dword \[ebp\+0x(\w+)\].+xor eax, 0x(\w+).+add eax, ebp.+jmp eax$", first_vm, re.S).groups()]
     #value = ((debugger.process.read_dword((debugger.thread.get_register("Ebp") + add_ebp) % (1<<32)) ^ xor_with) + debugger.thread.get_register("Ebp")) % (1<<32)
-    vm = ciscvm.VMFunction(executable.ToExecutable(debugger), res, jmp_to_vm)
+    vm = ciscvm.VMFunction(executable.ToExecutable(debugger), movimm.operands[1].value, jmp_to_vm.operands[0].value)
     vm.clean()
+    #print vm.get_code()
     address, compiled_code = vm.compile_code()
+    #print compiled_code.encode("hex")
     debugger.process.write(address, compiled_code)
     debugger.thread.set_pc(address)
     assert compiled_code[-2:] == "\xFF\xE0" # jmp eax
@@ -250,10 +263,12 @@ def goto_jmp_eax(debugger):
     inst = cc.get_clean_instruction(debugger.thread.get_pc())    
     exceptions = False
     saw = []
+    loop_detector = []
     while True:
         #print "0x%08X: %s" % (inst.address, inst)
         if str(inst) == "jmp eax":
             break
+        #print "0x%x: %s" % (inst.address, str(inst))
         if inst.opcode == "sti":
             exceptions = True
         if inst.opcode == "jnz":
@@ -280,15 +295,24 @@ def goto_jmp_eax(debugger):
                     saw.append(inst.address)
                     isnt = debugger.go(inst.address)
                     inst = debugger.step()
+            loop_detector = []
             inst = cc.get_clean_instruction(inst.address)
             continue
         if inst.opcode.startswith("j") or inst.opcode == "ret":
             inst = debugger.go(inst.address)
             inst = debugger.step()
+            loop_detector = []
             inst = cc.get_clean_instruction(inst.address)
         else:
             inst = cc.get_clean_instruction(inst.next)
-            
+
+        if loop_detector.count(inst.address) != 0:
+            inst = debugger.go(inst.address)
+            inst = cc.get_clean_instruction(inst.address)
+            loop_detector = []
+        loop_detector.append(inst.address)
+
+
     debugger.go(inst.address)
     print "Found jmp eax"
 
@@ -378,13 +402,13 @@ def follow(binary):
     while True:
         if str(inst) == "cmp esi, 0xa":
             break
-        if inst.opcode == "call" and not inst.operand1.is_immediate():
+        if inst.opcode == "call" and not inst.operands[0].is_immediate():
             inst = d.stepover()
         else:
             inst = d.step()
     jmp = d.step()
     assert jmp.opcode == "jz"
-    inst = d.go(jmp.operand1.value)
+    inst = d.go(jmp.operands[0].value)
     i = 0
     while True:
         goto_jmp_eax(d)
@@ -425,7 +449,7 @@ def new_follow(binary):
     antidebugging.hide_ZwSetInformationThread(d)
     antidebugging.hide_CheckRemoteDebuggerPresent(d)
     d.go()
-    assert first.opcode == "sub" and first.operand1.is_reg() and first.operand1.value == "esp" and isinstance(first.operand2, instruction.ImmediateOperand) and first.operand2.value == 4
+    assert first.opcode == "sub" and first.operands[0].is_reg("esp") and first.operands[1].is_immediate(4)
     
     res = d.go(find_ret(d))
     assert str(d.step()) == "mov eax, 0x0"
@@ -456,11 +480,11 @@ def new_follow(binary):
     d.go(find_cmp_PE(d))
     res = d.step()
     assert res.opcode == "jz"
-    d.go(res.operand1.value)
+    d.go(res.operands[0].value)
     d.go(find_cmp_PE(d))
     res = d.step()
     assert res.opcode == "jz"
-    res = d.go(res.operand1.value)
+    res = d.go(res.operands[0].value)
     assert str(res) == "xchg eax, esi"
     inst = d.step()
     if exceptions:
@@ -523,7 +547,6 @@ def run_clean(debugger):
     while True:
         print "0x%08X: %s" % (inst.address, inst)
         inst = cc.get_clean_instruction(inst.next)
-        
         
 def do(binary):
     follow(binary).dump(True)

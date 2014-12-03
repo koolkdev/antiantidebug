@@ -244,7 +244,7 @@ class VMOpcodeHandler(VMHandler):
         
         while True:
             inst = reader.get()
-            print "0x%x: %s" % (inst.address, str(inst))
+            #print "0x%x: %s" % (inst.address, str(inst))
             if inst.opcode == "jmp" and inst.operands[0].is_immediate():
                 # Since we ignore jumps, if we get a jump anyway,
                 # it means that it was a jump to the end, to the main handler
@@ -279,7 +279,7 @@ class VMHandlers(object):
             if fix_handlers:
                 handler_address = long(handler_address + vm_info.init_handler.encode)
             clean.set_option("end_address", vm_info.init_handler.main_handler_address)
-            print hex(handler_address)
+            #print hex(handler_address)
             self.handlers[i] = VMOpcodeHandler(clean.get_reader(handler_address))
             clean.set_option("end_address", 0)
             handlers_to_process.put(self.handlers[i])
@@ -364,12 +364,12 @@ class VMKey(vminstruction.VMKey):
         self.key = utils.uint32(0)
         
 class VMFunction(object):
-    def __init__(self, executable, push_inst, jmp_inst):
+    def __init__(self, executable, vm_code_address, vm_address):
         self.executable = executable
-        assert push_inst.opcode == "push" and push_inst.operands[0].is_immediate()
-        assert jmp_inst.opcode == "jmp" and jmp_inst.operands[0].is_immediate()
-        vm_address = jmp_inst.operands[0].value
-        vm_code_address = push_inst.operands[0].value
+        #assert push_inst.opcode == "push" and push_inst.operands[0].is_immediate()
+        #assert jmp_inst.opcode == "jmp" and jmp_inst.operands[0].is_immediate()
+        #vm_address = jmp_inst.operands[0].value
+        #vm_code_address = push_inst.operands[0].value
         print "Getting VM %08X %08X" % (vm_address, vm_code_address)
 
         self.vm_info = VMInfo.get_vm_info(executable, vm_address)
@@ -401,36 +401,11 @@ class VMFunction(object):
         # Start address is the address of push address2/jmp and end address is the address of vmcode
         real_vm_code_address = long(vm_code_address + self.vm_info.init_handler.encode)
         self.code_address = real_vm_code_address
-        vm_code_end = push_inst.address 
-        start_address = real_vm_code_address
-        i = 0
-        end_address = start_address
-        while True:
-            i += 1
-            assert i < 0x1000
-            try:
-                jmp = executable.get_instruction(start_address)
-            except:
-                start_address -= 1
-                continue
-            if jmp.opcode == "jmp" and jmp.operands[0].is_immediate() and jmp_inst.address <= jmp.operands[0].value <= jmp_inst.address + 0x20:
-                break
-            start_address -= 1
-        start_address += jmp.size
 
         # Mark the start of the vm code as part that something is started in it
         addresses_to_explore.put((real_vm_code_address, vm_code_address))
         starts.append(real_vm_code_address)
-        while start_address != end_address:
-            push = executable.get_instruction(start_address)
-            if push.opcode != "push":
-                push = executable.get_instruction(push.next)
-            assert push.opcode == "push" and push.operands[0].is_immediate()
-            jmp = executable.get_instruction(push.next)
-            assert jmp.opcode == "jmp" and jmp.operands[0].is_immediate(vm_address)
-            addresses_to_explore.put((long(push.operands[0].value + self.vm_info.init_handler.encode), push.operands[0].value))
-            starts.append(long(push.operands[0].value + self.vm_info.init_handler.encode))
-            start_address = jmp.next
+
         to_print = False
         while not addresses_to_explore.empty():
             next_labled = True
@@ -440,7 +415,7 @@ class VMFunction(object):
                 instructions[address].set_info("labled", True)
                 continue
             bytes_reader = vminstruction.BytesReader(executable, address)
-            while bytes_reader.address != vm_code_end:
+            while True:
                 # TODO: Do a method to do this
                 address = bytes_reader.address
                 func = self.vm_info.main_handler.read.decode(bytes_reader, key)
@@ -465,9 +440,21 @@ class VMFunction(object):
                 elif inst.name == "JMPIF":
                     addresses_to_explore.put((inst.args[0], 0))
                 elif inst.name == "RESETKEY":
-                    key.reset()                
+                    key.reset()
+                elif inst.name == "PUSHWITHENCODE":
+                    push = executable.get_instruction(long(inst.args[0] + self.vm_info.init_handler.encode))
+                    if push.opcode != "push":
+                        push = executable.get_instruction(push.next)
+                    assert push.opcode == "push" and push.operands[0].is_immediate()
+                    jmp = executable.get_instruction(push.next)
+                    assert jmp.opcode == "jmp" and jmp.operands[0].is_immediate(vm_address)
+                    addresses_to_explore.put((long(push.operands[0].value + self.vm_info.init_handler.encode), push.operands[0].value))
+                    starts.append(long(push.operands[0].value + self.vm_info.init_handler.encode))
 
                 instructions[inst.address] = inst
+
+                if inst.name in ("RETURN", "JMPREG", "JMPREGOFFSET"):
+                    break
 
                 if instructions.has_key(bytes_reader.address):
                     if next_labled:
@@ -604,7 +591,8 @@ class VMFunction(object):
                         asminst_after = self.executable.get_instruction(asminst.next)
                         assert asminst_after.opcode == "push"
                         assert asminst_after.operands[0].is_immediate()
-                        sectioncode += "\n".join(["db 0x%x" % ord(x) for x in asminst.bytes]) + "\n"
+                        #sectioncode += "\n".join(["db 0x%x" % ord(x) for x in asminst.bytes]) + "\n"
+                        sectioncode += str(asminst) + "\n"
                         next_section = long(asminst_after.operands[0].value + self.vm_info.init_handler.encode)
                         break
                     elif next.name.startswith("PUSHDWORD"):
@@ -662,12 +650,16 @@ class VMFunction(object):
 def get_vm(executable, address):
     push_inst = executable.get_instruction(address)
     jmp_inst = executable.get_instruction(push_inst.next)
-    vm = VMFunction(executable, push_inst, jmp_inst)
+    assert push_inst.opcode == "push" and push_inst.operands[0].is_immediate()
+    assert jmp_inst.opcode == "jmp" and jmp_inst.operands[0].is_immediate()
+    vm = VMFunction(executable, push_inst.operands[0].value, jmp_inst.operands[0].value)
     vm.clean()
     return vm
         
 def get_vm_code(executable, push_inst, jmp_inst):
-    vm = VMFunction(executable, push_inst, jmp_inst)
+    assert push_inst.opcode == "push" and push_inst.operands[0].is_immediate()
+    assert jmp_inst.opcode == "jmp" and jmp_inst.operands[0].is_immediate()
+    vm = VMFunction(executable, push_inst.operands[0].value, jmp_inst.operands[0].value)
     #print "Cleaning vm.."
     vm.clean()
     #vm.printfunc()
@@ -679,7 +671,9 @@ def get_vm_code(executable, push_inst, jmp_inst):
         raise
     
 def get_compiled_vm_code(executable, push_inst, jmp_inst, address = None):
-    vm = VMFunction(executable, push_inst, jmp_inst)
+    assert push_inst.opcode == "push" and push_inst.operands[0].is_immediate()
+    assert jmp_inst.opcode == "jmp" and jmp_inst.operands[0].is_immediate()
+    vm = VMFunction(executable, push_inst.operands[0].value, jmp_inst.operands[0].value)
     vm.clean()
     code = vm.get_code()
     if address == None:
