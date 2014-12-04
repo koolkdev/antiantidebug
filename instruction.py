@@ -293,18 +293,18 @@ class Function(object):
                         instructions_blocks[address].froms.append(block)
                     break
                 inst = executable.get_instruction(address)
-                if inst.opcode == "jmp" and inst.operand1.is_immediate():
+                if inst.opcode == "jmp" and inst.operands[0].is_immediate():
                     # Ignore jmps
-                    address = inst.operand1.value
+                    address = inst.operands[0].value
                     continue
                 block.instructions.append(inst)
                 instructions_blocks[inst.address] = block
-                if inst.opcode == "jmp" or inst.opcode == "retn":  # and not immediate
+                if inst.opcode == "jmp" or inst.opcode == "ret":  # and not immediate
                     break
                 if inst.opcode in CONDITIONAL_JUMPS:
                     block.next = get_block(inst.next)
                     block.next.froms.append(block)
-                    block.next_cond = get_block(inst.operand1.value)
+                    block.next_cond = get_block(inst.operands[0].value)
                     block.next_cond.froms.append(block)
                     break
                 address = inst.next

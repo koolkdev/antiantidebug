@@ -560,16 +560,7 @@ class State(object):
             self.flags = Invalid()
 
     def _get_full_register(self, reg):
-        if instruction.REGS["REG_DWORD"].count(reg) > 0:
-            return reg
-        elif instruction.REGS["REG_WORD"].count(reg) > 0:
-            return instruction.REGS["REG_DWORD"][instruction.REGS["REG_WORD"].index(reg)]
-        elif instruction.REGS["REG_BYTE"].count(reg) > 0:
-            index = instruction.REGS["REG_BYTE"].index(reg)
-            if index >= 4: # 2nd byte, should not appear
-                return None
-            return instruction.REGS["REG_DWORD"][index]
-        return None
+        return instruction.Arch(32).translate("{R:%s}" % reg)
 
     def get_register(self, reg):
         return VariableProxy(self.registers_variables[self._get_full_register(reg)], self.registers[self._get_full_register(reg)])
@@ -719,11 +710,11 @@ class Handler(object):
         state = State(state)
         def get_operand_value(op):
             if op.is_reg():
-                return state.get_register(op.value)
+                return state.get_register(op.reg)
             elif op.is_immediate():
                 return Immediate(op.value)
             elif op.is_memory():
-                assert op.index == None and op.displacement == 0 and op.scale == 0  # TODO (in case of unobfuscation)
+                assert op.index is None and op.offset == 0 and op.scale == 0  # TODO (in case of unobfuscation)
                 offset = state.get_register(op.base)
                 return ValueOf(offset, op.size)
             return None
@@ -757,12 +748,12 @@ class Handler(object):
             for inst in block.instructions:
                 if inst.opcode in ("mov", "movzx", "movsx", "add", "sub", "xor", "and", "or", "shl", "shr", "rcl", "rcr", "rol", "ror", "imul", "inc", "dec", "not", "neg"):
                     state.flags = Invalid()
-                    lvalue = get_operand_value(inst.operand1)
+                    lvalue = get_operand_value(inst.operands[0])
                     if inst.opcode in ("inc", "dec", "not", "neg"):
                         value = lvalue
                     else:
-                        value = get_operand_value(inst.operand2)
-                    if inst.operand1.is_reg() and not inst.operand1.is_reg("esp"):
+                        value = get_operand_value(inst.operands[1])
+                    if inst.operands[0].is_reg() and not inst.operands[0].is_reg("esp"):
                         if inst.opcode == "add":
                             value = Add(lvalue, value)
                         elif inst.opcode == "sub":
@@ -800,17 +791,17 @@ class Handler(object):
                         elif inst.opcode == "mov":
                             pass
                         elif inst.opcode =="movzx":
-                            if inst.operand2.is_reg():
-                                value = UnsignedConversion(value, inst.operand2.size)
+                            if inst.operands[1].is_reg():
+                                value = UnsignedConversion(value, inst.operands[1].size)
                         elif inst.opcode == "movsx":
-                            assert inst.operand2.is_reg()
-                            value = SignedConversion(value, inst.operand2.size)
+                            assert inst.operands[1].is_reg()
+                            value = SignedConversion(value, inst.operands[1].size)
                         else:
                             assert False
                         if not inst.opcode.startswith("mov"):
                             # TODO: line appear twice right now
                             state.flags = FlagsOf(value)
-                        set_register_value(inst.operand1.value, value)
+                        set_register_value(inst.operands[0].reg, value)
                     else:
                         if inst.opcode == "add":
                             value = AddValue(lvalue, value)
@@ -855,12 +846,12 @@ class Handler(object):
                             state.flags = FlagsOf(value)
                         set_value(lvalue, value)
                 elif inst.opcode == "jmp":
-                    instructions.append(Jump(get_operand_value(inst.operand1)))
+                    instructions.append(Jump(get_operand_value(inst.operands[0])))
                     self.make_visible(instructions[-1])
                     break
                 elif inst.opcode in ("cmp", "test"):
-                    value = get_operand_value(inst.operand2)
-                    lvalue = get_operand_value(inst.operand1)
+                    value = get_operand_value(inst.operands[1])
+                    lvalue = get_operand_value(inst.operands[0])
                     if inst.opcode == "cmp":
                         state.flags = FlagsOf(Cmp(lvalue, value))
                     elif inst.opcode == "test":
@@ -948,14 +939,14 @@ class Handler(object):
                     block = next_block
                     new_block = True
                     break
-                elif inst.opcode in ("push", "pushf"):
-                    if inst.opcode == "pushf":
+                elif inst.opcode in ("push", "pushfd"):
+                    if inst.opcode == "pushfd":
                         value = state.flags
                         state.has_flags = True
                         nop = Push(Flags())
                     else:
-                        value = get_operand_value(inst.operand1)
-                        if inst.operand1.size == 4:
+                        value = get_operand_value(inst.operands[0])
+                        if inst.operands[0].size == 4:
                             nop = Push(value)
                         else:
                             nop = PushWord(value)
@@ -967,39 +958,41 @@ class Handler(object):
                     op.lvalue.instructions.append(op)
                     instructions.append(op)
                     instructions.append(nop)
-                elif inst.opcode in ("pop", "popf"):
+                elif inst.opcode in ("pop", "popfd"):
                     if len(state.stack) > 0:
                         value = state.stack.pop()
                         state.stack_variables.pop()
                         state.stack_instructions.pop()
                         pop = False
                     else:
-                        if inst.operand1.size == 4:
+                        if inst.opcode == "popfd":
+                            value = Pop()
+                        elif inst.operands[0].size == 4:
                             value = Pop()
                         else:
                             value = PopWord()
                         pop = True
 
-                    if inst.operand1.is_reg() and not inst.operand1.is_reg("esp"):
-                        assert inst.operand1.size == 4
+                    if inst.opcode == "pop" and inst.operands[0].is_reg() and not inst.operands[0].is_reg("esp"):
+                        assert inst.operands[0].size == 4
                         if pop:
-                            instructions.append(SetValue(Register(inst.operand1.value), value))
+                            instructions.append(SetValue(Register(inst.operands[0].reg), value))
                             self.make_visible(instructions[-1])
-                            set_register_value(inst.operand1.value, Invalid())
+                            set_register_value(inst.operands[0].reg, Invalid())
                         else:
-                            set_register_value(inst.operand1.value, value)
+                            set_register_value(inst.operands[0].reg, value)
                     else:
-                        if inst.opcode == "popf":
+                        if inst.opcode == "popfd":
                             state.has_flags = True
                             lvalue = Flags()
                         else:
-                            lvalue = get_operand_value(inst.operand1)
+                            lvalue = get_operand_value(inst.operands[0])
                             if not pop:
-                                assert inst.operand1.size == 4
+                                assert inst.operands[0].size == 4
                         value = SetValue(lvalue, value)
                         set_value(lvalue, value)
-                elif inst.opcode == "retn":
-                    instructions.append(Return(inst.operand1.value))
+                elif inst.opcode == "ret":
+                    instructions.append(Return(inst.operands[0].value))
                 elif inst.opcode == "call":
                     return state, instructions
                 elif inst.opcode == "std":

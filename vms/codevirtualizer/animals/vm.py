@@ -32,112 +32,112 @@ class VMInit(VMHandler):
         #reader.get_cond(lambda x: x.opcode == "pusha") # In new version it is splitted
         pusha_regs = ["eax", "ecx", "edx", "ebx", "ebx", "ebp", "esi", "edi"]
         for reg in pusha_regs:
-            reader.get_cond(lambda x: x.opcode == "push" and x.operand1.is_reg(reg))
+            reader.get_cond(lambda x: x.opcode == "push" and x.operands[0].is_reg(reg))
             self.regs.append(reg)
         # call $+5
-        self.base_address = reader.get_cond(lambda x: x.opcode == "call" and x.operand1.value == x.address + 5).operand1.value
+        self.base_address = reader.get_cond(lambda x: x.opcode == "call" and x.operands[0].value == x.address + 5).operands[0].value
         # pop ecx
-        reader.get_cond(lambda x: x.opcode == "pop" and x.operand1.is_reg("ecx"))
+        reader.get_cond(lambda x: x.opcode == "pop" and x.operands[0].is_reg("ecx"))
         # sub ecx, X
-        self.base_address -= reader.get_cond(lambda x: x.opcode == "sub" and x.operand1.is_reg("ecx") and x.operand2.is_immediate()).operand2.value # Get the address of the start of main handler
+        self.base_address -= reader.get_cond(lambda x: x.opcode == "sub" and x.operands[0].is_reg("ecx") and x.operands[1].is_immediate()).operands[1].value # Get the address of the start of main handler
         assert self.base_address == address
         # sub ecx, X
-        self.base_address -= reader.get_cond(lambda x: x.opcode == "sub" and x.operand1.is_reg("ecx") and x.operand2.is_immediate()).operand2.value
+        self.base_address -= reader.get_cond(lambda x: x.opcode == "sub" and x.operands[0].is_reg("ecx") and x.operands[1].is_immediate()).operands[1].value
         # mov ebp, X
-        self.vm_struct = self.base_address + reader.get_cond(lambda x: x.opcode == "mov" and x.operand1.is_reg("ebp") and x.operand2.is_immediate()).operand2.value
+        self.vm_struct = self.base_address + reader.get_cond(lambda x: x.opcode == "mov" and x.operands[0].is_reg("ebp") and x.operands[1].is_immediate()).operands[1].value
         # add ebp, ecx
-        reader.get_cond(lambda x: x.opcode == "add" and x.operand1.is_reg("ebp") and x.operand2.is_reg("ecx")) # Get the address of the start of main handler
+        reader.get_cond(lambda x: x.opcode == "add" and x.operands[0].is_reg("ebp") and x.operands[1].is_reg("ecx")) # Get the address of the start of main handler
 
         # push ecx
-        reader.get_cond(lambda x: x.opcode == "push" and x.operand1.is_reg("ecx"))
+        reader.get_cond(lambda x: x.opcode == "push" and x.operands[0].is_reg("ecx"))
         # mov ecx, 1
-        reader.get_cond(lambda x: x.opcode == "mov" and x.operand1.is_reg("ecx") and x.operand2.is_immediate(1))
+        reader.get_cond(lambda x: x.opcode == "mov" and x.operands[0].is_reg("ecx") and x.operands[1].is_immediate(1))
         # mov ebx, X
-        vm_info.struct_fields["LOCK"] = reader.get_cond(lambda x: x.opcode == "mov" and x.operand1.is_reg("ebx") and x.operand2.is_immediate()).operand2.value
+        vm_info.struct_fields["LOCK"] = reader.get_cond(lambda x: x.opcode == "mov" and x.operands[0].is_reg("ebx") and x.operands[1].is_immediate()).operands[1].value
         # xor eax, eax
-        lock_loop_start = reader.get_cond(lambda x: x.opcode == "xor" and x.operand1.is_reg("eax") and x.operand2.is_reg("eax")).address
+        lock_loop_start = reader.get_cond(lambda x: x.opcode == "xor" and x.operands[0].is_reg("eax") and x.operands[1].is_reg("eax")).address
         # cmpxchg [ebp+ebx], ecx
-        reader.get_cond(lambda x: x.opcode == "cmpxchg" and x.operand2.is_reg("ecx") and x.operand1.is_memory() and x.operand1.base == "ebp" and x.operand1.index == "ebx" and x.operand1.displacement == 0 and x.operand1.scale == 0)
+        reader.get_cond(lambda x: x.opcode == "cmpxchg" and x.operands[1].is_reg("ecx") and x.operands[0].is_memory() and x.operands[0].base == "ebp" and x.operands[0].index == "ebx" and x.operands[0].offset == 0 and x.operands[0].scale == 0)
         # jz lock_loop_end
-        lock_loop_end = reader.get_cond(lambda x: x.opcode == "jz").operand1.value
+        lock_loop_end = reader.get_cond(lambda x: x.opcode == "jz").operands[0].value
         # pause
-        reader.get_cond(lambda x: x.bytes == "\xF3\x90") # TODO
+        reader.get_cond(lambda x: x.opcode == "pause")
         # jmp lock_loop_start
-        reader.get_cond(lambda x: x.opcode == "jmp" and x.operand1.is_immediate(lock_loop_start))
+        reader.get_cond(lambda x: x.opcode == "jmp" and x.operands[0].is_immediate(lock_loop_start))
         # pop ecx
-        reader.get_cond(lambda x: x.address == lock_loop_end and x.opcode == "pop" and x.operand1.is_reg("ecx"))
+        reader.get_cond(lambda x: x.address == lock_loop_end and x.opcode == "pop" and x.operands[0].is_reg("ecx"))
 
         # mov ebx, X
-        vm_info.struct_fields["BASE_ADDRESS"] = reader.get_cond(lambda x: x.opcode == "mov" and x.operand1.is_reg("ebx") and x.operand2.is_immediate()).operand2.value
+        vm_info.struct_fields["BASE_ADDRESS"] = reader.get_cond(lambda x: x.opcode == "mov" and x.operands[0].is_reg("ebx") and x.operands[1].is_immediate()).operands[1].value
         # mov [ebp+ebx], ecx
-        reader.get_cond(lambda x: x.opcode == "mov" and x.operand2.is_reg("ecx") and x.operand1.is_memory() and x.operand1.base == "ebp" and x.operand1.index == "ebx" and x.operand1.displacement == 0 and x.operand1.scale == 0)
+        reader.get_cond(lambda x: x.opcode == "mov" and x.operands[1].is_reg("ecx") and x.operands[0].is_memory() and x.operands[0].base == "ebp" and x.operands[0].index == "ebx" and x.operands[0].offset == 0 and x.operands[0].scale == 0)
 
         # mov ebx, X
-        vm_info.struct_fields["ORIGINAL_BASE_ADDRESS"] = reader.get_cond(lambda x: x.opcode == "mov" and x.operand1.is_reg("ebx") and x.operand2.is_immediate()).operand2.value
+        vm_info.struct_fields["ORIGINAL_BASE_ADDRESS"] = reader.get_cond(lambda x: x.opcode == "mov" and x.operands[0].is_reg("ebx") and x.operands[1].is_immediate()).operands[1].value
         # mov [ebp+ebx], X
-        self.original_base_address = reader.get_cond(lambda x: x.opcode == "mov" and x.operand2.is_immediate() and x.operand1.is_memory() and x.operand1.base == "ebp" and x.operand1.index == "ebx" and x.operand1.displacement == 0 and x.operand1.scale == 0).operand2.value
+        self.original_base_address = reader.get_cond(lambda x: x.opcode == "mov" and x.operands[1].is_immediate() and x.operands[0].is_memory() and x.operands[0].base == "ebp" and x.operands[0].index == "ebx" and x.operands[0].offset == 0 and x.operands[0].scale == 0).operands[1].value
 
         # mov ebx, X
-        vm_info.struct_fields["EIP"] = reader.get_cond(lambda x: x.opcode == "mov" and x.operand1.is_reg("ebx") and x.operand2.is_immediate()).operand2.value
+        vm_info.struct_fields["EIP"] = reader.get_cond(lambda x: x.opcode == "mov" and x.operands[0].is_reg("ebx") and x.operands[1].is_immediate()).operands[1].value
         # mov eax, [esp+0x28]
-        reader.get_cond(lambda x: x.opcode == "mov" and x.operand1.is_reg("eax") and x.operand2.is_memory() and x.operand2.base == "esp" and x.operand2.index == None and x.operand2.displacement == 0x28 and x.operand2.scale == 0)
+        reader.get_cond(lambda x: x.opcode == "mov" and x.operands[0].is_reg("eax") and x.operands[1].is_memory() and x.operands[1].base == "esp" and x.operands[1].index == None and x.operands[1].offset == 0x28 and x.operands[1].scale == 0)
         # add eax, ecx
-        reader.get_cond(lambda x: x.opcode == "add" and x.operand1.is_reg("eax") and x.operand2.is_reg("ecx"))
+        reader.get_cond(lambda x: x.opcode == "add" and x.operands[0].is_reg("eax") and x.operands[1].is_reg("ecx"))
         # mov [ebp+ebx], eax
-        reader.get_cond(lambda x: x.opcode == "mov" and x.operand2.is_reg("eax") and x.operand1.is_memory() and x.operand1.base == "ebp" and x.operand1.index == "ebx" and x.operand1.displacement == 0 and x.operand1.scale == 0)
+        reader.get_cond(lambda x: x.opcode == "mov" and x.operands[1].is_reg("eax") and x.operands[0].is_memory() and x.operands[0].base == "ebp" and x.operands[0].index == "ebx" and x.operands[0].offset == 0 and x.operands[0].scale == 0)
 
 
         # mov eax, X
-        self.handlers_address = self.base_address + reader.get_cond(lambda x: x.opcode == "mov" and x.operand1.is_reg("eax") and x.operand2.is_immediate()).operand2.value
+        self.handlers_address = self.base_address + reader.get_cond(lambda x: x.opcode == "mov" and x.operands[0].is_reg("eax") and x.operands[1].is_immediate()).operands[1].value
         # add eax ecx
-        reader.get_cond(lambda x: x.opcode == "add" and x.operand1.is_reg("eax") and x.operand2.is_reg("ecx"))
+        reader.get_cond(lambda x: x.opcode == "add" and x.operands[0].is_reg("eax") and x.operands[1].is_reg("ecx"))
         # mov ebx, X
-        vm_info.struct_fields["HANDLERS"] = reader.get_cond(lambda x: x.opcode == "mov" and x.operand1.is_reg("ebx") and x.operand2.is_immediate()).operand2.value
+        vm_info.struct_fields["HANDLERS"] = reader.get_cond(lambda x: x.opcode == "mov" and x.operands[0].is_reg("ebx") and x.operands[1].is_immediate()).operands[1].value
         # mov edx, [ebp+ebx]
-        reader.get_cond(lambda x: x.opcode == "mov" and x.operand1.is_reg("edx") and x.operand2.is_memory() and x.operand2.base == "ebp" and x.operand2.index == "ebx" and x.operand2.displacement == 0 and x.operand2.scale == 0)
+        reader.get_cond(lambda x: x.opcode == "mov" and x.operands[0].is_reg("edx") and x.operands[1].is_memory() and x.operands[1].base == "ebp" and x.operands[1].index == "ebx" and x.operands[1].offset == 0 and x.operands[1].scale == 0)
         # cmp edx, eax
-        reader.get_cond(lambda x: x.opcode == "cmp" and x.operand1.is_reg("edx") and x.operand2.is_reg("eax"))
+        reader.get_cond(lambda x: x.opcode == "cmp" and x.operands[0].is_reg("edx") and x.operands[1].is_reg("eax"))
         # jz after_handlers_init
-        after_handlers_init = reader.get_cond(lambda x: x.opcode == "jz").operand1.value
+        after_handlers_init = reader.get_cond(lambda x: x.opcode == "jz").operands[0].value
 
 
         # push ebx
-        reader.get_cond(lambda x: x.opcode == "push" and x.operand1.is_reg("ebx"))
+        reader.get_cond(lambda x: x.opcode == "push" and x.operands[0].is_reg("ebx"))
         # mov ebx, X
-        self.handlers_count = reader.get_cond(lambda x: x.opcode == "mov" and x.operand1.is_reg("ebx") and x.operand2.is_immediate() and (x.operand2.value % 4) == 0).operand2.value >> 2
+        self.handlers_count = reader.get_cond(lambda x: x.opcode == "mov" and x.operands[0].is_reg("ebx") and x.operands[1].is_immediate() and (x.operands[1].value % 4) == 0).operands[1].value >> 2
         # shr ebx, 2
-        reader.get_cond(lambda x: x.opcode == "shr" and x.operand1.is_reg("ebx") and x.operand2.is_immediate(2))
+        reader.get_cond(lambda x: x.opcode == "shr" and x.operands[0].is_reg("ebx") and x.operands[1].is_immediate(2))
         # push eax
-        reader.get_cond(lambda x: x.opcode == "push" and x.operand1.is_reg("eax"))
+        reader.get_cond(lambda x: x.opcode == "push" and x.operands[0].is_reg("eax"))
 
         # test ebx, ebx
-        init_next_handler = reader.get_cond(lambda x: x.opcode == "test" and x.operand1.is_reg("ebx") and x.operand2.is_reg("ebx")).address
+        init_next_handler = reader.get_cond(lambda x: x.opcode == "test" and x.operands[0].is_reg("ebx") and x.operands[1].is_reg("ebx")).address
         # jz handlers_init_end
-        handlers_init_end = reader.get_cond(lambda x: x.opcode == "jz").operand1.value
+        handlers_init_end = reader.get_cond(lambda x: x.opcode == "jz").operands[0].value
 
         # add [eax], ecx
-        reader.get_cond(lambda x: x.opcode == "add" and x.operand2.is_reg("ecx") and x.operand1.is_memory() and x.operand1.base == "eax" and x.operand1.index == None and x.operand1.displacement == 0 and x.operand1.scale == 0)
+        reader.get_cond(lambda x: x.opcode == "add" and x.operands[1].is_reg("ecx") and x.operands[0].is_memory() and x.operands[0].base == "eax" and x.operands[0].index == None and x.operands[0].offset == 0 and x.operands[0].scale == 0)
         # add eax, 4
-        reader.get_cond(lambda x: x.opcode == "add" and x.operand1.is_reg("eax") and x.operand2.is_immediate(4))
+        reader.get_cond(lambda x: x.opcode == "add" and x.operands[0].is_reg("eax") and x.operands[1].is_immediate(4))
         # dec ebx
-        reader.get_cond(lambda x: (x.opcode == "dec" and x.operand1.is_reg("ebx")) or (x.opcode == "sub" and x.operand1.is_reg("ebx") and x.operand2.is_immediate(1))) # TODO fix cleaner
+        reader.get_cond(lambda x: (x.opcode == "dec" and x.operands[0].is_reg("ebx")) or (x.opcode == "sub" and x.operands[0].is_reg("ebx") and x.operands[1].is_immediate(1))) # TODO fix cleaner
         # jmp init_next_handler
-        reader.get_cond(lambda x: x.opcode == "jmp" and x.operand1.is_immediate(init_next_handler))
+        reader.get_cond(lambda x: x.opcode == "jmp" and x.operands[0].is_immediate(init_next_handler))
 
         # pop eax
-        reader.get_cond(lambda x: x.opcode == "pop" and x.operand1.is_reg("eax"))
+        reader.get_cond(lambda x: x.opcode == "pop" and x.operands[0].is_reg("eax"))
         # pop ebx
-        reader.get_cond(lambda x: x.opcode == "pop" and x.operand1.is_reg("ebx"))
+        reader.get_cond(lambda x: x.opcode == "pop" and x.operands[0].is_reg("ebx"))
         # mov [ebp+ebx], eax
-        reader.get_cond(lambda x: x.opcode == "mov" and x.operand2.is_reg("eax") and x.operand1.is_memory() and x.operand1.base == "ebp" and x.operand1.index == "ebx" and x.operand1.displacement == 0 and x.operand1.scale == 0)
+        reader.get_cond(lambda x: x.opcode == "mov" and x.operands[1].is_reg("eax") and x.operands[0].is_memory() and x.operands[0].base == "ebp" and x.operands[0].index == "ebx" and x.operands[0].offset == 0 and x.operands[0].scale == 0)
         # mov ebx, [esp+0x24]
-        reader.get_cond(lambda x: x.opcode == "mov" and x.operand1.is_reg("ebx") and x.operand2.is_memory() and x.operand2.base == "esp" and x.operand2.index == None and x.operand2.displacement == 0x24 and x.operand2.scale == 0)
+        reader.get_cond(lambda x: x.opcode == "mov" and x.operands[0].is_reg("ebx") and x.operands[1].is_memory() and x.operands[1].base == "esp" and x.operands[1].index == None and x.operands[1].offset == 0x24 and x.operands[1].scale == 0)
         # shl ebx, 2
-        reader.get_cond(lambda x: x.opcode == "shl" and x.operand1.is_reg("ebx") and x.operand2.is_immediate(2))
+        reader.get_cond(lambda x: x.opcode == "shl" and x.operands[0].is_reg("ebx") and x.operands[1].is_immediate(2))
         # add eax, ebx
-        init_next_handler = reader.get_cond(lambda x: x.opcode == "add" and x.operand1.is_reg("eax") and x.operand2.is_reg("ebx")).address
+        init_next_handler = reader.get_cond(lambda x: x.opcode == "add" and x.operands[0].is_reg("eax") and x.operands[1].is_reg("ebx")).address
         # jmp [eax]
-        reader.get_cond(lambda x: x.opcode == "jmp" and x.operand1.is_memory() and x.operand1.base == "eax" and x.operand1.index == None and x.operand1.displacement == 0 and x.operand1.scale == 0)
+        reader.get_cond(lambda x: x.opcode == "jmp" and x.operands[0].is_memory() and x.operands[0].base == "eax" and x.operands[0].index == None and x.operands[0].offset == 0 and x.operands[0].scale == 0)
 
 
 
@@ -226,21 +226,21 @@ class VMFunctionJumper(object):
         clean.set_option("ignore_jumps", False)
         reader = clean.get_reader(cleaner.JunkSkipper(executable).get_next_real_instruction(address).address)
         # pushf
-        reader.get_cond(lambda x: x.opcode == "pushf")
+        reader.get_cond(lambda x: x.opcode == "pushfd")
         # push first_handler
-        self.first_handler = reader.get_cond(lambda x: x.opcode == "push" and x.operand1.is_immediate()).operand1.value
+        self.first_handler = reader.get_cond(lambda x: x.opcode == "push" and x.operands[0].is_immediate()).operands[0].value
         # push vm_code_address
-        self.vm_code_address = reader.get_cond(lambda x: x.opcode == "push" and x.operand1.is_immediate()).operand1.value
+        self.vm_code_address = reader.get_cond(lambda x: x.opcode == "push" and x.operands[0].is_immediate()).operands[0].value
         # Now switch between pushf and vm_code_address (so it will be as in the order of the old versions)
         reader.get_cond(lambda x: str(x) == "push eax")
         reader.get_cond(lambda x: str(x) == "push ebx")
-        reader.get_cond(lambda x: str(x) == "mov eax, [esp+0x10]")
-        reader.get_cond(lambda x: str(x) == "mov ebx, [esp+0x8]")
+        reader.get_cond(lambda x: str(x) == "mov eax, dword [esp+0x10]")
+        reader.get_cond(lambda x: str(x) == "mov ebx, dword [esp+0x8]")
         reader.get_cond(lambda x: str(x) == "mov dword [esp+0x8], eax")
         reader.get_cond(lambda x: str(x) == "mov dword [esp+0x10], ebx")
         reader.get_cond(lambda x: str(x) == "pop ebx")
         reader.get_cond(lambda x: str(x) == "pop eax")
-        self.vm_address = reader.get_cond(lambda x: x.opcode == "jmp" and x.operand1.is_immediate()).operand1.value
+        self.vm_address = reader.get_cond(lambda x: x.opcode == "jmp" and x.operands[0].is_immediate()).operands[0].value
         self.end = reader.address
 
 class VMFunction(object):
@@ -293,7 +293,7 @@ class VMFunction(object):
             except:
                 start_address -= 1
                 continue
-            if jmp.opcode == "jmp" and jmp.operand1.is_immediate() and jumper.end <= jmp.operand1.value <= jumper.end + 0x20:
+            if jmp.opcode == "jmp" and jmp.operands[0].is_immediate() and jumper.end <= jmp.operands[0].value <= jumper.end + 0x20:
                 break
             start_address -= 1
         start_address += jmp.length
@@ -305,11 +305,11 @@ class VMFunction(object):
             push = executable.get_instruction(start_address)
             if push.opcode != "push":
                 push = executable.get_instruction(push.next)
-            assert push.opcode == "push" and push.operand1.is_immediate()
+            assert push.opcode == "push" and push.operands[0].is_immediate()
             jmp = executable.get_instruction(push.next)
-            assert jmp.opcode == "jmp" and jmp.operand1.is_immediate(vm_address)
-            addresses_to_explore.put((long(push.operand1.value + self.vm_info.init_handler.encode), push.operand1.value))
-            starts.append(long(push.operand1.value + self.vm_info.init_handler.encode))
+            assert jmp.opcode == "jmp" and jmp.operands[0].is_immediate(vm_address)
+            addresses_to_explore.put((long(push.operands[0].value + self.vm_info.init_handler.encode), push.operands[0].value))
+            starts.append(long(push.operands[0].value + self.vm_info.init_handler.encode))
             start_address = jmp.next
         to_print = False
         while not addresses_to_explore.empty():
@@ -483,9 +483,9 @@ class VMFunction(object):
                         asminst = self.executable.get_instruction(long(inst.args[0] + self.vm_info.init_handler.encode))
                         asminst_after = self.executable.get_instruction(asminst.next)
                         assert asminst_after.opcode == "push"
-                        assert asminst_after.operand1.is_immediate()
+                        assert asminst_after.operands[0].is_immediate()
                         sectioncode += "\n".join(["db 0x%x" % ord(x) for x in asminst.bytes]) + "\n"
-                        next_section = long(asminst_after.operand1.value + self.vm_info.init_handler.encode)
+                        next_section = long(asminst_after.operands[0].value + self.vm_info.init_handler.encode)
                         break
                     elif next.name.startswith("PUSHDWORD"):
                         nextnext = reader.get_cond(lambda x: x.name == "JMP" and sections[x.args[0]].end)
@@ -619,8 +619,8 @@ def fix_vms(pe, code_section = 0, vms_section = 3):
             if vms_section_start <= jmp_address <= vms_section_end:
                 push_inst = exe.get_instruction(jmp_address)
                 jmp_inst = exe.get_instruction(push_inst.next)
-                if not (push_inst.opcode == "push" and push_inst.operand1.is_immediate()): continue
-                if not (jmp_inst.opcode == "jmp" and jmp_inst.operand1.is_immediate()): continue
+                if not (push_inst.opcode == "push" and push_inst.operands[0].is_immediate()): continue
+                if not (jmp_inst.opcode == "jmp" and jmp_inst.operands[0].is_immediate()): continue
                 print hex(address)
                 vm = get_vm(exe, jmp_address)
                 code = vm.get_code()
