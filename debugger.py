@@ -128,7 +128,7 @@ class Debugger(object):
     #def unhook(self, library, function):        
     
 
-    def dump(self, to_file = False):
+    def dump(self, to_file=None):
         base = self.create_process_event.get_module_base()
         pe = pefile.PE(data=self.process.read(base, 0x1000))
         pe.OPTIONAL_HEADER.AddressOfEntryPoint = self.thread.get_pc() - base
@@ -147,8 +147,8 @@ class Debugger(object):
             offset = structure.get_file_offset()
             file_data[offset:offset+len(struct_data)] = struct_data
         new_file_data = ''.join( [ chr(ord(c)) for c in file_data] ) + sections
-        if to_file:
-            open(self.filepath + ".dumped", "wb").write(new_file_data)
+        if to_file is not None:
+            open(to_file, "wb").write(new_file_data)
         return new_file_data
         # TODO: fix checksum
 

@@ -25,7 +25,8 @@ class VMReadInfo(object):
 
     SIZES = {1: "B",
              2: "H",
-             4: "L"}
+             4: "L",
+             8: "Q"}
 
     def read(self, bytes_reader):
         return struct.unpack("<%s" % self.SIZES[self.size], bytes_reader.read(self.size))[0]

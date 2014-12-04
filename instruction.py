@@ -97,7 +97,7 @@ class Arch(object):
         elif type in ("R", "RS"):
             if type == "RS":
                 if size == 1:
-                    size == 2
+                    size = 2
                 if size == 4 and self.mode == 64:
                     size = 8
             reg = fields[1]
