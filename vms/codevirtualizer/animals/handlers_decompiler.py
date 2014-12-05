@@ -117,6 +117,8 @@ class ValueOf(UnaryExpression):
             s = "WORD"
         if self.size == 4:
             s = "DWORD"
+        if self.size == 8:
+            s = "QWORD"
         return "*(%s*){0}" % s
 
 class NonVisible(object):
@@ -391,9 +393,9 @@ class VariableProxy(UnaryExpression):
     def __str__(self):
         return str(self.get_value())
 
-class Esp(Expression):
+class SP(Expression):
     def get_format(self):
-        return "ESP"
+        return "SP"
 
 class Flags(Expression):
     def get_format(self):
@@ -459,6 +461,8 @@ class Conversion(UnaryExpression):
             return "WORD"
         if self.size == 4:
             return "DWORD"
+        if self.size == 8:
+            return "QWORD"
 
     def get_format(self):
         return "(%s){0}" % self._get_size_name()
@@ -485,8 +489,9 @@ def merge_variables(var1, var2):
     return var
 
 class State(object):
-    def __init__(self, copy_state = None):
+    def __init__(self, copy_state=None, mode=None):
         if copy_state:
+            self.mode = copy_state.mode
             self.registers = dict(copy_state.registers)
             self.registers_variables = dict(copy_state.registers_variables)
             self.stack = list(copy_state.stack)
@@ -496,22 +501,15 @@ class State(object):
             self.has_flags = copy_state.has_flags
             self.handler = copy_state.handler
         else:
-            self.registers = {"eax": Invalid(),
-                             "ecx": Register("ecx"),
-                             "edx": Register("edx"),
-                             "ebx": Register("ebx"),
-                             "ebp": Register("ebp"),
-                             "esi": Register("esi"),
-                             "edi": Register("edi"),
-                             "esp": Esp()}
-            self.registers_variables = {"eax": Variable("eax"),
-                                                     "ecx": Variable("ecx"),
-                                                     "edx": Variable("edx"),
-                                                     "ebx": Variable("ebx"),
-                                                     "ebp": Variable("ebp"),
-                                                     "esi": Variable("esi"),
-                                                     "edi": Variable("edi"),
-                                                     "esp": Variable("esp")} # esp shouldn't be used from here
+            self.mode = instruction.Arch(mode)
+            self.registers = {}
+            self.registers_variables = {}
+            for reg in self.mode.get_registers():
+                if reg == self.mode.reg_native("sp"):
+                    self.registers[reg] = SP()
+                else:
+                    self.registers[reg] = Register(reg)
+                self.registers_variables[reg] = Variable(reg) # esp shouldn't be used from here
             self.stack = list()
             self.stack_variables = list()
             self.stack_instructions = list()
@@ -560,7 +558,7 @@ class State(object):
             self.flags = Invalid()
 
     def _get_full_register(self, reg):
-        return instruction.Arch(32).translate("{R:%s}" % reg)
+        return self.mode.translate("{R:%s}" % reg)
 
     def get_register(self, reg):
         return VariableProxy(self.registers_variables[self._get_full_register(reg)], self.registers[self._get_full_register(reg)])
@@ -578,7 +576,7 @@ class State(object):
 
 class Handler(object):
     def __init__(self, function):
-        state = State()
+        state = State(mode=function.mode)
         state.handler = self
         nstate, instructions = self._get_handler_block(function.start_block, state)
         state.invalidate_diff(nstate) # For push instructions taking effect
@@ -753,7 +751,7 @@ class Handler(object):
                         value = lvalue
                     else:
                         value = get_operand_value(inst.operands[1])
-                    if inst.operands[0].is_reg() and not inst.operands[0].is_reg("esp"):
+                    if inst.operands[0].is_reg() and state.mode.reg_native(inst.operands[0].reg) != state.mode.reg_native("sp"):
                         if inst.opcode == "add":
                             value = Add(lvalue, value)
                         elif inst.opcode == "sub":
@@ -939,14 +937,14 @@ class Handler(object):
                     block = next_block
                     new_block = True
                     break
-                elif inst.opcode in ("push", "pushfd"):
-                    if inst.opcode == "pushfd":
+                elif inst.opcode in ("push", state.mode.translate("pushf{SB}")):
+                    if inst.opcode == state.mode.translate("pushf{SB}"):
                         value = state.flags
                         state.has_flags = True
                         nop = Push(Flags())
                     else:
                         value = get_operand_value(inst.operands[0])
-                        if inst.operands[0].size == 4:
+                        if inst.operands[0].size == state.mode.native_size():
                             nop = Push(value)
                         else:
                             nop = PushWord(value)
@@ -958,23 +956,23 @@ class Handler(object):
                     op.lvalue.instructions.append(op)
                     instructions.append(op)
                     instructions.append(nop)
-                elif inst.opcode in ("pop", "popfd"):
+                elif inst.opcode in ("pop", state.mode.translate("popf{SB}")):
                     if len(state.stack) > 0:
                         value = state.stack.pop()
                         state.stack_variables.pop()
                         state.stack_instructions.pop()
                         pop = False
                     else:
-                        if inst.opcode == "popfd":
+                        if inst.opcode == state.mode.translate("popf{SB}"):
                             value = Pop()
-                        elif inst.operands[0].size == 4:
+                        elif inst.operands[0].size == state.mode.native_size():
                             value = Pop()
                         else:
                             value = PopWord()
                         pop = True
 
-                    if inst.opcode == "pop" and inst.operands[0].is_reg() and not inst.operands[0].is_reg("esp"):
-                        assert inst.operands[0].size == 4
+                    if inst.opcode == "pop" and inst.operands[0].is_reg() and state.mode.reg_native(inst.operands[0].reg) != state.mode.reg_native("sp"):
+                        assert inst.operands[0].size == state.mode.native_size()
                         if pop:
                             instructions.append(SetValue(Register(inst.operands[0].reg), value))
                             self.make_visible(instructions[-1])
@@ -982,13 +980,13 @@ class Handler(object):
                         else:
                             set_register_value(inst.operands[0].reg, value)
                     else:
-                        if inst.opcode == "popfd":
+                        if inst.opcode == state.mode.translate("popf{SB}"):
                             state.has_flags = True
                             lvalue = Flags()
                         else:
                             lvalue = get_operand_value(inst.operands[0])
                             if not pop:
-                                assert inst.operands[0].size == 4
+                                assert inst.operands[0].size == state.mode.native_size()
                         value = SetValue(lvalue, value)
                         set_value(lvalue, value)
                 elif inst.opcode == "ret":

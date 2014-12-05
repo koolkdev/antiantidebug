@@ -12,18 +12,17 @@ class Arch(object):
         ["spl", None, "sp", "esp", "rsp"],
         ["sil", None, "si", "esi", "rsi"],
         ["dil", None, "di", "edi", "rdi"],
-        ["r8b", None, "r8w", "r8d", "r8q"],
-        ["r9b", None, "r9w", "r9d", "r9q"],
-        ["r10b", None, "r10w", "r10d", "r10q"],
-        ["r11b", None, "r11w", "r11d", "r11q"],
-        ["r12b", None, "r12w", "r12d", "r12q"],
-        ["r13b", None, "r13w", "r13d", "r13q"],
-        ["r14b", None, "r14w", "r14d", "r14q"],
-        ["r15b", None, "r15w", "r15d", "r15q"],
+        ["r8b", None, "r8w", "r8d", "r8"],
+        ["r9b", None, "r9w", "r9d", "r9"],
+        ["r10b", None, "r10w", "r10d", "r10"],
+        ["r11b", None, "r11w", "r11d", "r11"],
+        ["r12b", None, "r12w", "r12d", "r12"],
+        ["r13b", None, "r13w", "r13d", "r13"],
+        ["r14b", None, "r14w", "r14d", "r14"],
+        ["r15b", None, "r15w", "r15d", "r15"],
     ]
 
     SIZES = {1: "byte", 2: "word", 4: "dword", 8: "qword"}
-
     def __init__(self, mode):
         self.mode = mode
 
@@ -32,6 +31,12 @@ class Arch(object):
 
     def pointer_size(self):
         return self.native_size()
+
+    def get_registers(self):
+        if self.mode == 32:
+            return [x[3] for x in self.REGS[:8]]
+        else:
+            return [x[4] for x in self.REGS]
 
     def _get_reg(self, reg, size_index):
         for r in self.REGS:
@@ -67,6 +72,7 @@ class Arch(object):
         type = fields[0]
         size = self.native_size()
         special = False
+        times = 1
 
         if type in ("S", "SB", "N"):
             expected_fields = 1
@@ -78,12 +84,15 @@ class Arch(object):
         if not expected_fields <= len(fields) <= expected_fields + 1:
             raise None
 
-        if len(fields) > expected_fields:
-            if fields[-1] == "1h":
-                size = 1
-                special = True
+        if len(fields) > expected_fields :
+            if type == "N":
+                times = int(fields[-1], 16)
             else:
-                size = int(fields[-1])
+                if fields[-1] == "1h":
+                    size = 1
+                    special = True
+                else:
+                    size = int(fields[-1])
 
         if size not in self.SIZES:
             return None
@@ -93,7 +102,7 @@ class Arch(object):
         elif type == "SB":
             return self.SIZES[size][0]
         elif type == "N":
-            return str(size)
+            return hex(size*times)[2:]
         elif type in ("R", "RS"):
             if type == "RS":
                 if size == 1:
@@ -122,7 +131,7 @@ class Arch(object):
                     {S:size} - specific size word
                     {SB:size} - specific size letter {d/q}
                     {N} - native size number
-                    {N:size} - specific size number (useless, but for the syntax)
+                    {N:times} - native size number multiplied by times
                     {R:reg} - native size register
                     {R:reg:size} - specific size version of reg (if size = 1h => high byte)
                     {RS:reg:size} - specific size version of reg upped to stack size
@@ -231,6 +240,7 @@ class Function(object):
         self.blocks_cache = {}
         instructions_blocks = {}
         self.blocks = {}
+        self.mode = executable.mode
         blocks_to_explores = deque()
 
         def get_block(address):
