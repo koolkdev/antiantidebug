@@ -1,6 +1,7 @@
 import struct
+import instruction
 
-CONDITIONAL_JUMPS = "JA JNB JB JE JG JGE JL JLE JBE JNO JPO JNS JO JPE JS JNE JCXZ LOOP LOOPE".split(" ")
+CONDITIONAL_JUMPS = "JO JNO JB JAE JZ JNZ JBE JA JS JNS JP JNP JL JGE JLE JG JCXZ LOOP LOOPE".split(" ")
 
 class BytesReader(object):
     def __init__(self, executable, address):
@@ -39,7 +40,8 @@ class VMKey(object):
     def __init__(self, key):
         pass
 
-INSTRUCTIONS = {x.split(" ", 1)[0]: x.split(" ", 1)[1] for x in open(r"vms\templates\ag_instructions.txt", "rb").read().splitlines()}
+INSTRUCTIONS_32 = {x.split(" ", 1)[0]: x.split(" ", 1)[1] for x in open(r"vms\templates\instructions_32.txt", "rb").read().splitlines()}
+INSTRUCTIONS_64 = {x.split(" ", 1)[0]: x.split(" ", 1)[1] for x in open(r"vms\templates\instructions_64.txt", "rb").read().splitlines()}
 
 class VMInstruction(object):
     def __init__(self, name, *args):
@@ -51,28 +53,34 @@ class VMInstruction(object):
     def set_info(self, name, value):
         self.info[name] = value
 
-    def to_asm(self, regs):
-        if not INSTRUCTIONS.has_key(self.name):
+    def to_asm(self, regs, mode):
+        if mode == 32:
+            insts = INSTRUCTIONS_32
+        else:
+            insts = INSTRUCTIONS_64
+        if not insts.has_key(self.name):
             raise Exception("Couldn't translate %s to assembly" % self)
         inst = ""
         next_special = None
-        for c in INSTRUCTIONS[self.name]:
+        for c in insts[self.name]:
             if next_special:
                 arg = self.args[int(c)]
-                if next_special == "#":
-                    inst += regs[arg]
-                elif next_special == "@":
-                    inst += {"eax": "ax", "ebx": "bx", "ecx": "cx", "edx": "dx", "esi": "si", "edi": "di", "ebp": "bp", "esp": "sp"}[regs[arg]]
-                elif next_special == "~":
-                    inst += {"eax": "al", "ebx": "bl", "ecx": "cl", "edx": "dl"}[regs[arg]]
+                if next_special == "~":
+                    inst += instruction.Arch(mode).reg_byte(regs[arg])
                 elif next_special == "!":
-                    inst += {"eax": "ah", "ebx": "bh", "ecx": "ch", "edx": "dh"}[regs[arg]]
+                    inst += instruction.Arch(mode).reg_byte_high(regs[arg])
+                elif next_special == "@":
+                    inst += instruction.Arch(mode).reg_word(regs[arg])
+                elif next_special == "#":
+                    inst += instruction.Arch(mode).reg_dword(regs[arg])
+                elif next_special == "%":
+                    inst += instruction.Arch(mode).reg_qword(regs[arg])
                 elif next_special == "$":
                     inst += "%X" % arg
                 elif next_special == "&":
                     inst += "label_%X" % arg
                 next_special = None
-            elif c in "#@~!$&":
+            elif c in "#@~!$&%":
                 next_special = c
             else:
                 inst += c
@@ -82,7 +90,7 @@ class VMInstruction(object):
         return "<VMInstruction '%s %s'>" % (self.name, " ".join(map(str, self.args)))
     
     def __str__(self):
-        return "0x%08X: %s %s" % (self.address, self.name, " ".join(["%X" % x for x in self.args]))
+        return "0x%08X: %s %s" % (self.address, self.name, " ".join(["0x%X" % x for x in self.args]))
     
 
 class ReaderException(Exception):
@@ -98,7 +106,7 @@ class VMInstructionsReader(object):
         self.history.append(self.index)
         
     def pop(self):
-        self.index = self.history.pop(0)
+        self.index = self.history.pop()
         
     def get(self):
         if self.index >= len(self.instructions):

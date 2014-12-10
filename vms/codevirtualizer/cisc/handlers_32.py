@@ -7,64 +7,64 @@ movzx eax, al
 push ax
 """,
 
-"PUSH_DWORD_MEMDX":
+"STACK_PUSH_DWORD_MEMDX":
 """
 push dword [edx]
 """,
 
-"POP_BYTE_MEMFSDX":
+"STACK_POP_BYTE_MEMFSDX":
 """
 pop ax
 mov byte fs:[edx], al
 """,
 
-"POP_WORD_MEMFSDX":
+"STACK_POP_WORD_MEMFSDX":
 """
 pop ax
 mov word fs:[edx], ax
 """,
 
-"POP_DWORD_MEMFSDX":
+"STACK_POP_DWORD_MEMFSDX":
 """
 pop dword fs:[edx]
 """,
 
-"PUSH_BYTE_MEMFSDX":
+"STACK_PUSH_BYTE_MEMFSDX":
 """
 movzx ax, byte fs:[edx]
 push ax
 """,
 
-"PUSH_WORD_MEMFSDX":
+"STACK_PUSH_WORD_MEMFSDX":
 """
 mov ax, word fs:[edx]
 push ax
 """,
 
-"PUSH_DWORD_MEMFSDX":
+"STACK_PUSH_DWORD_MEMFSDX":
 """
 push dword fs:[edx]
 """,
 
-"PUSH_DWORD_MEMIMM":
+"STACK_PUSH_DWORD_MEMIMM":
 """
 lodsd
 push dword [eax]
 """,
 
-"POP_DWORD_MEMDX":
+"STACK_POP_DWORD_MEMDX":
 """
 pop dword [edx]
 """,
 
-"POP_DWORD_REG":
+"STACK_POP_DWORD_REG":
 """
 lodsb
 movzx eax, al
 pop dword [edi+eax*4]
 """,
 
-"POP_DWORD_MEMIMM":
+"STACK_POP_DWORD_MEMIMM":
 """
 lodsd
 pop dword [eax]
@@ -106,7 +106,7 @@ mov ebx, 0x0
 mov eax, eax
 """,
 
-"ADDDXREG":
+"STACK_ADD_DX_REG":
 """
 lodsb
 movzx eax, al

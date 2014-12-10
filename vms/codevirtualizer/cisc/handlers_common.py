@@ -4,7 +4,7 @@ import re
 
 HANDLERS = {
 
-"PUSH_REGREF":
+"STACK_PUSH_REGREF":
 """
 lodsb
 movzx {R:ax}, al
@@ -12,7 +12,7 @@ lea {R:ax}, [{R:di}+{R:ax}*{N}]
 push {R:ax}
 """,
 
-"POP_DX":
+"STACK_POP_DX":
 """
 pop {R:dx}
 """,
@@ -49,18 +49,18 @@ movzx {R:ax}, al
 push {S} [{R:di}+{R:ax}*{N}]
 """,
 
-"PUSH_DX":
+"STACK_PUSH_DX":
 """
 push {R:dx}
 """,
 
-"PUSH_BYTE_MEMDX":
+"STACK_PUSH_BYTE_MEMDX":
 """
 movzx ax, byte [{R:dx}]
 push ax
 """,
 
-"PUSH_WORD_MEMDX":
+"STACK_PUSH_WORD_MEMDX":
 """
 push word [{R:dx}]
 """,
@@ -82,31 +82,31 @@ mov {R:ax}, {S} [{R:di}+{R:ax}*{N}]
 push word [{R:ax}]
 """,
 
-"PUSH_BYTE_MEMIMM":
+"STACK_PUSH_BYTE_MEMIMM":
 """
 lods{SB}
 movzx ax, byte [{R:ax}]
 push ax
 """,
 
-"PUSH_WORD_MEMIMM":
+"STACK_PUSH_WORD_MEMIMM":
 """
 lods{SB}
 push word [{R:ax}]
 """,
 
-"POP_BYTE_MEMDX":
+"STACK_POP_BYTE_MEMDX":
 """
 pop ax
 mov byte [{R:dx}], al
 """,
 
-"POP_WORD_MEMDX":
+"STACK_POP_WORD_MEMDX":
 """
 pop word [{R:dx}]
 """,
 
-"POP_BYTE_REGHIGH":
+"STACK_POP_BYTE_REGHIGH":
 """
 lodsb
 movzx {R:ax}, al
@@ -114,7 +114,7 @@ pop dx
 mov byte [{R:di}+{R:ax}*{N}+0x1], dl
 """,
 
-"POP_BYTE_REG":
+"STACK_POP_BYTE_REG":
 """
 lodsb
 movzx {R:ax}, al
@@ -122,21 +122,21 @@ pop dx
 mov byte [{R:di}+{R:ax}*{N}], dl
 """,
 
-"POP_WORD_REG":
+"STACK_POP_WORD_REG":
 """
 lodsb
 movzx {R:ax}, al
 pop word [{R:di}+{R:ax}*{N}]
 """,
 
-"POP_BYTE_MEMIMM":
+"STACK_POP_BYTE_MEMIMM":
 """
 lods{SB}
 pop dx
 mov byte [{R:ax}], dl
 """,
 
-"POP_WORD_MEMIMM":
+"STACK_POP_WORD_MEMIMM":
 """
 lods{SB}
 pop word [{R:ax}]
@@ -163,13 +163,13 @@ or dword [{R:di}+<FLAGS>], 0x1
 and dword [{R:di}+<FLAGS>], 0xfffffffe
 """,
 
-"STD":
+"CLD":
 """
 mov {S} [{R:di}+<DIRECTION_FLAG>], 0x0
 and dword [{R:di}+<FLAGS>], 0xfffffbff
 """,
 
-"CLD":
+"STD":
 """
 mov {S} [{R:di}+<DIRECTION_FLAG>], 0x1
 or dword [{R:di}+<FLAGS>], 0x400
@@ -249,7 +249,7 @@ pop {R:ax}
 push {S} [{R:ax}]
 """,
 
-"MOV_DX_SP":
+"STACK_MOV_DX_SP":
 """
 mov {R:dx}, {R:sp}
 """,
@@ -270,10 +270,10 @@ lodsb
 mov byte [{R:di}+<CHECK_CX_REG>], al
 """,
 
-"PUSHWITHENCODE":
+"PUSH_ENCODED":
 """
-lodsd
-add {R:ax}, {S} [{R:di}+<encode>]
+lods{SB}
+add {R:ax}, {S} [{R:di}+<ENCODE>]
 push {R:ax}
 """,
 
@@ -300,7 +300,7 @@ xor {S} [{R:sp}], {R:ax}
 mov ebx, 0x0
 """,
 
-"POPF":
+"STACK_POPF":
 """
 pop {S} [{R:di}+<FLAGS>]
 """,
@@ -321,7 +321,7 @@ MATH_HANDLER = namedtuple("MATH_HANDLER", ["NAME", "VARS", "CODE"])
 MATH_HANDLERS = [
 MATH_HANDLER(
 "#OP#F_#SIZE#",
-{"OP": ["add", "sub", "xor", "and", "or", "bt", "btc", "btr", "bts"],
+{"OP": ["add", "sub", "xor", "and", "or"],
 "SIZE": [1, 2, 4, 8]},
 """
 pop {RS:ax:#SIZE#}
@@ -388,7 +388,7 @@ pushf{SB}
 """),
 
 MATH_HANDLER(
-"#OP#F_#SIZE1#_#SIZE2#",
+"#OP#_#SIZE1#_#SIZE2#",
 {"OP": ["movzx", "movsx"],
 "SIZE1": [2, 4, 8],
 "SIZE2": [1, 2]},
@@ -489,7 +489,7 @@ pushf{SB}
 """),
 
 MATH_HANDLER(
-"#OP#F_#SIZE#",
+"#OP#_#SIZE#",
 {"OP": ["bswap"],
 "SIZE": [4, 8]},
 """

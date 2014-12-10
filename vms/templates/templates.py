@@ -17,30 +17,18 @@ nop = vminstruction.VMInstruction("NOP")
 class Templates(object):
     cache = {}
 
-    def __init__(self, data_reader):
+    def __init__(self, data_reader, mode):
         self.groups = {}
         self.line_to_templates = {}
-        group_name = data_reader.readline().strip()
-        while group_name:
-            self.groups[group_name] = data_reader.readline().strip().split(" ")
-            group_name = data_reader.readline().strip()
+        self.macros = {}
+        self.template_macros = {}
         self.templates = []
-        line = data_reader.readline().strip()
-            
-        while line:
-            instructions_from = []
-            instructions_to = []
-            while line != "=>":
-                instructions_from.append(vminstruction.VMInstruction(*line.split(" ")))
-                line = data_reader.readline().strip()
-            line = data_reader.readline().strip()
-            while line:
-                instructions_to.append(vminstruction.VMInstruction(*line.split(" ")))
-                line = data_reader.readline().strip()
-            self.templates.append((instructions_from, instructions_to))
-            
-            line = data_reader.readline().strip()
-            
+        self.mode = mode
+
+        # Parse the file first
+        self._parse_file(data_reader)
+
+        # Some optimization
         for template in self.templates:
             parts = []
             for part in template[0][0].name.split("|"):
@@ -54,13 +42,116 @@ class Templates(object):
                 if not self.line_to_templates.has_key(name):
                     self.line_to_templates[name] = []
                 self.line_to_templates[name].append(template)
-            
+
+
+    def _parse_file(self, data_reader):
+        while True:
+            line = data_reader.readline()
+            if not line:
+                break
+            line = line.strip()
+            if not line:
+                continue
+            if line[0] == "#":
+                continue # Comment
+
+            tokens = line.split(" ")
+
+            command = tokens[0]
+            ignore = False
+            if command.endswith("[32]"):
+                if self.mode != 32:
+                    ignore = True
+                command = command[:-4]
+            elif command.endswith("[64]"):
+                if self.mode != 64:
+                    ignore = True
+                command = command[:-4]
+
+            if command == "DEFINE_GROUP":
+                if len(tokens) < 3:
+                    raise Exception("Invalid DEFINE_GROUP")
+                group_name = tokens[1]
+                group = []
+                if group_name in self.groups:
+                    group = self.groups[group_name]
+                for member in tokens[2:]:
+                    parts = []
+                    for part in member.split("|"):
+                        if part.startswith("^"):
+                            parts.append(self.groups[part[1:]])
+                        else:
+                            parts.append([part])
+                    for name in product(*parts):
+                        name = "".join(name)
+                        group.append(name)
+                if not ignore:
+                    self.groups[group_name] = group
+            elif command == "DEFINE_MACRO":
+                if len(tokens) != 3:
+                    raise Exception("Invalid DEFINE_MACRO")
+                macro_name = tokens[1]
+                if not ignore and macro_name in self.macros:
+                    raise Exception("Macro name already used")
+                if not ignore:
+                    self.macros[macro_name] = tokens[2]
+            elif command == "DEFINE_TEMPLATE_MACRO":
+                if len(tokens) != 2:
+                    raise Exception("Invalid DEFINE_TEMPLATE_MACRO")
+                macro_name = tokens[1]
+                if not ignore and macro_name in self.template_macros:
+                    raise Exception("Template macro name already used")
+                lines = self._get_template_lines(data_reader)
+                if not ignore:
+                    self.template_macros[macro_name] = lines
+            elif command == "DEFINE_TEMPLATE":
+                if len(tokens) != 1:
+                    raise Exception("Invalid DEFINE_TEMPLATE")
+                instructions_from = []
+                instructions_to = []
+                lines = self._get_template_lines(data_reader, "=>")
+                for line in lines:
+                    instructions_from.append(vminstruction.VMInstruction(*line.split(" ")))
+                for line in self._get_template_lines(data_reader):
+                    instructions_to.append(vminstruction.VMInstruction(*line.split(" ")))
+                if not ignore:
+                    self.templates.append((instructions_from, instructions_to))
+            else:
+                raise Exception("Invalid command %s" % command)
+
+    def _get_template_lines(self, data_reader, end=''):
+        lines = []
+        while True:
+            line = data_reader.readline()
+            if not line:
+                if not end:
+                    return lines
+                else:
+                    raise Exception("Template EOF")
+            line = line.strip()
+            if line == end:
+                return lines
+            if line.startswith("@") and line.count("@") == 1:
+                lines.extend(self.template_macros[line[1:]])
+                continue
+            nline = ''
+            p = 0
+            while line.find("@", p) != -1:
+                ps = line.find("@", p)
+                nline += line[p:ps]
+                pe = line.find("@", ps+1)
+                if pe == -1:
+                    raise Exception("Invalid template line %s" % line)
+                nline += self.macros[line[ps+1:pe]]
+                p = pe+1
+            nline += line[p:]
+            lines.append(nline)
 
     @classmethod
-    def get_template(cls, name):
+    def get_template(cls, name, mode):
         if cls.cache.has_key(name):
             return cls.cache[name]
-        res = cls(open(r"vms\templates\files\%s" % name, "rb"))
+        res = cls(open(r"vms\templates\files\%s" % name, "r"), mode)
         cls.cache[name] = res
         return res
 
@@ -114,6 +205,7 @@ class Templates(object):
                     releated = []
                     values = {}
                     variables = {}
+                    saved_args = {}
                     j = i
                     ti = 0
                     match = True
@@ -132,24 +224,37 @@ class Templates(object):
                         elif not self.match_instruction(tinst, inst, variables):
                             match = False
                             break
-                        if len(template[0][ti].args) > len(insts[j].args):
-                            match = False
-                            break
-                        for ai in xrange(len(template[0][ti].args)):
-                            # Check if a number
-                            arg = template[0][ti].args[ai]
-                            # TODO Check that hexdigits
-                            if arg.isdigit() or ((arg.startswith("0x") or arg.startswith("0X"))):
-                                if insts[j].args[ai] != eval(arg):
+                        if len(template[0][ti].args) == 1 and template[0][ti].args[0].startswith("*"):
+                            var_name = template[0][ti].args[0][1:]
+                            if var_name in saved_args:
+                                if len(saved_args[var_name]) != len(insts[j].args):
                                     match = False
                                     break
+                                for ai in xrange(len(insts[j].args)):
+                                    if insts[j].args[ai] != saved_args[var_name][ai]:
+                                        match = False
+                                        break
                             else:
-                                if values.has_key(arg):
-                                    if values[arg] != insts[j].args[ai]:
+                                saved_args[var_name] = insts[j].args
+                        else:
+                            if len(template[0][ti].args) > len(insts[j].args):
+                                match = False
+                                break
+                            for ai in xrange(len(template[0][ti].args)):
+                                # Check if a number
+                                arg = template[0][ti].args[ai]
+                                # TODO Check that hexdigits
+                                if arg.isdigit() or ((arg.startswith("0x") or arg.startswith("0X"))):
+                                    if insts[j].args[ai] != eval(arg):
                                         match = False
                                         break
                                 else:
-                                    values[arg] = insts[j].args[ai]
+                                    if values.has_key(arg):
+                                        if values[arg] != insts[j].args[ai]:
+                                            match = False
+                                            break
+                                    else:
+                                        values[arg] = insts[j].args[ai]
                         if not match:
                             break
                         releated.append(j)
@@ -165,7 +270,13 @@ class Templates(object):
                             while new_name.find("*") != -1:
                                 splitted = new_name.split("*", 2)
                                 new_name = splitted[0] + variables[splitted[1]] + splitted[2]
-                            new_args = [eval(x, {}, values)&0xffffffff for x in inst.args]
+                            new_args = []
+                            for arg in inst.args:
+                                if arg.startswith("*"):
+                                    new_args.extend(["0x%x" % x for x in saved_args[arg[1:]]])
+                                else:
+                                    new_args.append(arg)
+                            new_args = [eval(x, {}, values)&0xffffffff for x in new_args]
                             new_insts.append(vminstruction.VMInstruction(new_name, *new_args))
                         new_insts += [nop] * (len(releated) - len(new_insts))
                         diff = 0

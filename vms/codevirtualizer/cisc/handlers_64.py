@@ -13,90 +13,90 @@ lodsq
 push rax
 """,
 
-"PUSH_DWORD_MEMDX":
+"STACK_PUSH_DWORD_MEMDX":
 """
 mov eax, dword [rdx]
 push rax
 """,
 
-"PUSH_QWORD_MEMDX":
+"STACK_PUSH_QWORD_MEMDX":
 """
 push qword [rdx]
 """,
 
-"POP_BYTE_MEMGSDX":
+"STACK_POP_BYTE_MEMGSDX":
 """
 pop ax
 mov byte gs:[rdx], al
 """,
 
-"POP_WORD_MEMGSDX":
+"STACK_POP_WORD_MEMGSDX":
 """
 pop ax
 mov word gs:[rdx], ax
 """,
 
-"POP_DWORD_MEMGSDX":
+"STACK_POP_DWORD_MEMGSDX":
 """
 pop rax
 mov dword gs:[rdx], eax
 """,
 
-"POP_QWORD_MEMGSDX":
+"STACK_POP_QWORD_MEMGSDX":
 """
 pop rax
 mov qword gs:[rdx], rax
 """,
 
-"PUSH_BYTE_MEMGSDX":
+"STACK_PUSH_BYTE_MEMGSDX":
 """
 movzx ax, byte gs:[rdx]
 push ax
 """,
 
-"PUSH_WORD_MEMGSDX":
+"STACK_PUSH_WORD_MEMGSDX":
 """
 mov ax, word gs:[rdx]
 push ax
 """,
 
-"PUSH_DWORD_MEMGSDX":
+"STACK_PUSH_DWORD_MEMGSDX":
 """
 mov eax, dword gs:[rdx]
 push rax
 """,
 
-"PUSH_QWORD_MEMGSDX":
+"STACK_PUSH_QWORD_MEMGSDX":
 """
 mov rax, qword gs:[rdx]
 push rax
 """,
 
-"PUSH_DWORD_MEMIMM":
+"STACK_PUSH_DWORD_MEMIMM":
 """
 lodsq
 mov eax, dword [rax]
 push rax
 """,
 
-"PUSH_QWORD_MEMIMM":
+"STACK_PUSH_QWORD_MEMIMM":
 """
 lodsq
 push qword [rax]
 """,
 
-"POP_DWORD_MEMDX":
+"STACK_POP_DWORD_MEMDX":
 """
 pop rax
 mov dword [rdx], eax
 """,
 
-"POP_QWORD_MEMDX":
+"STACK_POP_QWORD_MEMDX":
 """
 pop qword [rdx]
 """,
 
-"POP_DWORD_REG":
+"STACK_POP_DWORD_REG":
 """
 lodsb
 movzx rax, al
@@ -104,21 +104,21 @@ pop rcx
 mov dword [rdi+rax*8], ecx
 """,
 
-"POP_QWORD_REG":
+"STACK_POP_QWORD_REG":
 """
 lodsb
 movzx rax, al
 pop qword [rdi+rax*8]
 """,
 
-"POP_DWORD_MEMIMM":
+"STACK_POP_DWORD_MEMIMM":
 """
 lodsq
 pop rcx
 mov dword [rax], ecx
 """,
 
-"POP_QWORD_MEMIMM":
+"STACK_POP_QWORD_MEMIMM":
 """
 lodsq
 pop qword [rax]
@@ -134,7 +134,7 @@ mov dword [rsp+0x4], 0x0
 and dword [{R:di}+<FLAGS>], 0xfffffdff
 """,
 
-"PUSHENCODE":
+"PUSHENCODE2":
 """
 push qword [rdi+<ENCODE2>]
 """,
@@ -182,7 +182,7 @@ mov ebx, 0x0
 mov eax, eax
 """,
 
-"ADDDXREG":
+"STACK_ADD_DX_REG":
 """
 lodsb
 movzx eax, al
@@ -392,13 +392,6 @@ pop r14
 pop r15
 popfq
 ret
-""",
-
-"PUSH_DX_PLUS_UNKNOWN2":
-"""
-lodsq
-add rax, qword [rdi+<ANY>]
-push rax
 """,
 
 "CLC": # Bug
