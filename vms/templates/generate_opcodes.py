@@ -23,28 +23,37 @@ SEGMENTS = [("", ""),
             ("GS", "gs:")]
 
 ADDRESSES = [Operand("IMM", 1, "[0x$0]"),
+            Operand("RELIMM", 1, "[?0x$0]"),
             Operand("REG", 1, "[^0]"),
             Operand("REGIMM", 2, "[^0+0x$1]"),
+            Operand("REGRELIMM", 2, "[^0+?0x$1]"),
             Operand("REGREG", 2, "[^0+^1]"),
             Operand("REGREGIMM", 3, "[^0+^1+0x$2]"),
+            Operand("REGREGRELIMM", 3, "[^0+^1+?0x$2]"),
             Operand("REGMUL", 2, "[^0*$1]"),
             Operand("REGMULIMM", 3, "[^0*$1+0x$2]"),
+            Operand("REGMULRELIMM", 3, "[^0*$1+?0x$2]"),
             Operand("REGREGMUL", 3, "[^0+^1*$2]"),
             Operand("REGREGMULIMM", 4, "[^0+^1*$2+0x$3]"),
+            Operand("REGREGMULRELIMM", 4, "[^0+^1*$2+?0x$3]"),
             
             Operand("SP", 0, "[=]"),
             Operand("SPIMM", 1, "[=+0x$0]"),
+            Operand("SPRELIMM", 1, "[=+?0x$0]"),
             Operand("SPREG", 1, "[=+^0]"),
             Operand("SPREGIMM", 2, "[=+^0+0x$1]"),
+            Operand("SPREGRELIMM", 2, "[=+^0+?0x$1]"),
             Operand("SPREGMUL", 2, "[=+^0*$1]"),
-            Operand("SPREGMULIMM", 3, "[=+^0*$1+0x$2]")]
+            Operand("SPREGMULIMM", 3, "[=+^0*$1+0x$2]"),
+            Operand("SPREGMULRELIMM", 3, "[=+^0*$1+?0x$2]")]
             
 MEMORIES = []        
 for segment in SEGMENTS:
     for memory in ADDRESSES:
         MEMORIES.append(Operand("MEM" + segment[0] + memory.name, memory.args, segment[1] + memory.value))
         
-CONSTANT = [Operand("IMM", 1, "0x$0")]
+IMMEDIATE = [Operand("IMM", 1, "0x$0")]
+REALLOC_IMMEDIATE = [Operand("RELIMM", 1, "?0x$0")]
 
 Size = namedtuple("Size", ["name", "value", "size"])
 
@@ -71,11 +80,31 @@ def is_cl(op):
 def is_reg(op):
     return (op in REGS[1] and not is_cl(op)) or op in REGS[2] or op in REGS[4] or op in REGS[8]    
 
+def is_valid_reg(mode, size, op):
+    if not is_reg(op):
+        return False
+    if mode == 32 and op.name == "SP" and size.size == 1:
+        return False
+    return True
+    
 def is_mem(op):
     return op in MEMORIES
 
+def is_valid_mem(mode, size, op):
+    if not is_mem(op):
+        return False
+    if mode == 64 and "RELIMM" in op.name and op.name != "RELIMM" and "MEMRELIMM" not in op.name:
+        return False
+    return True
+
 def is_imm(op):
-    return op in CONSTANT
+    return op in IMMEDIATE
+
+def is_relimm(op):
+    return op in REALLOC_IMMEDIATE
+
+def is_valid_relimm(mode, size, op):
+    return mode == 32 and is_relimm(op) and size.size == 4
     
 def is_valid_size(mode, size):
     return not (mode == 32 and size.size == 8)
@@ -113,37 +142,37 @@ def check_none_operands(mode, size1, size2, size3):
 def check_none_operands_and_64(mode, size1, size2, size3):
     return size1 is None and mode == 64
     
-def check_two_operands_types(mode, op1, op2, op3):
-    if not is_reg(op1) and not is_mem(op1):
+def check_two_operands_types(mode, op1, op2, op3, size1, size2, size3):
+    if not is_valid_reg(mode, size1, op1) and not is_valid_mem(mode, size1, op1):
         return False
-    if not is_reg(op2) and not is_mem(op2) and not is_imm(op2):
+    if not is_valid_reg(mode, size2, op2) and not is_valid_mem(mode, size2, op2) and not is_imm(op2) and not is_valid_relimm(mode, size2, op2):
         return False
     if is_mem(op1) and is_mem(op2):
         return False
     return True
     
-def check_one_operand_type(mode, op1, op2, op3):
-    if not is_reg(op1) and not is_mem(op1):
+def check_one_operand_type(mode, op1, op2, op3, size1, size2, size3):
+    if not is_valid_reg(mode, size1, op1) and not is_valid_mem(mode, size1, op1):
         return False
     return True
     
-def check_one_operand_type_any(mode, op1, op2, op3):
-    if not is_reg(op1) and not is_mem(op1) and not is_imm(op1):
+def check_one_operand_type_any(mode, op1, op2, op3, size1, size2, size3):
+    if not is_valid_reg(mode, size1, op1) and not is_valid_mem(mode, size1, op1) and not is_imm(op1) and not is_valid_relimm(mode, size1, op1):
         return False
     return True
     
-def check_one_operand_type_imm(mode, op1, op2, op3):
+def check_one_operand_type_imm(mode, op1, op2, op3, size1, size2, size3):
     return is_imm(op1)
     
-def check_one_operand_reg_type(mode, op1, op2, op3):
-    if not is_reg(op1):
+def check_one_operand_reg_type(mode, op1, op2, op3, size1, size2, size3):
+    if not is_valid_reg(mode, size1, op1):
         return False
     return True
     
-def check_multwo_types(mode, op1, op2, op3):
-    if not is_reg(op1):
+def check_multwo_types(mode, op1, op2, op3, size1, size2, size3):
+    if not is_valid_reg(mode, size1, op1):
         return False
-    if not is_reg(op2) and not is_mem(op2) and not is_imm(op2):
+    if not is_valid_reg(mode, size2, op2) and not is_valid_mem(mode, size2, op2) and not is_imm(op2):
         return False
     return True
     
@@ -156,8 +185,8 @@ def check_three_operands_not_byte(mode, size1, size2, size3):
         return False
     return is_valid_size(mode, size1)
     
-def check_multhree_types(mode, op1, op2, op3):
-    if not check_multwo_types(mode, op1, op2, op3):
+def check_multhree_types(mode, op1, op2, op3, size1, size2, size3):
+    if not check_multwo_types(mode, op1, op2, op3, size1, size2, size3):
         return False
     if not is_imm(op3):
         return False
@@ -170,8 +199,8 @@ def check_shlshr_sizes(mode, size1, size2, size3):
         return False
     return is_valid_size(mode, size1)
     
-def check_shlshr_types(mode, op1, op2, op3):
-    if not is_reg(op1) and not is_mem(op1):
+def check_shlshr_types(mode, op1, op2, op3, size1, size2, size3):
+    if not is_valid_reg(mode, size1, op1) and not is_valid_mem(mode, size1, op1):
         return False
     if not is_imm(op2) and not is_cl(op2):
         return False
@@ -186,10 +215,10 @@ def check_movzx_movsx_sizes(mode, size1, size2, size3):
         return False
     return is_valid_size(mode, size1)
 
-def check_xchg_types(mode, op1, op2, op3):
-    if not check_two_operands_types(mode, op1, op2, op3):
+def check_xchg_types(mode, op1, op2, op3, size1, size2, size3):
+    if not check_two_operands_types(mode, op1, op2, op3, size1, size2, size3):
         return False
-    if is_imm(op2):
+    if not is_valid_reg(mode, size2, op2) and not is_valid_mem(mode, size2, op2):
         return False  
     return True
 
@@ -200,21 +229,21 @@ def check_stack_sizes(mode, size1, size2, size3):
         return True
     return size1.size == (mode >> 3)
 
-def check_lea_types(mode, op1, op2, op3):
-    return is_reg(op1) and op2 in ADDRESSES
+def check_lea_types(mode, op1, op2, op3, size1, size2, size3):
+    return is_valid_reg(mode, size1, op1) and op2 in ADDRESSES and (mode != 64 or "RELIMM" not in op2.name or op2.name == "RELIMM")
 
 def check_jmps_sizes(mode, size1, size2, size3):
     if size1 is None or size2 is not None:
         return False
     return size1.size == (mode >> 3)
 
-def check_jmp_types(mode, op1, op2, op3):
-    return is_reg(op1) or is_mem(op1) or is_imm(op1) or op1 in LABEL
+def check_jmp_types(mode, op1, op2, op3, size1, size2, size3):
+    return is_valid_reg(mode, size1, op1) or is_valid_mem(mode, size1, op1) or is_imm(op1) or is_relimm(op1) or op1 in LABEL
 
-def check_jcc_types(mode, op1, op2, op3):
-    return is_imm(op1) or op1 in LABEL
+def check_jcc_types(mode, op1, op2, op3, size1, size2, size3):
+    return is_imm(op1) or is_relimm(op1) or op1 in LABEL
 
-def check_label_type(mode, op1, op2, op3):
+def check_label_type(mode, op1, op2, op3, size1, size2, size3):
     return op1 in LABEL_DEF
     
 
@@ -310,36 +339,30 @@ def iterate_opcodes(mode):
                 if size1 is None:
                     args1 = [None]
                 else:
-                    args1 = REGS[size1.size] + MEMORIES + CONSTANT + ADDRESSES + LABEL + LABEL_DEF
+                    args1 = REGS[size1.size] + MEMORIES + IMMEDIATE + REALLOC_IMMEDIATE + ADDRESSES + LABEL + LABEL_DEF
                 if size2 is None:
                     args2 = [None]
                 else:
-                    args2 = REGS[size2.size] + MEMORIES + CONSTANT + ADDRESSES + LABEL + LABEL_DEF
+                    args2 = REGS[size2.size] + MEMORIES + IMMEDIATE + REALLOC_IMMEDIATE + ADDRESSES + LABEL + LABEL_DEF
                 if size3 is None:
                     args3 = [None]
                 else:
-                    args3 = REGS[size3.size] + MEMORIES + CONSTANT + ADDRESSES + LABEL + LABEL_DEF
+                    args3 = REGS[size3.size] + MEMORIES + IMMEDIATE + REALLOC_IMMEDIATE + ADDRESSES + LABEL + LABEL_DEF
                 for opcode in OPCODES:
                     if opcode.check_sizes is None or opcode.check_sizes(mode, size1, size2, size3):
                         for arg1 in args1:
-                            if arg1 and mode == 32 and arg1.value == "spl":
-                                continue
                             names4 = names3.copy()
                             if arg1 is not None:
                                 names4["TYPE1"] = arg1.name
                             for arg2 in args2:
-                                if arg2 and mode == 32 and arg2.value == "spl":
-                                    continue
                                 names5 = names4.copy()
                                 if arg2 is not None:
                                     names5["TYPE2"] = arg2.name
                                 for arg3 in args3:
-                                    if arg3 and mode == 32 and arg3.value == "spl":
-                                        continue
                                     names6 = names5.copy()
                                     if arg3 is not None:
                                         names6["TYPE3"] = arg3.name
-                                    if opcode.check_types is None or opcode.check_types(mode, arg1, arg2, arg3):
+                                    if opcode.check_types is None or opcode.check_types(mode, arg1, arg2, arg3, size1, size2, size3):
                                         yield OpcodeInfo(opcode.format.format(**names6), opcode, size1, size2, size3, arg1, arg2, arg3)
 
                                     

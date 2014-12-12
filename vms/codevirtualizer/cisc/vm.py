@@ -492,12 +492,12 @@ class VMFunction(object):
 
 
     def clean(self):
-        TEMPLATES = ["cisc_clean.txt", "cisc_push_pop.txt", "cisc_push_pop_step2.txt"]
+        TEMPLATES = ["cisc_00_clean.txt", "cisc_01_flags.txt", "cisc_02_realloc.txt", "cisc_03_movdx.txt", "cisc_04_push_pop.txt", "cisc_05_jumps_prepare.txt"]
         if self.mode == 32:
             TEMPLATES.append("cisc_templates_32.txt")
         else:
             TEMPLATES.append("cisc_templates_64.txt")
-        TEMPLATES += ["cisc_jumps.txt", "cisc_final.txt"]
+        TEMPLATES += ["cisc_06_jumps.txt", "cisc_07_final.txt"]
 
 
         for template in TEMPLATES:
@@ -596,19 +596,20 @@ class VMFunction(object):
 
             inst = reader.get()
             stop = False
+
             while inst:
-                if inst.name == ("%s_IMM" % push_native):
+                if inst.name in ("PUSH_ADDRESS_IMM", "PUSH_ADDRESS_RELIMM"):
                     reader.push()
                     try:
-                        jmp = reader.get_cond(lambda x: x.name in vminstruction.CONDITIONAL_JUMPS and sections[x.args[0]].end)
+                        jmp = reader.get_cond(lambda x: (x.name in vminstruction.CONDITIONAL_JUMPS or x.name == "JMP") and sections[x.args[0]].end)
                     except vminstruction.ReaderException:
                         reader.pop()
                     else:
                         # LOOPs are buggy
-                        if jmp.name not in ("LOOP", "LOOPE"):
+                        if jmp.name not in ("JMP", "LOOP", "LOOPE"):
                             reader.get_cond(lambda x: x.name == "POP_ADDRESS")
-                        inst = vminstruction.VMInstruction(inst.name.replace(push_native, jmp.name), *inst.args)
-                if inst.name.startswith(push_native):
+                        inst = vminstruction.VMInstruction(inst.name.replace("PUSH_ADDRESS", jmp.name), *inst.args)
+                elif inst.name.startswith(push_native) and inst.name[len(push_native):] not in ("_IMM", "_RELIMM"):
                     reader.push()
                     try:
                         reader.get_cond(lambda x: x.name == "JMP" and sections[x.args[0]].end)
@@ -629,12 +630,16 @@ class VMFunction(object):
                         sectioncode += str(asminst) + "\n"
                         next_section = long(asminst_after.operands[0].value + self.vm_info.init_handler.encode)
                         break
-                    elif next.name.startswith(push_native):
-                        reader.get_cond(lambda x: x.name == "JMP" and sections[x.args[0]].end)
-                        inst = vminstruction.VMInstruction(next.name.replace(push_native, "CALL"), *next.args)
-                        stop = True
                     else:
-                        assert False
+                        if next.name.startswith(push_native) and next.name[len(push_native):] not in ("_IMM", "_RELIMM"):
+                            push = push_native
+                        elif next.name in ("PUSH_ADDRESS_IMM", "PUSH_ADDRESS_RELIMM"):
+                            push = "PUSH_ADDRESS"
+                        else:
+                            assert False
+                        reader.get_cond(lambda x: x.name == "JMP" and sections[x.args[0]].end)
+                        inst = vminstruction.VMInstruction(next.name.replace(push, "CALL"), *next.args)
+                        stop = True
                 elif inst.name == "MOV_EAX_EAX":
                     # It is just a nop
                     inst = vminstruction.VMInstruction("NOP")
@@ -677,13 +682,15 @@ class VMFunction(object):
         self.code = code[:-1]
         return self.code
 
-    def compile_code(self, address = None):
+    def compile_code(self, address = None, relocs = False):
         code = self.get_code()
         if address == None:
             address = self.code_address
-        compiled_code = instruction.Assembler(self.mode).assemble(code, address)
+        compiled_code = instruction.Assembler(self.mode).assemble(code, address, relocs)
         if not compiled_code:
             raise Exception("Failed to compile code")
+        if relocs:
+            return address, compiled_code[0], compiled_code[1]
         return address, compiled_code        
         
     
@@ -781,8 +788,9 @@ def fix_vms(pe, code_section = 0, vms_section = 3, macro_size = 0x6):
                     raise
                 last_line = code.splitlines()[-1]
                 assert last_line.startswith("jmp ")
-                end_address = int(last_line.split()[1], 16)
-                code_address, compiled_code = vm.compile_code(address + macro_size)
+                end_address = int(last_line.split()[1].replace("?",""), 16)
+                code_address, compiled_code, relocations_info = vm.compile_code(address + macro_size, relocs=True)
+                print relocations_info
                 print hex(end_address), hex(code_address), hex(len(compiled_code))
                 print compiled_code.encode("hex")
                 assert end_address - code_address > len(compiled_code)
