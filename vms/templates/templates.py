@@ -192,6 +192,7 @@ class Templates(object):
 
     def clean(self, insts):
         # TODO clean insts as i should clean (get_clean_instruction), so I won't need the outer loop
+        value_mask = (1 << self.mode) - 1
         changed = True
         while changed:
             changed = False
@@ -276,7 +277,7 @@ class Templates(object):
                                     new_args.extend(["0x%x" % x for x in saved_args[arg[1:]]])
                                 else:
                                     new_args.append(arg)
-                            new_args = [eval(x, {}, values)&0xffffffff for x in new_args]
+                            new_args = [eval(x, {}, values)&value_mask for x in new_args]
                             new_insts.append(vminstruction.VMInstruction(new_name, *new_args))
                         new_insts += [nop] * (len(releated) - len(new_insts))
                         diff = 0

@@ -533,6 +533,12 @@ def find_matches(mode, handlers, handler, variables):
             if handler_name in ("JMP", "JMPIF") and handler.read.encrypted:
                 continue
             lines = lines[1:]
+            if lines[0].startswith("nop"):
+                if lines[1].startswith("cdqe"):
+                    if not handler.read.extend_dword:
+                        continue
+                    lines = lines[2:]
+
         if len(handler.insts) != len(lines):
             continue
         match = True

@@ -36,12 +36,15 @@ class VMInit(VMHandler):
     cache = {}
     def __init__(self, executable, address):
         mode = executable.get_arch()
+        address_mask = (1 << executable.mode) - 1
         if executable.mode == 32:
             reader = get_cleaner_reader(executable, address, [("ignore_jumps", False)])
             registers = 8
+            ptr = utils.uint32
         else:
             reader = executable.get_reader(address)
             registers = 15
+            ptr = utils.uint64
 
         self.regs = []
         if executable.mode == 32:
@@ -56,7 +59,7 @@ class VMInit(VMHandler):
         if executable.mode == 32:
             reader.get_cond(lambda x: x.opcode == "mov" and x.operands[0].is_reg("eax") and x.operands[1].is_reg("eax"))
 
-        self.encode = utils.uint32(reader.get_cond(lambda x: x.opcode == "call" and x.operands[0].value == x.address + 5).operands[0].value)
+        self.encode = ptr(reader.get_cond(lambda x: x.opcode == "call" and x.operands[0].value == x.address + 5).operands[0].value)
         reader.get_cond(lambda x: x.opcode == "pop" and x.operands[0].is_reg(mode.reg_native("di")))
 
         if executable.mode == 32:
@@ -75,14 +78,12 @@ class VMInit(VMHandler):
             self.encode2 -= self.encode2
             reader.get_cond(lambda x: x.opcode == "neg" and x.operands[0].is_reg("rcx"))
             self.encode2 = -self.encode2
-            self.encode2 &= (1 << executable.mode) - 1
+            self.encode2 &= address_mask
             reader.get_cond(lambda x: x.opcode == "sub" and x.operands[0].is_reg("rdi") and x.operands[1].is_reg("rax"))
             self.encode -= encode2
             reader.get_cond(lambda x: x.opcode == "mov" and x.operands[0].is_reg("rax") and x.operands[1].is_reg("rdi"))
             self.vm_struct = long(self.encode + reader.get_cond(lambda x: x.opcode == "mov" and x.operands[0].is_reg("rbx") and x.operands[1].is_immediate()).operands[1].value)
             reader.get_cond(lambda x: x.opcode == "add" and x.operands[0].is_reg("rdi") and x.operands[1].is_reg("rbx"))
-        self.encode &= (1 << executable.mode) - 1
-        self.vm_struct &= (1 << executable.mode) - 1
 
         self.encode_in_vm_struct = reader.get_cond(lambda x: x.opcode == "cmp" and x.operands[0].is_reg(mode.reg_native("ax")) and x.operands[1].is_memory() and (x.operands[1].base == mode.reg_native("di") or x.operands[1].index == mode.reg_native("di")) and x.operands[1].scale == 0).operands[1].offset
         jnz = reader.get_cond(lambda x: x.opcode == "jnz").operands[0].value
@@ -160,10 +161,12 @@ class VMReadInfo(vminstruction.VMReadInfo):
         self.first_operation = None
         self.second_operation = None
         self.after_operation = None
+        self.encrypted = False
+        self.extend_dword = False
         try:
             try:
                 self.before_operation = reader.get_cond(lambda x: x.opcode in ("add", "xor", "sub") and x.operands[0].is_reg(value_reg) and x.operands[1].is_reg(key_reg)).opcode
-            except cleaner.CleanerException, e:
+            except cleaner.CleanerException:
                 # In old version they didn't have lodsw, so try with size 2
                 if self.size == 4:
                     self.size = 2
@@ -187,14 +190,24 @@ class VMReadInfo(vminstruction.VMReadInfo):
                 self.second_operation = (res.opcode, res.operands[1].value)
             self.after_operation = reader.get_cond(lambda x: x.opcode in ("add", "xor", "sub") and x.operands[1].is_reg(value_reg) and x.operands[0].is_reg(key_reg)).opcode
             self.encrypted = True
-        except cleaner.CleanerException, e:
-            self.encrypted = False
+        except cleaner.CleanerException:
             self.size = real_size
             reader.address = current_address
+        if not self.encrypted and self.size == 4:
+            current_address = reader.address
+            try:
+                reader.get_cond(lambda x: x.opcode == "nop")
+                reader.get_cond(lambda x: x.opcode == "cdqe")
+                self.extend_dword = True
+            except cleaner.CleanerException:
+                reader.address = current_address
 
     def decode(self, bytes_reader, key):
         value = self.read(bytes_reader)
         if not self.encrypted:
+            if self.extend_dword:
+                if value >> 31:
+                    value |= ((~0) & ((1 << 32) - 1)) << 32
             return value
         value = vminstruction.VMReadInfo.do_operation(self.before_operation, value, key.key, self.size)
         value = vminstruction.VMReadInfo.do_operation(self.first_operation[0], value, self.first_operation[1], self.size)
@@ -249,7 +262,7 @@ class VMHandlers(object):
         clean = cleaner.Cleaner(executable)
         for reg in ["r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15"]:
             clean.set_reg_unused(reg)
-        fix_handlers = executable.read_dword(vm_info.init_handler.vm_struct + vm_info.init_handler.encode_in_vm_struct) != vm_info.init_handler.encode
+        fix_handlers = executable.read_pointer(vm_info.init_handler.vm_struct + vm_info.init_handler.encode_in_vm_struct) != vm_info.init_handler.encode
         mode = executable.get_arch()
 
         self.handlers = {}
@@ -258,7 +271,7 @@ class VMHandlers(object):
         for i in xrange(vm_info.init_handler.handlers_in_vm_struct / mode.pointer_size(), vm_info.init_handler.handlers_in_vm_struct / mode.pointer_size() + vm_info.init_handler.handlers_count):
             handler_address = executable.read_pointer(vm_info.init_handler.vm_struct + i * mode.pointer_size())
             if fix_handlers:
-                handler_address = long(handler_address + vm_info.init_handler.encode)
+                handler_address = long(handler_address + vm_info.init_handler.encode + vm_info.init_handler.encode_address_high_dword)
             clean.set_option("end_address", vm_info.init_handler.main_handler_address)
             #print hex(handler_address)
             self.handlers[i] = VMOpcodeHandler(clean.get_reader(handler_address))
@@ -307,10 +320,9 @@ class VMHandlers(object):
                         print inst
                     raise
                 handler.assign_name(operation_name)
-
         # Good, we have handlers now
-            
-                
+
+        self.realloc_offset = executable.read_pointer(vm_info.init_handler.vm_struct + variables["REALLOC"])
                         
 
 class VMInfo(object):
@@ -385,7 +397,7 @@ class VMFunction(object):
         # And we are looking for the jump to label1
 
         # Start address is the address of push address2/jmp and end address is the address of vmcode
-        real_vm_code_address = long(vm_code_address + self.vm_info.init_handler.encode)
+        real_vm_code_address = long(vm_code_address + self.vm_info.init_handler.encode + self.vm_info.init_handler.encode_address_high_dword)
         self.code_address = real_vm_code_address
 
         # Mark the start of the vm code as part that something is started in it
@@ -429,7 +441,7 @@ class VMFunction(object):
 
                 if inst.name in ("JMP", "JMPIF"):
                     inst.args[0] += bytes_reader.address
-                    inst.args[0] &= 0xffffffff
+                    inst.args[0] &= (1 << self.mode) - 1
                     
                 if inst.name == "JMP":
                     next_labeled = True
@@ -448,8 +460,12 @@ class VMFunction(object):
                     assert push.opcode == "push" and push.operands[0].is_immediate()
                     jmp = executable.get_instruction(push.next)
                     assert jmp.opcode == "jmp" and jmp.operands[0].is_immediate(vm_address)
-                    addresses_to_explore.put((long(push.operands[0].value + self.vm_info.init_handler.encode), push.operands[0].value))
-                    starts.append(long(push.operands[0].value + self.vm_info.init_handler.encode))
+                    jmp_vm_code_address = long(push.operands[0].value + self.vm_info.init_handler.encode + self.vm_info.init_handler.encode_address_high_dword)
+                    addresses_to_explore.put((jmp_vm_code_address, push.operands[0].value))
+                    starts.append(jmp_vm_code_address)
+                elif inst.name in ("ADD_DX_REALLOC", "STACK_ADD_REALLOC"): # TODO: Properly support reallocation
+                    inst.name += "_VALUE"
+                    inst.args = [self.vm_info.handlers.realloc_offset]
 
                 instructions[inst.address] = inst
                 #print inst
@@ -665,7 +681,9 @@ class VMFunction(object):
         code = self.get_code()
         if address == None:
             address = self.code_address
-        compiled_code = instruction.Assembler(self.executable.mode).assemble(code, address)
+        compiled_code = instruction.Assembler(self.mode).assemble(code, address)
+        if not compiled_code:
+            raise Exception("Failed to compile code")
         return address, compiled_code        
         
     
@@ -680,7 +698,7 @@ def get_vm(executable, address):
     assert push_inst.opcode == "push" and push_inst.operands[0].is_immediate()
     assert jmp_inst.opcode == "jmp" and jmp_inst.operands[0].is_immediate()
     vm = VMFunction(executable, push_inst.operands[0].value, jmp_inst.operands[0].value)
-    #vm.clean()
+    vm.clean()
     return vm
         
 def get_vm_code(executable, push_inst, jmp_inst):
@@ -727,14 +745,15 @@ def get_compiled_vm_code(executable, push_inst, jmp_inst, address = None):
     
     return address, compiled_code
 
-def fix_vms(pe, code_section = 0, vms_section = 3):
+def fix_vms(pe, code_section = 0, vms_section = 3, macro_size = 0x6):
     vms = []
     code_section_start = pe.sections[code_section].VirtualAddress + pe.OPTIONAL_HEADER.ImageBase
-    code_section_end = code_section_start + pe.sections[code_section].Misc_VirtualSize
+    code_section_end = code_section_start + pe.sections[code_section].SizeOfRawData
     vms_section_start = pe.sections[vms_section].VirtualAddress + pe.OPTIONAL_HEADER.ImageBase
-    vms_section_end = vms_section_start + pe.sections[vms_section].Misc_VirtualSize
+    vms_section_end = vms_section_start + pe.sections[vms_section].SizeOfRawData
     exe = executable.ToExecutable(pe)
-    for address in xrange(code_section_start, code_section_end):
+    address = code_section_start
+    while address < code_section_end:
         if address % 0x10000 == 0:
             print hex(address)
         if exe.read_byte(address) in (0xe9, 0xeb): # Jump
@@ -747,12 +766,14 @@ def fix_vms(pe, code_section = 0, vms_section = 3):
                     push_inst = exe.get_instruction(jmp_address)
                     jmp_inst = exe.get_instruction(push_inst.next)
                 except:
+                    address += 1
                     continue
                 if not (push_inst.opcode == "push" and push_inst.operands[0].is_immediate()): continue
                 if not (jmp_inst.opcode == "jmp" and jmp_inst.operands[0].is_immediate()): continue
                 print hex(address)
                 vm = get_vm(exe, jmp_address)
                 try:
+                    vm.printfunc()
                     code = vm.get_code()
                     print code
                 except:
@@ -761,11 +782,14 @@ def fix_vms(pe, code_section = 0, vms_section = 3):
                 last_line = code.splitlines()[-1]
                 assert last_line.startswith("jmp ")
                 end_address = int(last_line.split()[1], 16)
-                code_address, compiled_code = vm.compile_code(address + 0x12)
+                code_address, compiled_code = vm.compile_code(address + macro_size)
+                print hex(end_address), hex(code_address), hex(len(compiled_code))
+                print compiled_code.encode("hex")
                 assert end_address - code_address > len(compiled_code)
-                if end_address - code_address - 0x12 != len(compiled_code) - 2:
-                    print "Warning: Code size is different %d" % (end_address - code_address - 0x12 - (len(compiled_code) - 2))
-                exe.write(address, "\xeb\x10")
+                if end_address - code_address - macro_size != len(compiled_code) - 2:
+                    print "Warning: Code size is different %d" % (end_address - code_address - macro_size - (len(compiled_code) - 2))
+                exe.write(address, "\xeb" + chr(macro_size - 2))
                 exe.write(code_address, compiled_code)
                 #addressd, compil vm.compile_code(address + 0x12)
+        address += 1
                 
