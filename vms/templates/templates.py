@@ -24,6 +24,7 @@ class Templates(object):
         self.template_macros = {}
         self.templates = []
         self.mode = mode
+        self.run_once = False
 
         # Parse the file first
         self._parse_file(data_reader)
@@ -68,7 +69,16 @@ class Templates(object):
                     ignore = True
                 command = command[:-4]
 
-            if command == "DEFINE_GROUP":
+            if command == "OPTION":
+                if len(tokens) != 2:
+                    raise Exception("Invalid OPTION")
+                if not ignore:
+                    option = tokens[1]
+                    if option == "RUN_ONCE":
+                        self.run_once = True
+                    else:
+                        raise Exception("Unrecognized option %s" % option)
+            elif command == "DEFINE_GROUP":
                 if len(tokens) < 3:
                     raise Exception("Invalid DEFINE_GROUP")
                 group_name = tokens[1]
@@ -292,6 +302,8 @@ class Templates(object):
                     i += 1
                 else:
                     changed = True
+            if self.run_once:
+                break
         
 def translate_to_assembly(self):
     pass

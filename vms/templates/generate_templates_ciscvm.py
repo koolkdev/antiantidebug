@@ -4,11 +4,15 @@ from collections import namedtuple
 OperandPos = namedtuple("OperandPos", ["pos", "operand"])
 ARGS = ["X", "Y", "Z", "A", "B", "C"]
 def generate_templates(mode):
-    instructions_file = open(r"files\codevirtualizer\cisc\cisc_templates_%d.txt" % mode, "w")
+    templates_file = open(r"files\codevirtualizer\cisc\cisc_templates_%d.txt" % mode, "w")
+    mov_templates_file = open(r"files\codevirtualizer\cisc\cisc_templates_mov_%d.txt" % mode, "w")
+    
+    templates_file.write("OPTION RUN_ONCE\n\n")
+    mov_templates_file.write("OPTION RUN_ONCE\n\n")
     
     # Sometimes MOVZX_DWORD_BYTE can be detected as MOVZX_QWORD_BYTE because of the obfuscator, so this is for fixing that
     if mode == 64:
-        instructions_file.write("DEFINE_GROUP _MOVZX_DWORD_BYTE MOVZX_DWORD_BYTE MOVZX_QWORD_BYTE\n\n")
+        templates_file.write("DEFINE_GROUP _MOVZX_DWORD_BYTE MOVZX_DWORD_BYTE MOVZX_QWORD_BYTE\n\n")
     
     for opcode in generate_opcodes.iterate_opcodes(mode):
         operand1 = OperandPos(1, opcode.operand1)
@@ -217,15 +221,19 @@ def generate_templates(mode):
                 stack_pos += op_size
             elif is_pop:
                 stack_pos -= op_size
-                
-        instructions_file.write("DEFINE_TEMPLATE\n")
+        
+        if operation == "MOV":
+            file = mov_templates_file
+        else:
+            file = templates_file
+        file.write("DEFINE_TEMPLATE\n")
         for line, args in template_lines:
-            instructions_file.write(line)
+            file.write(line)
             for arg in args:
-                instructions_file.write(" ")
-                instructions_file.write(arg)
-            instructions_file.write("\n")
-        instructions_file.write("=>\n")
+                file.write(" ")
+                file.write(arg)
+            file.write("\n")
+        file.write("=>\n")
         t = 0
         if opcode.operand1 is not None:
             t += opcode.operand1.args
@@ -233,13 +241,14 @@ def generate_templates(mode):
                 t += opcode.operand2.args
                 if opcode.operand3 is not None:
                     t += opcode.operand3.args
-        instructions_file.write(opcode.name)
+        file.write(opcode.name)
         for i in xrange(t):
-            instructions_file.write(" ")
-            instructions_file.write(ARGS[i])
-        instructions_file.write("\n\n")
+            file.write(" ")
+            file.write(ARGS[i])
+        file.write("\n\n")
         #print template_lines
-    instructions_file.close()
+    templates_file.close()
+    mov_templates_file.close()
     
 generate_templates(32)
 generate_templates(64)

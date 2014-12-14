@@ -75,7 +75,7 @@ pop dword [eax]
 mov eax, 0x53947
 """,
 
-"PUSHENCODE":
+"PUSH_ENCODE":
 """
 push dword [edi+<ENCODE>]
 """,

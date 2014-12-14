@@ -76,9 +76,9 @@ class VMInstruction(object):
                 elif next_special == "%":
                     inst += instruction.Arch(mode).reg_qword(regs[arg])
                 elif next_special == "$":
-                    inst += "%X" % arg
+                    inst += "%x" % arg
                 elif next_special == "&":
-                    inst += "label_%X" % arg
+                    inst += "label_%x" % arg
                 next_special = None
             elif c in "#@~!$&%":
                 next_special = c

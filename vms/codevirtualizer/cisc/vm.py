@@ -35,6 +35,7 @@ def get_cleaner_reader(executable, address, options=None, unused_regs=None):
 class VMInit(VMHandler):
     cache = {}
     def __init__(self, executable, address):
+        print "Reading VMInit...",
         mode = executable.get_arch()
         address_mask = (1 << executable.mode) - 1
         if executable.mode == 32:
@@ -141,6 +142,7 @@ class VMInit(VMHandler):
         reader.get_cond(lambda x: x.opcode == "jnz" and x.operands[0].is_immediate(lock_loop_address))
 
         self.main_handler_address = reader.address
+        print "SUCCESS"
 
 
 class VMReadInfo(vminstruction.VMReadInfo):
@@ -218,6 +220,7 @@ class VMReadInfo(vminstruction.VMReadInfo):
 class VMMainHandler(VMHandler):
     cache = {}
     def __init__(self, executable, address):
+        print "Reading VMMainHandler...",
         reader = get_cleaner_reader(executable, address, unused_regs = ["r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15"])
         mode = executable.get_arch()
         self.read = VMReadInfo(reader)
@@ -225,6 +228,7 @@ class VMMainHandler(VMHandler):
             raise cleaner.CleanerException("Invalid size for main handler reader")
         reader.get_cond(lambda x: str(x) == mode.translate("movzx {R:ax}, al"))
         reader.get_cond(lambda x: str(x) == mode.translate("jmp {S} [{R:di}+{R:ax}*{N}]"))
+        print "SUCCESS"
 
 class VMOpcodeHandler(VMHandler):
     def __init__(self, reader):
@@ -267,6 +271,8 @@ class VMHandlers(object):
 
         self.handlers = {}
         handlers_to_process = Queue.Queue()
+
+        print ("Reading %d Handlers..." % (vm_info.init_handler.handlers_in_vm_struct / mode.pointer_size())),
         # Let's find all the handlers now
         for i in xrange(vm_info.init_handler.handlers_in_vm_struct / mode.pointer_size(), vm_info.init_handler.handlers_in_vm_struct / mode.pointer_size() + vm_info.init_handler.handlers_count):
             handler_address = executable.read_pointer(vm_info.init_handler.vm_struct + i * mode.pointer_size())
@@ -277,7 +283,9 @@ class VMHandlers(object):
             self.handlers[i] = VMOpcodeHandler(clean.get_reader(handler_address))
             clean.set_option("end_address", 0)
             handlers_to_process.put(self.handlers[i])
+        print "SUCCESS"
 
+        print "Detecting Handlers...",
         variables = {"FLAGS": 7 * mode.native_size(), "ENCODE": vm_info.init_handler.encode_in_vm_struct, "100_PTRS": 0x100 * mode.native_size()}
         if executable.mode == 64:
             variables["ENCODE2"] = vm_info.init_handler.encode2_in_vm_struct
@@ -321,6 +329,7 @@ class VMHandlers(object):
                     raise
                 handler.assign_name(operation_name)
         # Good, we have handlers now
+        print "SUCCESS"
 
         self.realloc_offset = executable.read_pointer(vm_info.init_handler.vm_struct + variables["REALLOC"])
                         
@@ -328,6 +337,7 @@ class VMHandlers(object):
 class VMInfo(object):
     cache = {}
     def __init__(self, executable, vm_address):
+        print "Parsing CISC%d VM at 0x%08x" % (executable.mode, vm_address)
         self.init_handler = VMInit(executable, vm_address)
         self.main_handler = VMMainHandler(executable, self.init_handler.main_handler_address)
         self.handlers = VMHandlers(executable, self)
@@ -372,7 +382,6 @@ class VMFunction(object):
 
         self.vm_info = VMInfo.get_vm_info(executable, vm_address)
         assert self.vm_info != None
-
         
         addresses_to_explore = Queue.Queue()
         starts = []
@@ -399,6 +408,8 @@ class VMFunction(object):
         # Start address is the address of push address2/jmp and end address is the address of vmcode
         real_vm_code_address = long(vm_code_address + self.vm_info.init_handler.encode + self.vm_info.init_handler.encode_address_high_dword)
         self.code_address = real_vm_code_address
+
+        print ("Reading VMFunction at 0x%08x..." % self.code_address),
 
         # Mark the start of the vm code as part that something is started in it
         addresses_to_explore.put((real_vm_code_address, vm_code_address))
@@ -471,6 +482,7 @@ class VMFunction(object):
                 #print inst
                 if inst.name == "RETURN":
                     break
+        print "SUCCESS"
 
         last_address = 0
         last_size = 0
@@ -490,18 +502,35 @@ class VMFunction(object):
             self.instructions.append(instructions[address])
         self.code = None
 
+        self._clean()
 
-    def clean(self):
+        print "Converting VMCode to Assembly...",
+        try:
+            self.get_code()
+        except:
+            print ""
+            self.printfunc()
+            raise
+        print "SUCCESS"
+
+    def _clean(self):
         TEMPLATES = ["cisc_00_clean.txt", "cisc_01_flags.txt", "cisc_02_realloc.txt", "cisc_03_movdx.txt", "cisc_04_push_pop.txt", "cisc_05_jumps_prepare.txt"]
         if self.mode == 32:
+            TEMPLATES.append("cisc_templates_mov_32.txt")
             TEMPLATES.append("cisc_templates_32.txt")
         else:
+            TEMPLATES.append("cisc_templates_mov_64.txt")
             TEMPLATES.append("cisc_templates_64.txt")
         TEMPLATES += ["cisc_06_jumps.txt", "cisc_07_final.txt"]
+        print "Processing VMFunction (%d instructions)..." % len(self.instructions)
 
 
         for template in TEMPLATES:
+            print ("Applying %s," % template),
             templates.Templates.get_template(r"codevirtualizer\cisc\%s" % template, self.mode).clean(self.instructions)
+            print "OK."
+
+        print "After processing: %d instructions" % len(self.instructions)
 
         # Clean labels
         refs = []
@@ -556,14 +585,13 @@ class VMFunction(object):
 
             if section.start:
                 registers = {}
-                """
+
                 if section_counter == 1:
                     index = max(max(code.rfind("add esp, 0x"), code.rfind("pop esp")), code.rfind("mov esp, dword [esp]"))
                     # Deal with anti-debugging
                     if index != -1:
                         code = code_base + code[code.find("\n", index+1)+1:]
                 section_counter += 1
-                """
 
                 regs = list(self.vm_info.init_handler.regs)
 
@@ -609,7 +637,7 @@ class VMFunction(object):
                         if jmp.name not in ("JMP", "LOOP", "LOOPE"):
                             reader.get_cond(lambda x: x.name == "POP_ADDRESS")
                         inst = vminstruction.VMInstruction(inst.name.replace("PUSH_ADDRESS", jmp.name), *inst.args)
-                elif inst.name.startswith(push_native) and inst.name[len(push_native):] not in ("_IMM", "_RELIMM"):
+                elif inst.name.startswith(push_native):
                     reader.push()
                     try:
                         reader.get_cond(lambda x: x.name == "JMP" and sections[x.args[0]].end)
@@ -643,9 +671,12 @@ class VMFunction(object):
                 elif inst.name == "MOV_EAX_EAX":
                     # It is just a nop
                     inst = vminstruction.VMInstruction("NOP")
-                # TODO
-                #if inst.name == "MOVENCODEREG":
-                #    inst = vminstruction.VMInstruction("MOVDWORDREG", inst.args[0], long(self.vm_info.init_handler.encode))
+                elif inst.name == ("MOV_%s_REG_ENCODE" % native_size_word):
+                    if self.mode == 32:
+                        inst = vminstruction.VMInstruction("MOV_%s_REG_IMM" % native_size_word, inst.args[0], long(self.vm_info.init_handler.encode))
+                    else:
+                        # Not sure about 64bit, should be checked, TODO
+                        inst = vminstruction.VMInstruction("MOV_%s_REG_IMM" % native_size_word, inst.args[0], long(self.vm_info.init_handler.encode2))
                 elif inst.name == "JMP" and not sections[inst.args[0]].end:
                     inst = vminstruction.VMInstruction("JMP_LABEL", inst.args[0])
                 elif inst.name in vminstruction.CONDITIONAL_JUMPS:
@@ -665,13 +696,13 @@ class VMFunction(object):
                 inst = reader.get()
             code += sectioncode
 
-        """
+
         if section_counter == 1:
             index = max(max(code.rfind("add esp, 0x"), code.rfind("pop esp")), code.rfind("mov esp, dword [esp]"))
             # Deal with anti-debugging
             if index != -1:
                 code = code_base + code[code.find("\n", index+1)+1:]
-        """
+
         if self.mode == 32:
             code = code.replace("push eax\npush ecx\npush edx\npush ebx\npush ebx\npush ebp\npush esi\npush edi", "pushad")
             code = code.replace("pop edi\npop esi\npop ebp\npop ebx\npop ebx\npop edx\npop ecx\npop eax", "popad")
@@ -704,23 +735,17 @@ def get_vm(executable, address):
     jmp_inst = executable.get_instruction(push_inst.next)
     assert push_inst.opcode == "push" and push_inst.operands[0].is_immediate()
     assert jmp_inst.opcode == "jmp" and jmp_inst.operands[0].is_immediate()
-    vm = VMFunction(executable, push_inst.operands[0].value, jmp_inst.operands[0].value)
-    vm.clean()
-    return vm
+    return VMFunction(executable, push_inst.operands[0].value, jmp_inst.operands[0].value)
         
 def get_vm_code(executable, push_inst, jmp_inst):
     assert push_inst.opcode == "push" and push_inst.operands[0].is_immediate()
     assert jmp_inst.opcode == "jmp" and jmp_inst.operands[0].is_immediate()
     vm = VMFunction(executable, push_inst.operands[0].value, jmp_inst.operands[0].value)
     #print "Cleaning vm.."
-    vm.clean()
+    #vm.clean()
     #vm.printfunc()
     #print "Converting to asm..."
-    try:
-        return vm.get_code()
-    except:
-        vm.printfunc()
-        raise
+    return vm.get_code()
     
 def get_compiled_vm_code(executable, push_inst, jmp_inst, address = None):
     assert push_inst.opcode == "push" and push_inst.operands[0].is_immediate()
@@ -752,7 +777,7 @@ def get_compiled_vm_code(executable, push_inst, jmp_inst, address = None):
     
     return address, compiled_code
 
-def fix_vms(pe, code_section = 0, vms_section = 3, macro_size = 0x6):
+def fix_vms(pe, code_section = 0, vms_section = 3, macro_size = 0x12):
     vms = []
     code_section_start = pe.sections[code_section].VirtualAddress + pe.OPTIONAL_HEADER.ImageBase
     code_section_end = code_section_start + pe.sections[code_section].SizeOfRawData
@@ -775,24 +800,23 @@ def fix_vms(pe, code_section = 0, vms_section = 3, macro_size = 0x6):
                 except:
                     address += 1
                     continue
-                if not (push_inst.opcode == "push" and push_inst.operands[0].is_immediate()): continue
-                if not (jmp_inst.opcode == "jmp" and jmp_inst.operands[0].is_immediate()): continue
+                if not (push_inst.opcode == "push" and push_inst.operands[0].is_immediate()):
+                    address += 1
+                    continue
+                if not (jmp_inst.opcode == "jmp" and jmp_inst.operands[0].is_immediate()):
+                    address += 1
+                    continue
                 print hex(address)
                 vm = get_vm(exe, jmp_address)
-                try:
-                    vm.printfunc()
-                    code = vm.get_code()
-                    print code
-                except:
-                    vm.printfunc()
-                    raise
+                code = vm.get_code()
+                print code
                 last_line = code.splitlines()[-1]
                 assert last_line.startswith("jmp ")
                 end_address = int(last_line.split()[1].replace("?",""), 16)
                 code_address, compiled_code, relocations_info = vm.compile_code(address + macro_size, relocs=True)
-                print relocations_info
-                print hex(end_address), hex(code_address), hex(len(compiled_code))
-                print compiled_code.encode("hex")
+                #print relocations_info
+                #print hex(end_address), hex(code_address), hex(len(compiled_code))
+                #print compiled_code.encode("hex")
                 assert end_address - code_address > len(compiled_code)
                 if end_address - code_address - macro_size != len(compiled_code) - 2:
                     print "Warning: Code size is different %d" % (end_address - code_address - macro_size - (len(compiled_code) - 2))

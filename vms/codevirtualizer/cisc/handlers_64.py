@@ -134,7 +134,7 @@ mov dword [rsp+0x4], 0x0
 and dword [{R:di}+<FLAGS>], 0xfffffdff
 """,
 
-"PUSHENCODE2":
+"PUSH_ENCODE":
 """
 push qword [rdi+<ENCODE2>]
 """,
