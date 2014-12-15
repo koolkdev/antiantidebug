@@ -5,11 +5,11 @@ import oreans_deobfuscator
 # Just a proxy for the class
 class Cleaner(object):
     # pe should have the function get_instruction_at
-    def __init__(self, executable):
-        self.executable = executable
+    def __init__(self, file):
+        self.file = file
         def read(address, size):
-            return executable.read(address, size)
-        self.cleaner = oreans_deobfuscator.Cleaner(read, self.executable.mode)
+            return file.read(address, size)
+        self.cleaner = oreans_deobfuscator.Cleaner(read, self.file.mode)
 
 
     def set_reg_unused(self, reg):
@@ -22,7 +22,7 @@ class Cleaner(object):
         next_address, data = self.cleaner.get_clean_instruction(address)
         if next_address is None:
             return None
-        inst = instruction.Instruction(data, address, self.executable.mode)
+        inst = instruction.Instruction(data, address, self.file.mode)
         inst.next = next_address
         return inst
 
@@ -56,8 +56,8 @@ class CleanReader(object):
 
 
 class JunkSkipper(object):
-    def __init__(self, executable):
-        self.executable = executable
+    def __init__(self, file):
+        self.file = file
         self.instructions = {}
         self.loop = {}
 
@@ -67,7 +67,7 @@ class JunkSkipper(object):
         if self.loop.has_key(address):
             raise Exception("loop")
         self.loop[address] = 1
-        inst = self.executable.get_instruction(address)
+        inst = self.file.get_instruction(address)
         inst = self._clean_instruction(inst)
         self.instructions[address] = inst
         return inst

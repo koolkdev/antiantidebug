@@ -1,9 +1,15 @@
 import utils
+import sys
 from themida import cleaner
 from vms import vminstruction
 from vms import templates
 import instruction
-import executable
+import mappedfile
+try:
+    import progressbar
+    PROGRESSBAR = True
+except ImportError:
+    PROGRESSBAR = False
 
 import handlers_common
 import handlers_32
@@ -22,8 +28,8 @@ class VMHandler(object):
 
 # TODO, do not just remove MATHF POP, becuase it is real math!
 
-def get_cleaner_reader(executable, address, options=None, unused_regs=None):
-    clean = cleaner.Cleaner(executable)
+def get_cleaner_reader(file, address, options=None, unused_regs=None):
+    clean = cleaner.Cleaner(file)
     if options:
         for option, value in options:
             clean.set_option(option, value)
@@ -34,36 +40,36 @@ def get_cleaner_reader(executable, address, options=None, unused_regs=None):
 
 class VMInit(VMHandler):
     cache = {}
-    def __init__(self, executable, address):
+    def __init__(self, file, address):
         print "Reading VMInit...",
-        mode = executable.get_arch()
-        address_mask = (1 << executable.mode) - 1
-        if executable.mode == 32:
-            reader = get_cleaner_reader(executable, address, [("ignore_jumps", False)])
+        mode = file.get_arch()
+        address_mask = (1 << file.mode) - 1
+        if file.mode == 32:
+            reader = get_cleaner_reader(file, address, [("ignore_jumps", False)])
             registers = 8
             ptr = utils.uint32
         else:
-            reader = executable.get_reader(address)
+            reader = file.get_reader(address)
             registers = 15
             ptr = utils.uint64
 
         self.regs = []
-        if executable.mode == 32:
+        if file.mode == 32:
             reader.get_cond(lambda x: x.opcode == "pushfd")
             self.regs.append("flags")
         self.regs += [reader.get_cond(lambda x: x.opcode == "push" and x.operands[0].is_reg()).operands[0].reg for i in xrange(registers)]
-        if executable.mode == 64:
+        if file.mode == 64:
             reader.get_cond(lambda x: x.opcode == "pushfq")
             self.regs.append("flags")
 
         reader.get_cond(lambda x: x.opcode == "cld")
-        if executable.mode == 32:
+        if file.mode == 32:
             reader.get_cond(lambda x: x.opcode == "mov" and x.operands[0].is_reg("eax") and x.operands[1].is_reg("eax"))
 
         self.encode = ptr(reader.get_cond(lambda x: x.opcode == "call" and x.operands[0].value == x.address + 5).operands[0].value)
         reader.get_cond(lambda x: x.opcode == "pop" and x.operands[0].is_reg(mode.reg_native("di")))
 
-        if executable.mode == 32:
+        if file.mode == 32:
             self.encode -= reader.get_cond(lambda x: x.opcode == "sub" and x.operands[0].is_reg("edi") and x.operands[1].is_immediate()).operands[1].value
             reader.get_cond(lambda x: x.opcode == "and" and x.operands[0].is_reg("edi") and x.operands[1].is_immediate(0xFFFFF000))
             self.encode &= 0xFFFFF000
@@ -90,11 +96,11 @@ class VMInit(VMHandler):
         jnz = reader.get_cond(lambda x: x.opcode == "jnz").operands[0].value
         reader.get_cond(lambda x: x.opcode == "jmp" and x.operands[0].is_immediate())
         reader.get_cond(lambda x: x.address == jnz and x.opcode == "mov" and x.operands[1].is_reg(mode.reg_native("ax")) and x.operands[0].is_memory() and (x.operands[0].base == mode.reg_native("di") or x.operands[0].index == mode.reg_native("di")) and x.operands[0].offset == self.encode_in_vm_struct and x.operands[0].scale == 0)
-        if executable.mode == 64:
+        if file.mode == 64:
             self.encode2_in_vm_struct = reader.get_cond(lambda x: x.opcode == "mov" and x.operands[1].is_reg(mode.reg_native("cx")) and x.operands[0].is_memory() and (x.operands[0].base == mode.reg_native("di") or x.operands[0].index == mode.reg_native("di")) and x.operands[0].scale == 0).operands[0].offset
 
         self.handlers_count = reader.get_cond(lambda x: x.opcode == "mov" and x.operands[0].is_reg("ecx") and x.operands[1].is_immediate()).operands[1].value
-        if executable.mode == 64:
+        if file.mode == 64:
             test_address = reader.get_cond(lambda x: x.opcode == "test" and x.operands[0].is_reg("ecx") and x.operands[1].is_reg("ecx")).address
             after_loop = reader.get_cond(lambda x: x.opcode == "jz" and x.operands[0].is_immediate()).operands[0].value
         else:
@@ -104,7 +110,7 @@ class VMInit(VMHandler):
         self.handlers_in_vm_struct = reader.get_cond(lambda x: x.opcode == "add" and x.operands[1].is_reg(mode.reg_native("ax")) and x.operands[0].is_memory() and x.operands[0].base == mode.reg_native("di") and x.operands[0].index == mode.reg_native("cx") and x.operands[0].scale == mode.pointer_size()).operands[0].offset + mode.pointer_size()
         reader.get_cond(lambda x: x.opcode == "dec" and x.operands[0].is_reg("ecx"))
 
-        if executable.mode == 64:
+        if file.mode == 64:
             reader.get_cond(lambda x: x.opcode == "jmp" and x.operands[0].is_immediate(test_address))
             assert after_loop == reader.address
         else:
@@ -118,7 +124,7 @@ class VMInit(VMHandler):
         #    reader.address = reader.get_cond(lambda x: x.opcode == "jmp" and x.operands[0].is_immediate()).operands[0].value
         #    self.handlers_in_vm_struct = reader.get_cond(lambda x: x.opcode == "add" and x.operands[1].is_reg("eax") and x.operands[0].is_memory() and x.operands[0].base == "edi" and x.operands[0].index == "ecx" and x.operands[0].scale == 4).operands[0].offset + 4
 
-        if executable.mode == 64:
+        if file.mode == 64:
             self.encode_address_high_dword = reader.get_cond(lambda x: x.opcode == "mov" and x.operands[0].is_reg("rdx") and x.operands[1].is_immediate()).operands[1].value
         else:
             self.encode_address_high_dword = 0
@@ -127,7 +133,7 @@ class VMInit(VMHandler):
         reader.get_cond(lambda x: x.opcode == "mov" and x.operands[0].is_reg("esi") and x.operands[1].is_memory() and x.operands[1].base == mode.reg_native("sp") and x.operands[1].offset == (registers + 1) * mode.pointer_size())
         # mov ebx, esi
         reader.get_cond(lambda x: x.opcode == "mov" and x.operands[0].is_reg("ebx") and x.operands[1].is_reg("esi"))
-        if executable.mode == 64:
+        if file.mode == 64:
             # add rsi, edx
             reader.get_cond(lambda x: x.opcode == "add" and x.operands[0].is_reg("rsi") and x.operands[1].is_reg("rdx"))
         # add rsi, rax
@@ -219,10 +225,10 @@ class VMReadInfo(vminstruction.VMReadInfo):
 
 class VMMainHandler(VMHandler):
     cache = {}
-    def __init__(self, executable, address):
+    def __init__(self, file, address):
         print "Reading VMMainHandler...",
-        reader = get_cleaner_reader(executable, address, unused_regs = ["r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15"])
-        mode = executable.get_arch()
+        reader = get_cleaner_reader(file, address, unused_regs = ["r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15"])
+        mode = file.get_arch()
         self.read = VMReadInfo(reader)
         if self.read.size != 1:
             raise cleaner.CleanerException("Invalid size for main handler reader")
@@ -262,12 +268,12 @@ class VMOpcodeHandler(VMHandler):
         return vminstruction.VMInstruction(self.name)
             
 class VMHandlers(object):
-    def __init__(self, executable, vm_info):
-        clean = cleaner.Cleaner(executable)
+    def __init__(self, file, vm_info):
+        clean = cleaner.Cleaner(file)
         for reg in ["r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15"]:
             clean.set_reg_unused(reg)
-        fix_handlers = executable.read_pointer(vm_info.init_handler.vm_struct + vm_info.init_handler.encode_in_vm_struct) != vm_info.init_handler.encode
-        mode = executable.get_arch()
+        fix_handlers = file.read_pointer(vm_info.init_handler.vm_struct + vm_info.init_handler.encode_in_vm_struct) != vm_info.init_handler.encode
+        mode = file.get_arch()
 
         self.handlers = {}
         handlers_to_process = Queue.Queue()
@@ -275,7 +281,7 @@ class VMHandlers(object):
         print ("Reading %d Handlers..." % (vm_info.init_handler.handlers_in_vm_struct / mode.pointer_size())),
         # Let's find all the handlers now
         for i in xrange(vm_info.init_handler.handlers_in_vm_struct / mode.pointer_size(), vm_info.init_handler.handlers_in_vm_struct / mode.pointer_size() + vm_info.init_handler.handlers_count):
-            handler_address = executable.read_pointer(vm_info.init_handler.vm_struct + i * mode.pointer_size())
+            handler_address = file.read_pointer(vm_info.init_handler.vm_struct + i * mode.pointer_size())
             if fix_handlers:
                 handler_address = long(handler_address + vm_info.init_handler.encode + vm_info.init_handler.encode_address_high_dword)
             clean.set_option("end_address", vm_info.init_handler.main_handler_address)
@@ -287,14 +293,14 @@ class VMHandlers(object):
 
         print "Detecting Handlers...",
         variables = {"FLAGS": 7 * mode.native_size(), "ENCODE": vm_info.init_handler.encode_in_vm_struct, "100_PTRS": 0x100 * mode.native_size()}
-        if executable.mode == 64:
+        if file.mode == 64:
             variables["ENCODE2"] = vm_info.init_handler.encode2_in_vm_struct
         processed = []
         while not handlers_to_process.empty():
             handler = handlers_to_process.get()
             # Try to match with HANDLERS
             matches = handlers_common.find_matches(mode, handlers_common.HANDLERS, handler, variables)
-            if executable.mode == 32:
+            if file.mode == 32:
                 matches += handlers_common.find_matches(mode, handlers_32.HANDLERS, handler, variables)
             else:
                 matches += handlers_common.find_matches(mode, handlers_64.HANDLERS, handler, variables)
@@ -331,23 +337,23 @@ class VMHandlers(object):
         # Good, we have handlers now
         print "SUCCESS"
 
-        self.realloc_offset = executable.read_pointer(vm_info.init_handler.vm_struct + variables["REALLOC"])
+        self.realloc_offset = file.read_pointer(vm_info.init_handler.vm_struct + variables["REALLOC"])
                         
 
 class VMInfo(object):
     cache = {}
-    def __init__(self, executable, vm_address):
-        print "Parsing CISC%d VM at 0x%08x" % (executable.mode, vm_address)
-        self.init_handler = VMInit(executable, vm_address)
-        self.main_handler = VMMainHandler(executable, self.init_handler.main_handler_address)
-        self.handlers = VMHandlers(executable, self)
+    def __init__(self, file, vm_address):
+        print "Parsing CISC%d VM at 0x%08x" % (file.mode, vm_address)
+        self.init_handler = VMInit(file, vm_address)
+        self.main_handler = VMMainHandler(file, self.init_handler.main_handler_address)
+        self.handlers = VMHandlers(file, self)
 
     @classmethod
-    def get_vm_info(cls, executable, address):
+    def get_vm_info(cls, file, address):
         if cls.cache.has_key(address):
             return cls.cache[address]
         #try:
-        res = cls(executable, address)
+        res = cls(file, address)
         #except cleaner.CleanerException, e:
         #    res = None
             
@@ -371,16 +377,16 @@ class VMKey(vminstruction.VMKey):
         self.key = utils.uint32(0)
         
 class VMFunction(object):
-    def __init__(self, executable, vm_code_address, vm_address):
-        self.mode = executable.mode
-        self.executable = executable
+    def __init__(self, file, vm_code_address, vm_address):
+        self.mode = file.mode
+        self.file = file
         #assert push_inst.opcode == "push" and push_inst.operands[0].is_immediate()
         #assert jmp_inst.opcode == "jmp" and jmp_inst.operands[0].is_immediate()
         #vm_address = jmp_inst.operands[0].value
         #vm_code_address = push_inst.operands[0].value
-        print "Getting VM %08X %08X" % (vm_address, vm_code_address)
+        #print "` %08X %08X" % (vm_address, vm_code_address)
 
-        self.vm_info = VMInfo.get_vm_info(executable, vm_address)
+        self.vm_info = VMInfo.get_vm_info(file, vm_address)
         assert self.vm_info != None
         
         addresses_to_explore = Queue.Queue()
@@ -423,7 +429,7 @@ class VMFunction(object):
             if instructions.has_key(address):
                 instructions[address].set_info("labled", True)
                 continue
-            bytes_reader = vminstruction.BytesReader(executable, address)
+            bytes_reader = vminstruction.BytesReader(file, address)
             while True:
                 if instructions.has_key(bytes_reader.address):
                     if next_labeled:
@@ -465,11 +471,11 @@ class VMFunction(object):
                     # It isn't really an opcode, so don't store it
                     continue
                 elif inst.name == "PUSH_ENCODED":
-                    push = executable.get_instruction(long(inst.args[0] + self.vm_info.init_handler.encode))
+                    push = file.get_instruction(long(inst.args[0] + self.vm_info.init_handler.encode))
                     if push.opcode != "push":
-                        push = executable.get_instruction(push.next)
+                        push = file.get_instruction(push.next)
                     assert push.opcode == "push" and push.operands[0].is_immediate()
-                    jmp = executable.get_instruction(push.next)
+                    jmp = file.get_instruction(push.next)
                     assert jmp.opcode == "jmp" and jmp.operands[0].is_immediate(vm_address)
                     jmp_vm_code_address = long(push.operands[0].value + self.vm_info.init_handler.encode + self.vm_info.init_handler.encode_address_high_dword)
                     addresses_to_explore.put((jmp_vm_code_address, push.operands[0].value))
@@ -650,8 +656,8 @@ class VMFunction(object):
                     next = reader.get()
                     if next.name == "JMP":
                         assert sections[next.args[0]].end
-                        asminst = self.executable.get_instruction(long(inst.args[0] + self.vm_info.init_handler.encode))                    
-                        asminst_after = self.executable.get_instruction(asminst.next)
+                        asminst = self.file.get_instruction(long(inst.args[0] + self.vm_info.init_handler.encode))                    
+                        asminst_after = self.file.get_instruction(asminst.next)
                         assert asminst_after.opcode == "push"
                         assert asminst_after.operands[0].is_immediate()
                         #sectioncode += "\n".join(["db 0x%x" % ord(x) for x in asminst.bytes]) + "\n"
@@ -730,73 +736,61 @@ class VMFunction(object):
         for inst in self.instructions:
             print inst
 
-def get_vm(executable, address):
-    push_inst = executable.get_instruction(address)
-    jmp_inst = executable.get_instruction(push_inst.next)
+
+def get_vm(file, address):
+    push_inst = file.get_instruction(address)
+    jmp_inst = file.get_instruction(push_inst.next)
     assert push_inst.opcode == "push" and push_inst.operands[0].is_immediate()
     assert jmp_inst.opcode == "jmp" and jmp_inst.operands[0].is_immediate()
-    return VMFunction(executable, push_inst.operands[0].value, jmp_inst.operands[0].value)
-        
-def get_vm_code(executable, push_inst, jmp_inst):
+    return VMFunction(file, push_inst.operands[0].value, jmp_inst.operands[0].value)
+
+
+def get_vm_code(file, push_inst, jmp_inst):
     assert push_inst.opcode == "push" and push_inst.operands[0].is_immediate()
     assert jmp_inst.opcode == "jmp" and jmp_inst.operands[0].is_immediate()
-    vm = VMFunction(executable, push_inst.operands[0].value, jmp_inst.operands[0].value)
+    vm = VMFunction(file, push_inst.operands[0].value, jmp_inst.operands[0].value)
     #print "Cleaning vm.."
     #vm.clean()
     #vm.printfunc()
     #print "Converting to asm..."
     return vm.get_code()
-    
-def get_compiled_vm_code(executable, push_inst, jmp_inst, address = None):
+
+
+def get_compiled_vm_code(file, push_inst, jmp_inst, address = None):
     assert push_inst.opcode == "push" and push_inst.operands[0].is_immediate()
     assert jmp_inst.opcode == "jmp" and jmp_inst.operands[0].is_immediate()
-    vm = VMFunction(executable, push_inst.operands[0].value, jmp_inst.operands[0].value)
-    vm.clean()
-    code = vm.get_code()
-    if address == None:
-        address = vm.code_address
-    #print code
-    code = ("use32 org 0x%08X\n" % address) + code
-    source = tempfile.NamedTemporaryFile("wb", delete = False)
-    source.write(code)
-    source.close()
+    return VMFunction(file, push_inst.operands[0].value, jmp_inst.operands[0].value).compile_code()
 
-    # Ugly hack to get temporary file name
-    output = tempfile.NamedTemporaryFile("wb", delete = False)
-    output.close()
-    os.unlink(output.name)
-    startupinfo = subprocess.STARTUPINFO()
-    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-    fasm = subprocess.Popen([r"vms\fasm.exe", source.name, output.name], stdout = subprocess.PIPE, stderr = subprocess.STDOUT, startupinfo=startupinfo)
-    if fasm.wait() != 0:
-        raise Exception(fasm.stdout.read())
-    print fasm.stdout.read()
-    compiled_code = open(output.name, "rb").read()
-    os.unlink(output.name)
-    os.unlink(source.name)  
-    
-    return address, compiled_code
 
-def fix_vms(pe, code_section = 0, vms_section = 3, macro_size = 0x12):
+def fix_vms(pe, code_section=0, vms_section=3, macro_size=0x12):
     vms = []
     code_section_start = pe.sections[code_section].VirtualAddress + pe.OPTIONAL_HEADER.ImageBase
     code_section_end = code_section_start + pe.sections[code_section].SizeOfRawData
     vms_section_start = pe.sections[vms_section].VirtualAddress + pe.OPTIONAL_HEADER.ImageBase
     vms_section_end = vms_section_start + pe.sections[vms_section].SizeOfRawData
-    exe = executable.ToExecutable(pe)
-    address = code_section_start
-    while address < code_section_end:
-        if address % 0x10000 == 0:
-            print hex(address)
-        if exe.read_byte(address) in (0xe9, 0xeb): # Jump
-            if exe.read_byte(address) == 0xe9:
-                jmp_address = exe.read_dword(address + 1) + address + 5
+    file = mappedfile.PEMappedFile(pe)
+    decompile_all_vms(file, (code_section_start, code_section_end), (vms_section_start, vms_section_end))
+
+
+def decompile_all_vms(file, code_section, vm_section, macro_size=0x12):
+    address = code_section[0]
+    if PROGRESSBAR:
+        class Address(progressbar.Widget):
+            def update(self, pbar):
+                return '0x%x' % (pbar.currval + code_section[0])
+        widgets = ['Searching: ', Address(), ' ', progressbar.Percentage(), ' ', progressbar.Bar(),
+           ' ', progressbar.ETA()]
+        prog = progressbar.ProgressBar(maxval=code_section[1] - code_section[0], widgets=widgets, fd=sys.stdout).start()
+    while address < code_section[1]:
+        if file.read_byte(address) in (0xe9, 0xeb): # Jump
+            if file.read_byte(address) == 0xe9:
+                jmp_address = file.read_dword(address + 1) + address + 5
             else:
-                jmp_address = exe.read_byte(address + 1) + address + 2
-            if vms_section_start <= jmp_address <= vms_section_end:
+                jmp_address = file.read_byte(address + 1) + address + 2
+            if vm_section[0] <= jmp_address <= vm_section[1]:
                 try:
-                    push_inst = exe.get_instruction(jmp_address)
-                    jmp_inst = exe.get_instruction(push_inst.next)
+                    push_inst = file.get_instruction(jmp_address)
+                    jmp_inst = file.get_instruction(push_inst.next)
                 except:
                     address += 1
                     continue
@@ -806,22 +800,33 @@ def fix_vms(pe, code_section = 0, vms_section = 3, macro_size = 0x12):
                 if not (jmp_inst.opcode == "jmp" and jmp_inst.operands[0].is_immediate()):
                     address += 1
                     continue
-                print hex(address)
-                vm = get_vm(exe, jmp_address)
-                code = vm.get_code()
-                print code
-                last_line = code.splitlines()[-1]
-                assert last_line.startswith("jmp ")
-                end_address = int(last_line.split()[1].replace("?",""), 16)
-                code_address, compiled_code, relocations_info = vm.compile_code(address + macro_size, relocs=True)
-                #print relocations_info
-                #print hex(end_address), hex(code_address), hex(len(compiled_code))
-                #print compiled_code.encode("hex")
-                assert end_address - code_address > len(compiled_code)
-                if end_address - code_address - macro_size != len(compiled_code) - 2:
-                    print "Warning: Code size is different %d" % (end_address - code_address - macro_size - (len(compiled_code) - 2))
-                exe.write(address, "\xeb" + chr(macro_size - 2))
-                exe.write(code_address, compiled_code)
-                #addressd, compil vm.compile_code(address + 0x12)
+                # Now it must be a vm
+                print "Found VM: 0x%08x" % address
+                decompile_vm(file, address, macro_size)
         address += 1
-                
+        if PROGRESSBAR:
+            prog.update(address - code_section[0])
+    if PROGRESSBAR:
+        prog.finish()
+
+
+def decompile_vm(file, address, macro_size=0x12):
+    if file.read_byte(address) == 0xe9:
+        jmp_address = file.read_dword(address + 1) + address + 5
+    elif file.read_byte(address) == 0xe8:
+        jmp_address = file.read_byte(address + 1) + address + 2
+    else:
+        assert False
+    vm = get_vm(file, jmp_address)
+    code = vm.get_code()
+    print code
+    last_line = code.splitlines()[-1]
+    assert last_line.startswith("jmp ")
+    end_address = int(last_line.split()[1].replace("?", ""), 16)
+    code_address, compiled_code, relocations_info = vm.compile_code(address + macro_size, relocs=True)
+
+    assert end_address - code_address > len(compiled_code)
+    if end_address - code_address - macro_size != len(compiled_code) - 2:
+        print "Warning: Code size is different %d" % (end_address - code_address - macro_size - (len(compiled_code) - 2))
+    file.write(address, "\xeb" + chr(macro_size - 2))
+    file.write(code_address, compiled_code)

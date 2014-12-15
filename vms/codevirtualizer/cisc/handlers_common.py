@@ -521,6 +521,8 @@ def find_matches(mode, handlers, handler, variables):
     matches = []
     match_without_variables = None
     for handler_name, code in handlers.items():
+        if handler_name.find("_OLD") != -1:
+            handler_name = handler_name[:handler_name.find("_OLD")]
         local_variables = variables.copy()
         lines = [mode.translate(x.strip()) for x in code.splitlines() if x.strip()]
         if lines[0].startswith("lods"):

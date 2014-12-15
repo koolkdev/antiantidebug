@@ -304,4 +304,19 @@ popfd
 ret
 """,
 
+"CMC_OLD": # Bug
+"""
+mov eax, dword [edi+<FLAGS>]
+and eax, 0x1
+or eax, eax
+jz <ANY>
+and dword [edi+<FLAGS>], 0xfe
+mov ebx, ebx
+""",
+
+"CLC_OLD": # Bug
+"""
+and dword [{R:di}+<FLAGS>], 0xfe
+""",
+
 }

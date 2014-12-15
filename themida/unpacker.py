@@ -1,9 +1,8 @@
 import debugger
 import instruction
 from themida import cleaner
-from vms.codevirtualizer import ciscvm
+from vms.codevirtualizer.cisc import vm
 import antidebugging
-import executable
 
 import re
 
@@ -151,12 +150,12 @@ def old_follow(binary):
             inst = d.stepover()
             
     d.step()
-    cc = cleaner.Cleaner(executable.ToExecutable(d))
+    cc = cleaner.Cleaner(d.get_as_mapped_file())
     cc.set_option("fixOperationConstantThruRegOnStack", True)
     cc.set_option("fixPush_allowConstants", True)
     res = cc.get_clean_instruction(d.thread.get_pc())
     jmp_to_vm = d.get_instruction(res.next)
-    first_vm = ciscvm.get_vm_code(executable.ToExecutable(d), res, jmp_to_vm)
+    first_vm = vm.get_vm_code(d.get_as_mapped_file(), res, jmp_to_vm)
     
     add_ebp, xor_with = [int(x, 16) for x in re.match(r".+\nmov eax, dword \[ebp\+0x(\w+)\]\nxor eax, 0x(\w+)\nadd eax, ebp\njmp eax$", first_vm, re.S).groups()]
     value = ((d.process.read_dword((d.thread.get_register("Ebp") + add_ebp) % (1<<32)) ^ xor_with) + d.thread.get_register("Ebp")) % (1<<32)
@@ -217,7 +216,7 @@ def old_follow(binary):
     return d
 
 def get_vm(debugger):
-    cc = cleaner.Cleaner(executable.ToExecutable(debugger))
+    cc = cleaner.Cleaner(debugger.get_as_mapped_file())
     #cc.set_option("fixOperationConstantThruRegOnStack", True)
     #cc.set_option("fixPush_allowConstants", True)
 
@@ -239,14 +238,14 @@ def get_vm(debugger):
     pop1 = reader.get_cond(lambda x: x.opcode == "pop" and x.operands[0].is_reg(push1.operands[0].reg))
     jmp_to_vm = reader.get_cond(lambda x: x.opcode == "jmp" and x.operands[0].is_immediate())
 
-    #first_vm = ciscvm.get_vm_code(debugger, res, jmp_to_vm)
+    #first_vm = vm.get_vm_code(debugger, res, jmp_to_vm)
     #print first_vm
     #assert first_vm.endswith("\njmp eax")
 
     #first_vm = first_vm[first_vm.rfind("mov eax, dword [ebp+0x"):]
     #add_ebp, xor_with = [int(x, 16) for x in re.match(r"mov eax, dword \[ebp\+0x(\w+)\].+xor eax, 0x(\w+).+add eax, ebp.+jmp eax$", first_vm, re.S).groups()]
     #value = ((debugger.process.read_dword((debugger.thread.get_register("Ebp") + add_ebp) % (1<<32)) ^ xor_with) + debugger.thread.get_register("Ebp")) % (1<<32)
-    vm = ciscvm.VMFunction(executable.ToExecutable(debugger), movimm.operands[1].value, jmp_to_vm.operands[0].value)
+    vm = vm.VMFunction(debugger.get_as_mapped_file(), movimm.operands[1].value, jmp_to_vm.operands[0].value)
     vm.clean()
     #print vm.get_code()
     address, compiled_code = vm.compile_code()
@@ -258,7 +257,7 @@ def get_vm(debugger):
 
 def goto_jmp_eax(debugger):
     print "Looking for jmp eax"
-    cc = cleaner.Cleaner(executable.ToExecutable(debugger))
+    cc = cleaner.Cleaner(debugger.get_as_mapped_file())
     cc.set_option("ignore_calls", True)
     inst = cc.get_clean_instruction(debugger.thread.get_pc())    
     exceptions = False
@@ -318,7 +317,7 @@ def goto_jmp_eax(debugger):
 
 def new_goto_jmp_eax(debugger):
     print "Looking for jmp eax"
-    cc = cleaner.Cleaner(executable.ToExecutable(debugger))
+    cc = cleaner.Cleaner(debugger.get_as_mapped_file())
     cc.set_option("ignore_calls", True)
     try_address = debugger.thread.get_pc()
     inst = cc.get_clean_instruction(debugger.thread.get_pc())    
@@ -437,7 +436,7 @@ def follow(binary):
         i += 1
     #d.go()
     
-    #address, compiled_code = ciscvm.get_compiled_vm_code(d, res, jmp_to_vm)
+    #address, compiled_code = vm.get_compiled_vm_code(d, res, jmp_to_vm)
     #d.process.write(address, compiled_code)
     #d.thread.set_pc(address)
     return d
@@ -521,7 +520,7 @@ def new_follow(binary):
         i += 1
     #d.go()
     
-    #address, compiled_code = ciscvm.get_compiled_vm_code(d, res, jmp_to_vm)
+    #address, compiled_code = vm.get_compiled_vm_code(d, res, jmp_to_vm)
     #d.process.write(address, compiled_code)
     #d.thread.set_pc(address)
     return d
@@ -541,7 +540,7 @@ def get_debugger(binary):
 #    return d
     
 def run_clean(debugger):
-    cc = cleaner.Cleaner(executable.ToExecutable(debugger))
+    cc = cleaner.Cleaner(debugger.get_as_mapped_file())
     cc.set_option("ignore_calls", True)
     inst = cc.get_clean_instruction(debugger.thread.get_pc())
     while True:

@@ -3,6 +3,7 @@ import threading
 import time
 import pefile
 import instruction
+import mappedfile
 
 class AsyncOperation(object):
     def __init__(self):
@@ -178,4 +179,17 @@ class Debugger(object):
             inst = self.stepover()
             print "0x%08X: %s" % (inst.address, str(inst))
 
-        
+    def get_as_mapped_file(self):
+        return DebuggerMappedFile(self)
+
+
+class DebuggerMappedFile(mappedfile.MappedFile):
+    def __init__(self, debugger):
+        mappedfile.MappedFile.__init__(self, debugger.mode)
+        self.debugger = debugger
+
+    def read(self, address, length):
+        return self.debugger.process.read(address, length)
+
+    def write(self, address, data):
+        self.debugger.process.write(address, data)

@@ -150,12 +150,12 @@ class ReaderException(Exception):
 
 
 class InstructionReader(object):
-    def __init__(self, executable, address):
+    def __init__(self, file, address):
         self.address = address
-        self.executable = executable
+        self.file = file
 
     def get(self):
-        res = self.executable.get_instruction(self.address)
+        res = self.file.get_instruction(self.address)
         self.address = res.next
         return res
 
@@ -236,11 +236,11 @@ CONDITIONAL_JUMPS = "jz jnz".split(" ")  # TODO more
 
 
 class Function(object):
-    def __init__(self, executable, address):
+    def __init__(self, file, address):
         self.blocks_cache = {}
         instructions_blocks = {}
         self.blocks = {}
-        self.mode = executable.mode
+        self.mode = file.mode
         blocks_to_explores = deque()
 
         def get_block(address):
@@ -302,7 +302,7 @@ class Function(object):
                         block.next = instructions_blocks[address]
                         instructions_blocks[address].froms.append(block)
                     break
-                inst = executable.get_instruction(address)
+                inst = file.get_instruction(address)
                 if inst.opcode == "jmp" and inst.operands[0].is_immediate():
                     # Ignore jmps
                     address = inst.operands[0].value

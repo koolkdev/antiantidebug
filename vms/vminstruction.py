@@ -1,15 +1,16 @@
 import struct
 import instruction
+import os
 
 CONDITIONAL_JUMPS = "JO JNO JB JAE JZ JNZ JBE JA JS JNS JP JNP JL JGE JLE JG JCXZ LOOP LOOPE".split(" ")
 
 class BytesReader(object):
-    def __init__(self, executable, address):
-        self.executable = executable
+    def __init__(self, file, address):
+        self.file = file
         self.address = address
 
     def read(self, length):
-        res = self.executable.read(self.address, length)
+        res = self.file.read(self.address, length)
         self.address += length
         return res
 
@@ -40,8 +41,8 @@ class VMKey(object):
     def __init__(self, key):
         pass
 
-INSTRUCTIONS_32 = {x.split(" ", 1)[0]: x.split(" ", 1)[1] for x in open(r"vms\templates\instructions_32.txt", "rb").read().splitlines()}
-INSTRUCTIONS_64 = {x.split(" ", 1)[0]: x.split(" ", 1)[1] for x in open(r"vms\templates\instructions_64.txt", "rb").read().splitlines()}
+INSTRUCTIONS_32 = {x.split(" ", 1)[0]: x.split(" ", 1)[1] for x in open(r"%s\templates\instructions_32.txt" % os.path.dirname(os.path.abspath(__file__)), "rb").read().splitlines()}
+INSTRUCTIONS_64 = {x.split(" ", 1)[0]: x.split(" ", 1)[1] for x in open(r"%s\templates\instructions_64.txt" % os.path.dirname(os.path.abspath(__file__)), "rb").read().splitlines()}
 
 class VMInstruction(object):
     def __init__(self, name, *args):

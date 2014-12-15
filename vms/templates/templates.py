@@ -1,5 +1,6 @@
 from vms import vminstruction
 import re
+import os
 
 # itertools.product
 def product(*args, **kwds):
@@ -161,7 +162,7 @@ class Templates(object):
     def get_template(cls, name, mode):
         if cls.cache.has_key(name):
             return cls.cache[name]
-        res = cls(open(r"vms\templates\files\%s" % name, "r"), mode)
+        res = cls(open(r"%s\files\%s" % (os.path.dirname(os.path.abspath(__file__)), name), "r"), mode)
         cls.cache[name] = res
         return res
 
