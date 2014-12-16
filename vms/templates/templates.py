@@ -20,7 +20,9 @@ class Templates(object):
 
     def __init__(self, data_reader, mode):
         self.groups = {}
-        self.line_to_templates = {}
+        template_index = 0
+        self.line_to_templates = (template_index, {}, [])
+        template_index += 1
         self.macros = {}
         self.template_macros = {}
         self.templates = []
@@ -30,20 +32,59 @@ class Templates(object):
         # Parse the file first
         self._parse_file(data_reader)
 
-        # Some optimization
+        # Prepare optimization
         for template in self.templates:
-            parts = []
-            for part in template[0][0].name.split("|"):
-                part = part.split("=")[-1]
-                if part.startswith("^"):
-                    parts.append(self.groups[part[1:]])
-                else:
-                    parts.append([part])
-            for name in product(*parts):
-                name = "".join(name)
-                if not self.line_to_templates.has_key(name):
-                    self.line_to_templates[name] = []
-                self.line_to_templates[name].append(template)
+            current_tables = [self.line_to_templates]
+            tables_conditions = {self.line_to_templates[0]: {}}
+            for i in xrange(len(template[0])):
+                new_tables = []
+                new_tables_conditions = {}
+                possible_names = [("", {})]
+                if template[0][i].name.startswith("*"):
+                    break
+                for part in template[0][i].name.split("|"):
+                    vname = None
+                    if part.startswith("&"):
+                        vname, part = part[1:].split("=")
+                    if part.startswith("^"):
+                        new_names = []
+                        for gval in self.groups[part[1:]]:
+                            for name, vals in possible_names:
+                                if vname is not None:
+                                    vals = dict(vals)
+                                    if vname in vals:
+                                        if vals[vname] != gval:
+                                            continue
+                                    else:
+                                        vals[vname] = gval
+                                new_names.append((name + gval, vals))
+                        possible_names = new_names
+                    else:
+                        possible_names = [(x[0] + part, x[1]) for x in possible_names]
+
+                for name, vars in possible_names:
+                    for table in current_tables:
+                        conds = tables_conditions[table[0]]
+                        good = True
+                        for vk, vv in vars.iteritems():
+                            if vk in conds:
+                                if conds[vk] != vv:
+                                    good = False
+                                    break
+                            else:
+                                conds = dict(conds)
+                                conds[vk] = vv
+                        if not good:
+                            continue
+                        if name not in table[1]:
+                            table[1][name] = (template_index, {}, [])
+                            template_index += 1
+                        new_tables.append(table[1][name])
+                        new_tables_conditions[table[1][name][0]] = conds
+                current_tables = new_tables
+                tables_conditions = new_tables_conditions
+            for table in current_tables:
+                table[2].append(template)
 
 
     def _parse_file(self, data_reader):
@@ -209,11 +250,20 @@ class Templates(object):
             changed = False
             i = 0
             while i < len(insts):
-                if not self.line_to_templates.has_key(insts[i].name):
-                    i += 1
-                    continue
+                matched_templates = []
+                current_tables = [self.line_to_templates]
+                j = 0
+                while current_tables and i + j < len(insts):
+                    new_tables = []
+                    for table in current_tables:
+                        if insts[i + j].name in table[1]:
+                            new_tables.append(table[1][insts[i + j].name])
+                        matched_templates.extend(table[2])
+                    current_tables = new_tables
+                    j += 1
+
                 match = False
-                for template in self.line_to_templates[insts[i].name]:
+                for template in matched_templates:
                     releated = []
                     values = {}
                     variables = {}
