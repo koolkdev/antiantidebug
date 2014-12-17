@@ -5,10 +5,8 @@ OperandPos = namedtuple("OperandPos", ["pos", "operand"])
 ARGS = ["X", "Y", "Z", "A", "B", "C"]
 def generate_templates(mode):
     templates_file = open(r"files\codevirtualizer\cisc\cisc_templates_%d.txt" % mode, "w")
-    mov_templates_file = open(r"files\codevirtualizer\cisc\cisc_templates_mov_%d.txt" % mode, "w")
     
     templates_file.write("OPTION RUN_ONCE\n\n")
-    mov_templates_file.write("OPTION RUN_ONCE\n\n")
     
     # Sometimes MOVZX_DWORD_BYTE can be detected as MOVZX_QWORD_BYTE because of the obfuscator, so this is for fixing that
     if mode == 64:
@@ -67,26 +65,16 @@ def generate_templates(mode):
                             ([opcode.opcode, opcode.size1], None),
                             (["POP", opcode.size1, operand1], None)]
         elif operation in ("XCHG"):
-            # All the things that mov will fail to operate on
-            if (generate_opcodes.is_mem(opcode.operand2) and "MEMSP" in opcode.operand2.name and "IMM" in opcode.operand2.name) or \
-                (generate_opcodes.is_reg(opcode.operand2) and opcode.operand2.name == "SP") or \
-                (generate_opcodes.is_reg(opcode.operand2) and opcode.size2.size == 4 and mode == 64): # This because in xchg there isn't ZERO_HIGH_STACK, so it won't be changed to mov
-                # Need to fix memory.. it didn't collapse to mov
-                # PUSH SIZE1 ARG1
-                # PUSH SIZE2 ARG2
-                # POP SIZE1 ARG1
-                # POP SIZE2 ARG2
-                instructions = [(["PUSH", opcode.size1, operand1], None),
-                                (["PUSH", opcode.size2, operand2], None),
-                                (["POP", opcode.size1, operand1], None),
-                                (["POP", opcode.size2, operand2], None)]
-            else:
-                # PUSH SIZE1 ARG1
-                # MOV SIZE1 ARG1 ARG2
-                # POP SIZE2 ARG2
-                instructions = [(["PUSH", opcode.size1, operand1], None),
-                                (["MOV", opcode.size1, operand1, operand2], None),
-                                (["POP", opcode.size2, operand2], None)]
+            # Notice that the two middle commanands will be mov most of the time.
+            # But because the RUN_ONCE option it will be xchg before it will be mov
+            # PUSH SIZE1 ARG1
+            # PUSH SIZE2 ARG2
+            # POP SIZE1 ARG1
+            # POP SIZE2 ARG2
+            instructions = [(["PUSH", opcode.size1, operand1], None),
+                            (["PUSH", opcode.size2, operand2], None),
+                            (["POP", opcode.size1, operand1], None),
+                            (["POP", opcode.size2, operand2], None)]
         elif operation in ("LEA"):
             # PUSH_ADDRESS ARG2
             # POP SIZE1 ARG1
@@ -221,19 +209,15 @@ def generate_templates(mode):
                 stack_pos += op_size
             elif is_pop:
                 stack_pos -= op_size
-        
-        if operation == "MOV":
-            file = mov_templates_file
-        else:
-            file = templates_file
-        file.write("DEFINE_TEMPLATE\n")
+
+        templates_file.write("DEFINE_TEMPLATE\n")
         for line, args in template_lines:
-            file.write(line)
+            templates_file.write(line)
             for arg in args:
-                file.write(" ")
-                file.write(arg)
-            file.write("\n")
-        file.write("=>\n")
+                templates_file.write(" ")
+                templates_file.write(arg)
+            templates_file.write("\n")
+        templates_file.write("=>\n")
         t = 0
         if opcode.operand1 is not None:
             t += opcode.operand1.args
@@ -241,14 +225,13 @@ def generate_templates(mode):
                 t += opcode.operand2.args
                 if opcode.operand3 is not None:
                     t += opcode.operand3.args
-        file.write(opcode.name)
+        templates_file.write(opcode.name)
         for i in xrange(t):
-            file.write(" ")
-            file.write(ARGS[i])
-        file.write("\n\n")
+            templates_file.write(" ")
+            templates_file.write(ARGS[i])
+        templates_file.write("\n\n")
         #print template_lines
     templates_file.close()
-    mov_templates_file.close()
     
 generate_templates(32)
 generate_templates(64)

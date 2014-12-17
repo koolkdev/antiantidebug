@@ -522,10 +522,8 @@ class VMFunction(object):
     def _clean(self):
         TEMPLATES = ["cisc_00_clean.txt", "cisc_01_flags.txt", "cisc_02_realloc.txt", "cisc_03_movdx.txt", "cisc_04_push_pop.txt", "cisc_05_jumps_prepare.txt"]
         if self.mode == 32:
-            TEMPLATES.append("cisc_templates_mov_32.txt")
             TEMPLATES.append("cisc_templates_32.txt")
         else:
-            TEMPLATES.append("cisc_templates_mov_64.txt")
             TEMPLATES.append("cisc_templates_64.txt")
         TEMPLATES += ["cisc_06_jumps.txt", "cisc_07_final.txt"]
         print "Processing VMFunction (%d instructions)..." % len(self.instructions)

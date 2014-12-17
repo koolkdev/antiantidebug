@@ -264,6 +264,8 @@ class Templates(object):
                 current_tables = new_tables
                 j += 1
 
+            # So the longer matching templates will be first
+            matched_templates = matched_templates[::-1]
             match = False
             for template in matched_templates:
                 releated = []
