@@ -245,116 +245,121 @@ class Templates(object):
     def clean(self, insts):
         # TODO clean insts as i should clean (get_clean_instruction), so I won't need the outer loop
         value_mask = (1 << self.mode) - 1
-        changed = True
-        while changed:
-            changed = False
+        if self.run_once:
+            # It will run once anyway, but that is the more faster way, becuase we have less instructions to pass on
+            # (In the reverse order, we would pass on all the instructions of each template before finding it)
             i = 0
-            while i < len(insts):
-                matched_templates = []
-                current_tables = [self.line_to_templates]
-                j = 0
-                while current_tables and i + j < len(insts):
-                    new_tables = []
-                    for table in current_tables:
-                        if insts[i + j].name in table[1]:
-                            new_tables.append(table[1][insts[i + j].name])
-                        matched_templates.extend(table[2])
-                    current_tables = new_tables
-                    j += 1
+        else:
+            i = len(insts) - 1
+        while 0 <= i < len(insts):
+            matched_templates = []
+            current_tables = [self.line_to_templates]
+            j = 0
+            while current_tables and i + j < len(insts):
+                new_tables = []
+                for table in current_tables:
+                    if insts[i + j].name in table[1]:
+                        new_tables.append(table[1][insts[i + j].name])
+                    matched_templates.extend(table[2])
+                current_tables = new_tables
+                j += 1
 
-                match = False
-                for template in matched_templates:
-                    releated = []
-                    values = {}
-                    variables = {}
-                    saved_args = {}
-                    j = i
-                    ti = 0
-                    match = True
-                    while j < len(insts) and ti < len(template[0]):
-                        tinst = template[0][ti].name
-                        inst = insts[j].name
-                        if tinst.startswith("*"):
-                            if ti + 1 != len(template[0]) and self.match_instruction(template[0][ti+1].name, inst, variables):
-                                ti += 1
-                            elif self.match_instruction(tinst, inst, variables):
-                                j += 1
-                                continue
-                            else:
-                                match = False
-                                break
-                        elif not self.match_instruction(tinst, inst, variables):
+            match = False
+            for template in matched_templates:
+                releated = []
+                values = {}
+                variables = {}
+                saved_args = {}
+                j = i
+                ti = 0
+                match = True
+                while j < len(insts) and ti < len(template[0]):
+                    tinst = template[0][ti].name
+                    inst = insts[j].name
+                    if tinst.startswith("*"):
+                        if ti + 1 != len(template[0]) and self.match_instruction(template[0][ti+1].name, inst, variables):
+                            ti += 1
+                        elif self.match_instruction(tinst, inst, variables):
+                            j += 1
+                            continue
+                        else:
                             match = False
                             break
-                        if len(template[0][ti].args) == 1 and template[0][ti].args[0].startswith("*"):
-                            var_name = template[0][ti].args[0][1:]
-                            if var_name in saved_args:
-                                if len(saved_args[var_name]) != len(insts[j].args):
-                                    match = False
-                                    break
-                                for ai in xrange(len(insts[j].args)):
-                                    if insts[j].args[ai] != saved_args[var_name][ai]:
-                                        match = False
-                                        break
-                            else:
-                                saved_args[var_name] = insts[j].args
-                        else:
-                            if len(template[0][ti].args) > len(insts[j].args):
+                    elif not self.match_instruction(tinst, inst, variables):
+                        match = False
+                        break
+                    if len(template[0][ti].args) == 1 and template[0][ti].args[0].startswith("*"):
+                        var_name = template[0][ti].args[0][1:]
+                        if var_name in saved_args:
+                            if len(saved_args[var_name]) != len(insts[j].args):
                                 match = False
                                 break
-                            for ai in xrange(len(template[0][ti].args)):
-                                # Check if a number
-                                arg = template[0][ti].args[ai]
-                                # TODO Check that hexdigits
-                                if arg.isdigit() or ((arg.startswith("0x") or arg.startswith("0X"))):
-                                    if insts[j].args[ai] != eval(arg):
+                            for ai in xrange(len(insts[j].args)):
+                                if insts[j].args[ai] != saved_args[var_name][ai]:
+                                    match = False
+                                    break
+                        else:
+                            saved_args[var_name] = insts[j].args
+                    else:
+                        if len(template[0][ti].args) > len(insts[j].args):
+                            match = False
+                            break
+                        for ai in xrange(len(template[0][ti].args)):
+                            # Check if a number
+                            arg = template[0][ti].args[ai]
+                            # TODO Check that hexdigits
+                            if arg.isdigit() or ((arg.startswith("0x") or arg.startswith("0X"))):
+                                if insts[j].args[ai] != eval(arg):
+                                    match = False
+                                    break
+                            else:
+                                if values.has_key(arg):
+                                    if values[arg] != insts[j].args[ai]:
                                         match = False
                                         break
                                 else:
-                                    if values.has_key(arg):
-                                        if values[arg] != insts[j].args[ai]:
-                                            match = False
-                                            break
-                                    else:
-                                        values[arg] = insts[j].args[ai]
-                        if not match:
-                            break
-                        releated.append(j)
-                        ti += 1
-                        j += 1
-
-                    if ti != len(template[0]):
-                        match = False
-                    if match:
-                        new_insts = []
-                        for inst in template[1]:
-                            new_name = inst.name
-                            while new_name.find("*") != -1:
-                                splitted = new_name.split("*", 2)
-                                new_name = splitted[0] + variables[splitted[1]] + splitted[2]
-                            new_args = []
-                            for arg in inst.args:
-                                if arg.startswith("*"):
-                                    new_args.extend(["0x%x" % x for x in saved_args[arg[1:]]])
-                                else:
-                                    new_args.append(arg)
-                            new_args = [eval(x, {}, values)&value_mask for x in new_args]
-                            new_insts.append(vminstruction.VMInstruction(new_name, *new_args))
-                        new_insts += [nop] * (len(releated) - len(new_insts))
-                        diff = 0
-                        for ri in xrange(len(releated)):
-                            if new_insts[ri].name == "NOP":
-                                insts.pop(releated[ri]-diff)
-                                diff += 1
-                            else:
-                                insts[releated[ri]-diff] = new_insts[ri]
+                                    values[arg] = insts[j].args[ai]
+                    if not match:
                         break
-                if not match:
+                    releated.append(j)
+                    ti += 1
+                    j += 1
+
+                if ti != len(template[0]):
+                    match = False
+                if match:
+                    new_insts = []
+                    for inst in template[1]:
+                        new_name = inst.name
+                        while new_name.find("*") != -1:
+                            splitted = new_name.split("*", 2)
+                            new_name = splitted[0] + variables[splitted[1]] + splitted[2]
+                        new_args = []
+                        for arg in inst.args:
+                            if arg.startswith("*"):
+                                new_args.extend(["0x%x" % x for x in saved_args[arg[1:]]])
+                            else:
+                                new_args.append(arg)
+                        new_args = [eval(x, {}, values)&value_mask for x in new_args]
+                        new_insts.append(vminstruction.VMInstruction(new_name, *new_args))
+                    new_insts += [nop] * (len(releated) - len(new_insts))
+                    diff = 0
+                    ni = i
+                    for ri in xrange(len(releated)):
+                        if new_insts[ri].name == "NOP":
+                            insts.pop(releated[ri]-diff)
+                            diff += 1
+                        else:
+                            ni = releated[ri]-diff
+                            insts[ni] = new_insts[ri]
+                    # Go to the last new instruction and pass again
+                    i = ni
+                    break
+            if not match:
+                if self.run_once:
                     i += 1
                 else:
-                    changed = True
-            if self.run_once:
-                break
+                    i -= 1
         
 def translate_to_assembly(self):
     pass

@@ -678,6 +678,7 @@ class VMFunction(object):
                     # It is just a nop
                     inst = vminstruction.VMInstruction("NOP")
                 elif inst.name == ("MOV_%s_REG_ENCODE" % native_size_word):
+                    # TODO: Clear the anti-dumps code only if this register appears, and it should appear only in the first section
                     if self.mode == 32:
                         inst = vminstruction.VMInstruction("MOV_%s_REG_IMM" % native_size_word, inst.args[0], long(self.vm_info.init_handler.encode))
                     else:
