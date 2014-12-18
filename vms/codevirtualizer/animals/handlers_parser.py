@@ -5,6 +5,7 @@ import re
 GROUPS = {
     "SIMPLE_MATH": ["+", "-", "^"],
     "UPDATE_MATH": ["+", "-", "^", "&", "|"],
+    "COMPARE": ["==", "!="],
     "READ_PARAMETER": ["ReadParameterByte", "ReadParameterWord", "ReadParameterDword"],
     "STRUCT_FIELD": ["VMStructFieldByte", "VMStructFieldWord", "VMStructFieldDword"],
 }
@@ -44,28 +45,28 @@ EXPRESSIONS_MACROS = [
     ),
 
     (
-        "(!READ_PARAMETER_1(^IMM_1, DecodingInfo(None, None, None, None, None, None, None, None, None)) !SIMPLE_MATH_1 VMStructFieldDword(@KEY1))",
-        "!READ_PARAMETER_1(^IMM_1, DecodingInfo(Operation(!SIMPLE_MATH_1), None, None, None, None, None, None, None, None))"
+        "(?READ_PARAMETER_1(^IMM_1, DecodingInfo(None, None, None, None, None, None, None, None, None)) ?SIMPLE_MATH_1 VMStructFieldDword(@KEY1))",
+        "?READ_PARAMETER_1(^IMM_1, DecodingInfo(Operation(?SIMPLE_MATH_1), None, None, None, None, None, None, None, None))"
     ),
     (
-        "(!READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, None, None, None, None, None, None, None, None)) !SIMPLE_MATH_1 VMStructFieldDword(@KEY2))",
-        "!READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, Operation(!SIMPLE_MATH_1), None, None, None, None, None, None, None))"
+        "(?READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, None, None, None, None, None, None, None, None)) ?SIMPLE_MATH_1 VMStructFieldDword(@KEY2))",
+        "?READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, Operation(?SIMPLE_MATH_1), None, None, None, None, None, None, None))"
     ),
     (
-        "(!READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, &X2, None, None, None, None, None, None, None)) !SIMPLE_MATH_1 VMStructFieldDword(@KEY6))",
-        "!READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, &X2, None, Operation(!SIMPLE_MATH_1), None, None, None, None, None))"
+        "(?READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, &X2, None, None, None, None, None, None, None)) ?SIMPLE_MATH_1 VMStructFieldDword(@KEY6))",
+        "?READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, &X2, None, Operation(?SIMPLE_MATH_1), None, None, None, None, None))"
     ),
     (
-        "(!READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, None, None, None, None, None, None, None, None)) !SIMPLE_MATH_1 VMStructFieldDword(@KEY4))",
-        "!READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, None, Operation(!SIMPLE_MATH_1), None, None, None, None, None, None))"
+        "(?READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, None, None, None, None, None, None, None, None)) ?SIMPLE_MATH_1 VMStructFieldDword(@KEY4))",
+        "?READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, None, Operation(?SIMPLE_MATH_1), None, None, None, None, None, None))"
     ),
     (
-        "(!READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, None, None, None, None, None, None, None, None)) !SIMPLE_MATH_1 ^IMM_2)",
-        "!READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, None, None, None, SimpleOperation(Operation(!SIMPLE_MATH_1), ^IMM_2), None, None, None, None))"
+        "(?READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, None, None, None, None, None, None, None, None)) ?SIMPLE_MATH_1 ^IMM_2)",
+        "?READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, None, None, None, SimpleOperation(Operation(?SIMPLE_MATH_1), ^IMM_2), None, None, None, None))"
     ),
     (
-        "(!READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, &X2, &X3, &X4, &X5, &X6, &X7, None, None)) !SIMPLE_MATH_1 VMStructFieldDword(@KEY3))",
-        "!READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, &X2, &X3, &X4, &X5, &X6, &X7, Operation(!SIMPLE_MATH_1), None))"
+        "(?READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, &X2, &X3, &X4, &X5, &X6, &X7, None, None)) ?SIMPLE_MATH_1 VMStructFieldDword(@KEY3))",
+        "?READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, &X2, &X3, &X4, &X5, &X6, &X7, Operation(?SIMPLE_MATH_1), None))"
     ),
     (
         "((&X1 & 0xF0) >> 0x4)",
@@ -74,53 +75,72 @@ EXPRESSIONS_MACROS = [
     (
         "(&X1 & 0xF)",
         "LOW_NIBBLE(&X1)"
+    ),
+    (
+        "(((VMStructFieldByte(@ACC_BYTE) ?SIMPLE_MATH_1 ^IMM_1) - ^IMM_2) ?COMPARE_1 0x0)",
+        "(DecodedAccByte(SimpleOperation(Operation(?SIMPLE_MATH_1), ^IMM_1), None) ?COMPARE_1 ^IMM_2)"
+    ),
+    (
+        "((((VMStructFieldByte(@ACC_BYTE) ?SIMPLE_MATH_1 ^IMM_1) ?SIMPLE_MATH_2 ^IMM_2) - ^IMM_3) ?COMPARE_1 0x0)",
+        "(DecodedAccByte(SimpleOperation(Operation(?SIMPLE_MATH_1), ^IMM_1), SimpleOperation(Operation(?SIMPLE_MATH_2), ^IMM_2)) ?COMPARE_1 ^IMM_3)"
     )
 ]
 
 MACROS = [
     (
         [
-        "^VAR_1 = !READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, &X2, &X3, &X4, &X5, None, None, None, None))",
-        "VMStructFieldDword(@KEY1) !UPDATE_MATH_1= ^VAR_1"
+        "^VAR_1 = ?READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, &X2, &X3, &X4, &X5, None, None, None, None))",
+        "VMStructFieldDword(@KEY1) ?UPDATE_MATH_1= ^VAR_1"
         ],
-        "^VAR_1 = !READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, &X2, &X3, &X4, &X5, Operation(!UPDATE_MATH_1), None, None, None))"
+        "^VAR_1 = ?READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, &X2, &X3, &X4, &X5, Operation(?UPDATE_MATH_1), None, None, None))"
     ),
     (
-        ["VMStructFieldDword(@KEY*) !UPDATE_MATH_1= ^IMM_2"],
-        "UpdateKey(VMStructFieldDword(@KEY*), SimpleOperation(Operation(!UPDATE_MATH_1), ^IMM_2))"
+        ["VMStructFieldDword(@KEY*) ?UPDATE_MATH_1= ^IMM_2"],
+        "UpdateKey(VMStructFieldDword(@KEY*), SimpleOperation(Operation(?UPDATE_MATH_1), ^IMM_2))"
     ),
     (
         [
-        "^VAR_1 = !READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, &X2, &X3, &X4, &X5, &X6, None, None, None))",
+        "^VAR_1 = ?READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, &X2, &X3, &X4, &X5, &X6, None, None, None))",
         "UpdateKey(VMStructFieldDword(@KEY2), &Y1)",
         ],
-        "^VAR_1 = !READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, &X2, &X3, &X4, &X5, &X6, &Y1, None, None))"
+        "^VAR_1 = ?READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, &X2, &X3, &X4, &X5, &X6, &Y1, None, None))"
     ),
     (
         [
-        "^VAR_1 = !READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, &X2, &X3, &X4, &X5, &X6, &X7, &X8, None))",
+        "^VAR_1 = ?READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, &X2, &X3, &X4, &X5, &X6, &X7, &X8, None))",
         "UpdateKey(VMStructFieldDword(@KEY3), &Y1)",
         ],
-        "^VAR_1 = !READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, &X2, &X3, &X4, &X5, &X6, &X7, &X8, &Y1))"
+        "^VAR_1 = ?READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, &X2, &X3, &X4, &X5, &X6, &X7, &X8, &Y1))"
     ),
     (
-        ["!STRUCT_FIELD_1($ENCODED_VALUE_) = (&X1 !SIMPLE_MATH_1 ^IMM_1)"],
-        "!STRUCT_FIELD_1($ENCODED_VALUE_) = EncodedValue(&X1, SimpleOperation(Operation(!SIMPLE_MATH_1), ^IMM_1), None)"
+        ["?STRUCT_FIELD_1($ENCODED_VALUE_) = (&X1 ?SIMPLE_MATH_1 ^IMM_1)"],
+        "?STRUCT_FIELD_1($ENCODED_VALUE_) = EncodedValue(&X1, SimpleOperation(Operation(?SIMPLE_MATH_1), ^IMM_1), None)"
+    ),
+    # For some cases in IFs
+    (
+        ["^VAR_1 = (^VAR_1 ?SIMPLE_MATH_1 ^IMM1)",
+        "?STRUCT_FIELD_1($ENCODED_VALUE_) = ^VAR_1"],
+        "?STRUCT_FIELD_1($ENCODED_VALUE_) = EncodedValue(&X1, SimpleOperation(Operation(?SIMPLE_MATH_1), ^IMM_1), None)"
     ),
     (
-        ["VMStructFieldDword($ENCODED_VALUE_) = ((&X1 !SIMPLE_MATH_1 VMStructFieldDword($JUNK)) !SIMPLE_MATH_2 ^IMM_1)"],
-        "VMStructFieldDword($ENCODED_VALUE_) = EncodedValue(&X1, SimpleOperation(Operation(!SIMPLE_MATH_1), VMStructFieldDword($JUNK)), SimpleOperation(Operation(!SIMPLE_MATH_2), ^IMM_1))"
+        ["VMStructFieldDword($ENCODED_VALUE_) = ((&X1 ?SIMPLE_MATH_1 VMStructFieldDword($JUNK)) ?SIMPLE_MATH_2 ^IMM_1)"],
+        "VMStructFieldDword($ENCODED_VALUE_) = EncodedValue(&X1, SimpleOperation(Operation(?SIMPLE_MATH_1), VMStructFieldDword($JUNK)), SimpleOperation(Operation(?SIMPLE_MATH_2), ^IMM_1))"
     ),
     (
-        ["VMStructFieldDword($ENCODED_VALUE_) = ((&X1 !SIMPLE_MATH_1 ^IMM_1) !SIMPLE_MATH_2 VMStructFieldDword($JUNK))"],
-        "VMStructFieldDword($ENCODED_VALUE_) = EncodedValue(&X1, SimpleOperation(Operation(!SIMPLE_MATH_1), ^IMM_1), SimpleOperation(Operation(!SIMPLE_MATH_2), VMStructFieldDword($JUNK)))"
+        ["VMStructFieldDword($ENCODED_VALUE_) = ((&X1 ?SIMPLE_MATH_1 ^IMM_1) ?SIMPLE_MATH_2 VMStructFieldDword($JUNK))"],
+        "VMStructFieldDword($ENCODED_VALUE_) = EncodedValue(&X1, SimpleOperation(Operation(?SIMPLE_MATH_1), ^IMM_1), SimpleOperation(Operation(?SIMPLE_MATH_2), VMStructFieldDword($JUNK)))"
+    ),
+    # TODO: Fix that for 0x404116L
+    (
+        ["VMStructFieldDword($ENCODED_VALUE_) = EncodedValue((&X1 ?SIMPLE_MATH_2 VMStructFieldDword($JUNK)), SimpleOperation(Operation(?SIMPLE_MATH_1), ^IMM_1), None)"],
+        "VMStructFieldDword($ENCODED_VALUE_) = EncodedValue(&X1, SimpleOperation(Operation(?SIMPLE_MATH_1), ^IMM_1), SimpleOperation(Operation(?SIMPLE_MATH_2), VMStructFieldDword($JUNK)))"
     ),
     (
-        ["VMStructFieldDword($ENCODED_VALUE_) = (&X1 !SIMPLE_MATH_1 VMStructFieldDword($JUNK))"],
-        "VMStructFieldDword($ENCODED_VALUE_) = EncodedValue(&X1, SimpleOperation(Operation(!SIMPLE_MATH_1), VMStructFieldDword($JUNK)), None)"
+        ["VMStructFieldDword($ENCODED_VALUE_) = (&X1 ?SIMPLE_MATH_1 VMStructFieldDword($JUNK))"],
+        "VMStructFieldDword($ENCODED_VALUE_) = EncodedValue(&X1, SimpleOperation(Operation(?SIMPLE_MATH_1), VMStructFieldDword($JUNK)), None)"
     ),
     (
-        ["VMStructFieldDword(@JUNK) !UPDATE_MATH_1= &X1"],
+        ["VMStructFieldDword(@JUNK) ?UPDATE_MATH_1= &X1"],
         None
     ),
     (
@@ -159,6 +179,12 @@ MACROS = [
         ],
         "UpdateKeyCond(&X1)"
     ),
+    (
+        [
+            "VMStructFieldByte(@ACC_BYTE) ?SIMPLE_MATH_1= &X"
+        ],
+        "UpdateAccByte(SimpleOperation(Operation(?SIMPLE_MATH_1), &X))"
+    )
 ]
 
 """
@@ -193,9 +219,21 @@ MACROS = [
 
 ]"""
 
+OPS = {
+    "+": Add,
+    "-": Sub,
+    "^": Xor,
+    "==": Equal,
+    "!=": NotEqual,
+    "&&": AndCond,
+    "||": Test
+}
+
+
 class NoneExpression(Expression):
     def get_format(self):
         return "None"
+
 
 class Str(Expression):
     def __init__(self, value):
@@ -203,6 +241,7 @@ class Str(Expression):
 
     def get_format(self):
         return str(self.value)
+
 
 class Macro(Expression):
     def __init__(self, name, parameters):
@@ -223,6 +262,7 @@ class Macro(Expression):
 
     def get_format(self):
         return "%s(%s)" % (self.name, ", ".join([("{%d}" % i) for i in xrange(len(self.parameters))]))
+
 
 class Params(object):
     def __init__(self, fields, parameters):
@@ -289,15 +329,18 @@ class Params(object):
     def set_group_var_value(self, name, value):
         return self._set_dict_value(self.group_vars, name, value, comp = lambda x,y: x.equals(y))
 
+
 def is_var_name(string):
-    if string[0] not in "!@#$^&":
+    if string[0] not in "?@#$^&":
         return False
     return re.subn("[^_A-Z0-9*]","",string[1:])[1] == 0
+
 
 def is_constant(string):
     if not string.startswith("0x"):
         return False
-    return string[2:].isdigit()
+    return re.subn("[^A-F0-9]", "", string[2:])[1] == 0
+
 
 def match_expression(expression, match, params):
     #print expression, match
@@ -368,7 +411,7 @@ def match_expression(expression, match, params):
                         return True
                     return False
                 else:
-                    depth =0
+                    depth = 0
                     start = match_index
                     while depth != 0 or fmt[fmt_index] != match[match_index]:
                         if match[match_index] == "(":
@@ -382,7 +425,7 @@ def match_expression(expression, match, params):
                             return False
                     if not match_expression(child, match[start:match_index], nparams):
                         return False
-            elif match[match_index] == "!" and fmt[fmt_index] != match[match_index]:
+            elif match[match_index] == "?" and fmt[fmt_index] != match[match_index]:
                 match_index += 1
                 operation_name = ""
                 while ("A" <= match[match_index] <= "Z") or ("0" <= match[match_index] <= "9") or match[match_index] == "_":
@@ -432,7 +475,7 @@ def create_macro_result(result_line, params, left = False):
                     return params.vars[name]
                 else:
                     return NoneExpression()
-            elif var_type == "!":
+            elif var_type == "?":
                 return Str(params.group_vars[name])
             elif var_type == "^":
                 if params.specific_vars.has_key(name):
@@ -451,11 +494,12 @@ def create_macro_result(result_line, params, left = False):
             macro_name = result_line[:result_line.index("(")]
             index = result_line.index("(") + 1
             parameters = []
+            op = None
             while result_line[index] != ")":
                 # Find end
                 depth = 0
                 param = ''
-                while depth > 0 or (result_line[index:index+2] != ", " and result_line[index] !=")"):
+                while depth > 0 or (result_line[index:index+2] != ", " and result_line[index] != " " and result_line[index] !=")"):
                     param += result_line[index]
                     if result_line[index] == "(":
                         depth += 1
@@ -466,25 +510,40 @@ def create_macro_result(result_line, params, left = False):
                 parameters.append(create_macro_result(param, params))
                 if result_line[index:index+2] == ", ":
                     index += 2
+                elif result_line[index] != ")":
+                    assert result_line[index] == " "
+                    op_name = result_line[index+1:result_line.find(" ", index + 1)]
+                    index += 2 + len(op_name)
+                    assert len(parameters) == 1
+                    assert macro_name == ""
+                    if is_var_name(op_name):
+                        if op_name[0] == "?":
+                            op_name = params.group_vars[op_name[1:]]
+                        else:
+                            assert False
+                    op = OPS[op_name]
+            if op is not None:
+                assert len(parameters) == 2
+                return op(parameters[0], parameters[1])
             if is_var_name(macro_name):
-                if macro_name[0] == "!":
+                if macro_name[0] == "?":
                     macro_name = params.group_vars[macro_name[1:]]
                 else:
                     assert False
             return Macro(macro_name, parameters)
 
-def replace_macros_in_expression(handler, expression, params):
+def replace_macros_in_expression(handler, macros, expression, params):
     changed = False
 
     for child in expression.get_children():
         if isinstance(child, VariableProxy) and child.show_reg:
             # It is an hidden var, so no need to replace macros in it anyway
             continue
-        changed |= replace_macros_in_expression(handler, child, params)
+        changed |= replace_macros_in_expression(handler, macros, child, params)
         if isinstance(child, VariableProxy):
             # We don't want to match expressions for proxy, because the expression will match to their child anyway, and we want to keep the proxy wrapper
             continue
-        for macro_line, macro_result in EXPRESSIONS_MACROS:
+        for macro_line, macro_result in macros:
             nparams = params.copy()
             if match_expression(child, macro_line, nparams):
                 new_child = create_macro_result(macro_result, nparams)
@@ -498,13 +557,17 @@ def replace_macros_in_expression(handler, expression, params):
 def replace_macros_in_instructions(handler, instructions, params):
     changed = False
     for instruction in instructions:
-        while replace_macros_in_expression(handler, instruction, params):
+        while replace_macros_in_expression(handler, EXPRESSIONS_MACROS, instruction, params):
             changed = True
         if isinstance(instruction, ConditionBlock):
             changed |= replace_macros_in_instructions(handler, instruction.instructions, params)
     return changed
 
-def match_instructions(instructions, index, lines, lines_index, params, pad = ''):
+def match_instructions(instructions, index, lines, lines_index, params, pad=None):
+    if pad is None:
+        if len(instructions) > 0:
+            s = str(instructions[0])
+            pad = ' ' * (len(s) - len(s.lstrip()))
     nparams = params.copy()
     while index < len(instructions) and lines_index < len(lines):
         if not lines[lines_index].startswith(pad):
@@ -558,7 +621,7 @@ def replace_instructions_macros(handler, instructions_container, index, params):
                 nlines = [create_macro_result(result, nparams)]
             else:
                 nlines = []
-            instructions = replace_instructions(handler, instructions_container, index, len(lines), nlines)
+            instructions = replace_instructions(handler, instructions_container, index, len([l for l in lines if not l.startswith(" ")]), nlines)
             params.update_global(nparams)
             changed = True
     return changed
@@ -620,6 +683,46 @@ def remove_unneeded_variable(handler, instructions_container, params):
         i += 1
     return changed
 
+def replace_encoded_value(handler, instructions_container, params, to_replace=None):
+    changed = False
+    if to_replace is None:
+        to_replace = []
+    #else:
+    #    to_replace = list(to_replace)
+
+    for i in xrange(len(instructions_container.instructions)):
+        changed |= replace_macros_in_expression(handler, to_replace, instructions_container.instructions[i], params)
+
+        nparams = params.copy()
+        if match_instructions(instructions_container.instructions, i, ["&X1 = EncodedValue(&X2, SimpleOperation(Operation(&OP1), &VAR1), &OP2T)"], 0, nparams)[0]:
+            current_expression = nparams.vars["X1"]
+            if type(nparams.vars["OP2T"]) is not NoneExpression:
+                assert match_expression(nparams.vars["OP2T"], "SimpleOperation(Operation(&OP2), &VAR2)", nparams)
+                if str(nparams.vars["OP2"]) == "+":
+                    neg_op = Sub
+                elif str(nparams.vars["OP2"]) == "-":
+                    neg_op = Add
+                elif str(nparams.vars["OP2"]) == "^":
+                    neg_op = Xor
+                current_expression = neg_op(current_expression, nparams.vars["VAR2"])
+            if str(nparams.vars["OP1"]) == "+":
+                neg_op = Sub
+            elif str(nparams.vars["OP1"]) == "-":
+                neg_op = Add
+            elif str(nparams.vars["OP1"]) == "^":
+                neg_op = Xor
+            current_expression = neg_op(current_expression, nparams.vars["VAR1"])
+            replace_instructions(handler, instructions_container, i, 1, [create_macro_result("&X1 = EncodedValue(&X2)", nparams)])
+            res = (str(current_expression), str(create_macro_result("DecodedValue(&X1)", nparams)))
+            if res not in to_replace:
+                to_replace.append(res)
+            changed = True
+        elif isinstance(instructions_container.instructions[i], ConditionBlock):
+            changed |= replace_encoded_value(handler, instructions_container.instructions[i], params, to_replace)
+
+    return changed
+
+
 def run_on_all_instructions(handler, instructions_container, func, params):
     changed = False
     changed |= func(handler, instructions_container, params)
@@ -634,6 +737,7 @@ def parse_handler(handler, fields, parameters):
     changed |= replace_macros_in_instructions(handler, handler.get_instructions(), params)
     changed |= run_on_all_instructions(handler, handler, replace_instructions_macros_in_instructions, params)
     changed |= run_on_all_instructions(handler, handler, remove_unneeded_variable, params)
+    changed |= replace_encoded_value(handler, handler, params)
     if changed:
         fields.update(params.fields)
         parameters.update(params.parameters)
