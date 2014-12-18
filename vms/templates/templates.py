@@ -354,8 +354,9 @@ class Templates(object):
                         else:
                             ni = releated[ri]-diff
                             insts[ni] = new_insts[ri]
-                    # Go to the last new instruction and pass again
-                    i = ni
+                    if not self.run_once:
+                        # Go to the last new instruction and pass again
+                        i = ni
                     break
             if not match:
                 if self.run_once:
