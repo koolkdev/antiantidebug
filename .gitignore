@@ -1,5 +1,7 @@
 *.pyc
 build
+/themida/oreans_deobfuscator/oreans_deobfuscator.c
+/themida/oreans_deobfuscator/oreans_deobfuscator.pyd
 *.pyd
 *.pyo
 *.sublime-workspace

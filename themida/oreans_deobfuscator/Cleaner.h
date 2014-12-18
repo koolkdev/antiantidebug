@@ -55,7 +55,7 @@ public:
 	std::map<int, uint64_t> options;
 	
 private:
-	std::map<uint64_t, std::pair<instruction_info, uint64_t>> cache;
+	std::map<uint64_t, std::pair<instruction_info, uint64_t> > cache;
 	reader_f reader;
 	int mode;
 	void * opaque;

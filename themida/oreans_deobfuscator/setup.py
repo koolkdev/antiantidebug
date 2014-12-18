@@ -21,7 +21,7 @@ ext_modules = [Extension("oreans_deobfuscator",
                      #define_macros=[('MS_NO_COREDLL', None)],
                      include_dirs=[ r'%s\x86utils' % x86utils_dir, r'%s\libyasm-2.1.2' % x86utils_dir, r'%s\udis86-1.7.2' % x86utils_dir],
                      library_dirs=[r'%s\%s\Release' % (x86utils_dir, folder)],
-                     libraries=['x86utils', 'modules', 'libyasm', 'libudis86'],
+                     libraries=['x86utils', 'modules', 'libyasm', 'libudis86'],#, 'stdc++'],
                      )]
 setup(
   name = 'oreans deobfuscator',

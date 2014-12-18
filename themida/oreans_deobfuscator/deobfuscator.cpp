@@ -1,8 +1,11 @@
+#include <cstddef>
+
 extern "C" {
 #include "deobfuscator.h"
 }
 
 #include "Cleaner.h"
+#include <stdexcept>
 
 extern "C" {
 void * create_cleaner(reader_f reader, int mode, void * opaque) {
@@ -14,7 +17,7 @@ uint64_t clean_instruction(void * cleaner, uint64_t address, unsigned char * out
 		instruction_info opcode = ((Cleaner *)cleaner)->getCleanInstructionAt(&naddress);
 		((Cleaner *)cleaner)->cleanIncDecSure(&naddress, &opcode); // fix inc and dec before returning the result
 		if (instruction_assemble(&opcode, output, output_size, address)) {
-			throw std::exception("FATAL: Failed to assemble instruction\n");
+			throw std::runtime_error("FATAL: Failed to assemble instruction\n");
 		}
 		return naddress;
 	} catch(std::exception &e) {

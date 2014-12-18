@@ -1,4 +1,13 @@
+#ifdef __GNUC__
+	#define __STDC_LIMIT_MACROS
+#endif
+
 #include "Cleaner.h"
+#include <string.h>
+#include <stdlib.h>
+#include <stdint.h>
+
+#include <stdexcept>
 
 extern "C" {
 	#include <x86utils.h>
@@ -6,33 +15,38 @@ extern "C" {
 
 class StringHash 
 { 
-unsigned m_val; 
+unsigned m_val;
 
-template<size_t N> __forceinline unsigned _Hash(const char (&str)[N]) 
+#ifdef __GNUC__
+	#define FORCE_INLINE __attribute__((always_inline))
+#else
+	#define FORCE_INLINE __forceinline
+#endif
+
+template<size_t N> FORCE_INLINE unsigned _Hash(const char (&str)[N])
 { 
 	typedef const char (&truncated_str)[N-4]; 
 	return str[N-1] + 65599*(str[N-2] + 65599*(str[N-3] + 65599 * (str[N-4] + 65599*_Hash((truncated_str)str)))); 
 } 
-__forceinline unsigned _Hash(const char (&str)[4]) 
-{ 
+FORCE_INLINE unsigned _Hash(const char (&str)[4])
+{
 	typedef const char (&truncated_str)[3]; 
 	return str[3] + 65599 * _Hash((truncated_str)str); 
 } 
-__forceinline unsigned _Hash(const char (&str)[3]) 
+FORCE_INLINE unsigned _Hash(const char (&str)[3])
 { 
 	typedef const char (&truncated_str)[2]; 
 	return str[2] + 65599 * _Hash((truncated_str)str); 
 } 
-__forceinline unsigned _Hash(const char (&str)[2]) { return str[1] + 65599 * str[0]; } 
-__forceinline unsigned _Hash(const char (&str)[1]) { return str[0]; } 
+FORCE_INLINE unsigned _Hash(const char (&str)[2]) { return str[1] + 65599 * str[0]; }
+FORCE_INLINE unsigned _Hash(const char (&str)[1]) { return str[0]; }
 
 public: 
-template <size_t N> __forceinline StringHash(const char (&str)[N]) { m_val = _Hash(str); } 
+template <size_t N> FORCE_INLINE StringHash(const char (&str)[N]) { m_val = _Hash(str); }
 	operator unsigned() { return m_val; } 
 }; 
 
 unsigned dynamicStringHash(char * str) {
-	char * start = str;
 	unsigned res = 0;
 	do {
 		res *= 65599;
@@ -1731,10 +1745,10 @@ instruction_info Cleaner::getInstructionAt(uint64_t * address) {
 	unsigned char buffer[20] = {0};
 	int buffer_size = reader(opaque, *address, buffer, sizeof(buffer));
 	if (!buffer_size) {
-		throw std::exception("Failed to read data");
+		throw std::runtime_error("Failed to read data");
 	}
 	if (instruction_disassemble(&result, buffer, buffer_size, *address)) {
-		throw std::exception("Failed to dissassemble");
+		throw std::runtime_error("Failed to dissassemble");
 	}
 	*address += result.size;
 	return result;
