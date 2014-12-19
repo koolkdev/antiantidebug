@@ -1,15 +1,15 @@
 HANDLERS = {
     "INIT_HANDLER":
         [
-            "VMStructFieldDword($KEY1) = 0x0",
-            "VMStructFieldDword($KEY2) = 0x0",
-            "VMStructFieldDword($KEY3) = 0x0",
-            "VMStructFieldDword($KEY4) = 0x0",
-            "VMStructFieldDword($KEY5) = 0x0",
-            "VMStructFieldWord($UNKNOWN_WORD) = 0x0",
-            "VMStructFieldByte($ACC_BYTE) = 0x0",
-            "VMStructFieldDword($KEY6) = 0x0",
-            "UpdateEipAndJump(ReadParameterWord(#NEXT_HANDLER, &X1), 0x2)"
+            "VMStructFieldDword($O[KEY1]) = 0x0",
+            "VMStructFieldDword($O[KEY2]) = 0x0",
+            "VMStructFieldDword($O[KEY3]) = 0x0",
+            "VMStructFieldDword($O[KEY4]) = 0x0",
+            "VMStructFieldDword($O[KEY5]) = 0x0",
+            "VMStructFieldWord($O[UNKNOWN_WORD]) = 0x0",
+            "VMStructFieldByte($O[ACC_BYTE]) = 0x0",
+            "VMStructFieldDword($O[KEY6]) = 0x0",
+            "UpdateEipAndJump(ReadParameterWord($P[NEXT_HANDLER], $[X1]), 0x2)"
         ]
 }
 

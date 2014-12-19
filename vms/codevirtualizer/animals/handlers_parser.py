@@ -10,214 +10,194 @@ GROUPS = {
     "STRUCT_FIELD": ["VMStructFieldByte", "VMStructFieldWord", "VMStructFieldDword"],
 }
 
+# $X[...] - variable
+# Readings: (X)
+#  - any
+# N - number
+# V - variable
+# G - group
+# O - offset
+# ?O - offset that is already set
+# P - handler parameter
+# H - handler vars
+
+
 EXPRESSIONS_MACROS = [
     (
-        "(ebp + &X)",
-        "VMStructOffset(&X)"
+        "(ebp + $[X])",
+        "VMStructOffset($[X])"
     ),
     (
-        "(&X + ebp)",
-        "VMStructOffset(&X)"
+        "($A[X] + ebp)",
+        "VMStructOffset($[X])"
     ),
     (
-        "*(BYTE*)VMStructOffset(&X)",
-        "VMStructFieldByte(&X)"
+        "*(BYTE*)VMStructOffset($[X])",
+        "VMStructFieldByte($[X])"
     ),
     (
-        "*(WORD*)VMStructOffset(&X)",
-        "VMStructFieldWord(&X)"
+        "*(WORD*)VMStructOffset($[X])",
+        "VMStructFieldWord($[X])"
     ),
     (
-        "*(DWORD*)VMStructOffset(&X)",
-        "VMStructFieldDword(&X)"
+        "*(DWORD*)VMStructOffset($[X])",
+        "VMStructFieldDword($[X])"
     ),
     (
-        "*(BYTE*)(VMStructFieldDword(@EIP) + &X)",
-        "ReadParameterByte(&X, DecodingInfo(None, None, None, None, None, None, None, None, None))"
+        "*(BYTE*)(VMStructFieldDword(?O[EIP]) + $[X])",
+        "ReadParameterByte($[X], DecodingInfo(None, None, None, None, None, None, None, None, None))"
     ),
     (
-        "*(WORD*)(VMStructFieldDword(@EIP) + &X)",
-        "ReadParameterWord(&X, DecodingInfo(None, None, None, None, None, None, None, None, None))"
+        "*(WORD*)(VMStructFieldDword(?O[EIP]) + $[X])",
+        "ReadParameterWord($[X], DecodingInfo(None, None, None, None, None, None, None, None, None))"
     ),
     (
-        "*(DWORD*)(VMStructFieldDword(@EIP) + &X)",
-        "ReadParameterDword(&X, DecodingInfo(None, None, None, None, None, None, None, None, None))"
+        "*(DWORD*)(VMStructFieldDword(?O[EIP]) + $[X])",
+        "ReadParameterDword($[X], DecodingInfo(None, None, None, None, None, None, None, None, None))"
     ),
 
     (
-        "(?READ_PARAMETER_1(^IMM_1, DecodingInfo(None, None, None, None, None, None, None, None, None)) ?SIMPLE_MATH_1 VMStructFieldDword(@KEY1))",
-        "?READ_PARAMETER_1(^IMM_1, DecodingInfo(Operation(?SIMPLE_MATH_1), None, None, None, None, None, None, None, None))"
+        "($G[READ_PARAMETER:READ_OP]($N[OFFSET], DecodingInfo(None, None, None, None, None, None, None, None, None)) $G[SIMPLE_MATH:OP] VMStructFieldDword(?O[KEY1]))",
+        "$G[READ_OP]($N[OFFSET], DecodingInfo(Operation($G[OP]), None, None, None, None, None, None, None, None))"
     ),
     (
-        "(?READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, None, None, None, None, None, None, None, None)) ?SIMPLE_MATH_1 VMStructFieldDword(@KEY2))",
-        "?READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, Operation(?SIMPLE_MATH_1), None, None, None, None, None, None, None))"
+        "($G[READ_PARAMETER:READ_OP]($N[OFFSET], DecodingInfo($[X1], None, None, None, None, None, None, None, None)) $G[SIMPLE_MATH:OP] VMStructFieldDword(?O[KEY2]))",
+        "$G[READ_OP]($N[OFFSET], DecodingInfo($[X1], Operation($G[OP]), None, None, None, None, None, None, None))"
     ),
     (
-        "(?READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, &X2, None, None, None, None, None, None, None)) ?SIMPLE_MATH_1 VMStructFieldDword(@KEY6))",
-        "?READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, &X2, None, Operation(?SIMPLE_MATH_1), None, None, None, None, None))"
+        "($G[READ_PARAMETER:READ_OP]($N[OFFSET], DecodingInfo($[X1], $[X2], None, None, None, None, None, None, None)) $G[SIMPLE_MATH:OP] VMStructFieldDword(?O[KEY6]))",
+        "$G[READ_OP]($N[OFFSET], DecodingInfo($[X1], $[X2], None, Operation($G[OP]), None, None, None, None, None))"
     ),
     (
-        "(?READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, None, None, None, None, None, None, None, None)) ?SIMPLE_MATH_1 VMStructFieldDword(@KEY4))",
-        "?READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, None, Operation(?SIMPLE_MATH_1), None, None, None, None, None, None))"
+        "($G[READ_PARAMETER:READ_OP]($N[OFFSET], DecodingInfo($[X1], None, None, None, None, None, None, None, None)) $G[SIMPLE_MATH:OP] VMStructFieldDword(?O[KEY4]))",
+        "$G[READ_OP]($N[OFFSET], DecodingInfo($[X1], None, Operation($G[OP]), None, None, None, None, None, None))"
     ),
     (
-        "(?READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, None, None, None, None, None, None, None, None)) ?SIMPLE_MATH_1 ^IMM_2)",
-        "?READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, None, None, None, SimpleOperation(Operation(?SIMPLE_MATH_1), ^IMM_2), None, None, None, None))"
+        "($G[READ_PARAMETER:READ_OP]($N[OFFSET], DecodingInfo($[X1], None, None, None, None, None, None, None, None)) $G[SIMPLE_MATH:OP] $N[NUMBER])",
+        "$G[READ_OP]($N[OFFSET], DecodingInfo($[X1], None, None, None, SimpleOperation(Operation($G[OP]), $N[NUMBER]), None, None, None, None))"
     ),
     (
-        "(?READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, &X2, &X3, &X4, &X5, &X6, &X7, None, None)) ?SIMPLE_MATH_1 VMStructFieldDword(@KEY3))",
-        "?READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, &X2, &X3, &X4, &X5, &X6, &X7, Operation(?SIMPLE_MATH_1), None))"
+        "($G[READ_PARAMETER:READ_OP]($N[OFFSET], DecodingInfo($[X1], $[X2], $[X3], $[X4], $[X5], $[X6], $[X7], None, None)) $G[SIMPLE_MATH:OP] VMStructFieldDword(?O[KEY3]))",
+        "$G[READ_OP]($N[OFFSET], DecodingInfo($[X1], $[X2], $[X3], $[X4], $[X5], $[X6], $[X7], Operation($G[OP]), None))"
     ),
     (
-        "((&X1 & 0xF0) >> 0x4)",
-        "HIGH_NIBBLE(&X1)"
+        "(($[X] & 0xF0) >> 0x4)",
+        "HIGH_NIBBLE($[X])"
     ),
     (
-        "(&X1 & 0xF)",
-        "LOW_NIBBLE(&X1)"
+        "($[X] & 0xF)",
+        "LOW_NIBBLE($[X])"
     ),
     (
-        "(((VMStructFieldByte(@ACC_BYTE) ?SIMPLE_MATH_1 ^IMM_1) - ^IMM_2) ?COMPARE_1 0x0)",
-        "(DecodedAccByte(SimpleOperation(Operation(?SIMPLE_MATH_1), ^IMM_1), None) ?COMPARE_1 ^IMM_2)"
+        "(((VMStructFieldByte(?O[ACC_BYTE]) $G[SIMPLE_MATH:OP] $N[NUMBER]) - $N[VALUE]) $G[COMPARE:COMP_OP] 0x0)",
+        "(DecodedAccByte(SimpleOperation(Operation($G[OP]), $N[NUMBER]), None) $G[COMP_OP] $N[VALUE])"
     ),
     (
-        "((((VMStructFieldByte(@ACC_BYTE) ?SIMPLE_MATH_1 ^IMM_1) ?SIMPLE_MATH_2 ^IMM_2) - ^IMM_3) ?COMPARE_1 0x0)",
-        "(DecodedAccByte(SimpleOperation(Operation(?SIMPLE_MATH_1), ^IMM_1), SimpleOperation(Operation(?SIMPLE_MATH_2), ^IMM_2)) ?COMPARE_1 ^IMM_3)"
+        "((((VMStructFieldByte(?O[ACC_BYTE]) $G[SIMPLE_MATH:OP1] $N[NUMBER1]) $G[SIMPLE_MATH:OP2] $N[NUMBER2]) - $N[VALUE]) $G[COMPARE:COMP_OP] 0x0)",
+        "(DecodedAccByte(SimpleOperation(Operation($G[OP1]), $N[NUMBER1]), SimpleOperation(Operation($G[OP2]), $N[NUMBER2])) $G[COMP_OP] $N[VALUE])"
     )
 ]
 
 MACROS = [
     (
         [
-        "^VAR_1 = ?READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, &X2, &X3, &X4, &X5, None, None, None, None))",
-        "VMStructFieldDword(@KEY1) ?UPDATE_MATH_1= ^VAR_1"
+        "$V[VAR] = $G[READ_PARAMETER:READ_OP]($N[OFFSET], DecodingInfo($[X1], $[X2], $[X3], $[X4], $[X5], None, None, None, None))",
+        "VMStructFieldDword(?O[KEY1]) $G[UPDATE_MATH:OP]= $V[VAR]"
         ],
-        "^VAR_1 = ?READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, &X2, &X3, &X4, &X5, Operation(?UPDATE_MATH_1), None, None, None))"
+        "$V[VAR] = $G[READ_OP]($N[OFFSET], DecodingInfo($[X1], $[X2], $[X3], $[X4], $[X5], Operation($G[OP]), None, None, None))"
     ),
     (
-        ["VMStructFieldDword(@KEY*) ?UPDATE_MATH_1= ^IMM_2"],
-        "UpdateKey(VMStructFieldDword(@KEY*), SimpleOperation(Operation(?UPDATE_MATH_1), ^IMM_2))"
+        ["VMStructFieldDword(?O[KEY*:KEY]) $G[UPDATE_MATH:OP]= $N[NUMBER]"],
+        "UpdateKey(VMStructFieldDword(?O[KEY]), SimpleOperation(Operation($G[OP]), $N[NUMBER]))"
     ),
     (
         [
-        "^VAR_1 = ?READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, &X2, &X3, &X4, &X5, &X6, None, None, None))",
-        "UpdateKey(VMStructFieldDword(@KEY2), &Y1)",
+        "$V[VAR] = $G[READ_PARAMETER:READ_OP]($N[OFFSET], DecodingInfo($[X1], $[X2], $[X3], $[X4], $[X5], $[X6], None, None, None))",
+        "UpdateKey(VMStructFieldDword(?O[KEY2]), $[Y1])",
         ],
-        "^VAR_1 = ?READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, &X2, &X3, &X4, &X5, &X6, &Y1, None, None))"
+        "$V[VAR] = $G[READ_OP]($N[OFFSET], DecodingInfo($[X1], $[X2], $[X3], $[X4], $[X5], $[X6], $[Y1], None, None))"
     ),
     (
         [
-        "^VAR_1 = ?READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, &X2, &X3, &X4, &X5, &X6, &X7, &X8, None))",
-        "UpdateKey(VMStructFieldDword(@KEY3), &Y1)",
+        "$V[VAR] = $G[READ_PARAMETER:READ_OP]($N[OFFSET], DecodingInfo($[X1], $[X2], $[X3], $[X4], $[X5], $[X6], $[X7], $[X8], None))",
+        "UpdateKey(VMStructFieldDword(?O[KEY3]), $[Y1])",
         ],
-        "^VAR_1 = ?READ_PARAMETER_1(^IMM_1, DecodingInfo(&X1, &X2, &X3, &X4, &X5, &X6, &X7, &X8, &Y1))"
+        "$V[VAR] = $G[READ_OP]($N[OFFSET], DecodingInfo($[X1], $[X2], $[X3], $[X4], $[X5], $[X6], $[X7], $[X8], $[Y1]))"
     ),
+    # (
+    #     ["$G[STRUCT_FIELD:FIELD]($O[ENCODED_VALUE_*:OFFSET]) = ($[X1] $G[SIMPLE_MATH:OP] $N[NUMBER])"],
+    #     "$G[FIELD]($O[OFFSET]) = EncodedValue($[X1], SimpleOperation(Operation($G[OP]), $N[NUMBER]), None)"
+    # ),
+    # # For some cases in IFs
+    # (
+    #     ["$V[VAR] = ($V[VAR] $G[SIMPLE_MATH:OP] $N[NUMBER])",
+    #     "$G[STRUCT_FIELD:FIELD]($O[ENCODED_VALUE_*:OFFSET]) = $V[VAR]"],
+    #     "$G[FIELD]($O[OFFSET]) = EncodedValue($[X1], SimpleOperation(Operation($G[OP]), $N[NUMBER]), None)"
+    # ),
+    # (
+    #     ["VMStructFieldDword($O[ENCODED_VALUE_*:OFFSET]) = (($[X1] $G[SIMPLE_MATH:OP1] VMStructFieldDword($O[JUNK])) $G[SIMPLE_MATH:OP2] $N[NUMBER])"],
+    #     "VMStructFieldDword($O[OFFSET]) = EncodedValue($[X1], SimpleOperation(Operation($G[OP1]), VMStructFieldDword($O[JUNK])), SimpleOperation(Operation($G[OP2]), $N[NUMBER]))"
+    # ),
+    # (
+    #     ["VMStructFieldDword($O[ENCODED_VALUE_*:OFFSET]) = (($[X1] $G[SIMPLE_MATH:OP1] $N[NUMBER]) ?SIMPLE_MATH_2 VMStructFieldDword($O[JUNK]))"],
+    #     "VMStructFieldDword($O[OFFSET]) = EncodedValue($[X1], SimpleOperation(Operation($G[OP1]), $N[NUMBER]), SimpleOperation(Operation($G[OP2]), VMStructFieldDword($O[JUNK])))"
+    # ),
+    # # TODO: Fix that for 0x404116L
+    # (
+    #     ["VMStructFieldDword($O[ENCODED_VALUE_*:OFFSET]) = EncodedValue(($[X1] $G[SIMPLE_MATH:OP2] VMStructFieldDword($O[JUNK])), SimpleOperation(Operation($G[SIMPLE_MATH:OP1]), $N[NUMBER]), None)"],
+    #     "VMStructFieldDword($O[OFFSET]) = EncodedValue($[X1], SimpleOperation(Operation($G[OP1]), $N[NUMBER]), SimpleOperation(Operation($G[OP2]), VMStructFieldDword($O[JUNK])))"
+    # ),
+    # (
+    #     ["VMStructFieldDword($O[ENCODED_VALUE_*:OFFSET]) = ($[X1] $G[SIMPLE_MATH:OP] VMStructFieldDword($O[JUNK]))"],
+    #     "VMStructFieldDword($O[OFFSET]) = EncodedValue($[X1], SimpleOperation(Operation($G[OP]), VMStructFieldDword($O[JUNK])), None)"
+    # ),
     (
-        ["?STRUCT_FIELD_1($ENCODED_VALUE_) = (&X1 ?SIMPLE_MATH_1 ^IMM_1)"],
-        "?STRUCT_FIELD_1($ENCODED_VALUE_) = EncodedValue(&X1, SimpleOperation(Operation(?SIMPLE_MATH_1), ^IMM_1), None)"
-    ),
-    # For some cases in IFs
-    (
-        ["^VAR_1 = (^VAR_1 ?SIMPLE_MATH_1 ^IMM1)",
-        "?STRUCT_FIELD_1($ENCODED_VALUE_) = ^VAR_1"],
-        "?STRUCT_FIELD_1($ENCODED_VALUE_) = EncodedValue(&X1, SimpleOperation(Operation(?SIMPLE_MATH_1), ^IMM_1), None)"
-    ),
-    (
-        ["VMStructFieldDword($ENCODED_VALUE_) = ((&X1 ?SIMPLE_MATH_1 VMStructFieldDword($JUNK)) ?SIMPLE_MATH_2 ^IMM_1)"],
-        "VMStructFieldDword($ENCODED_VALUE_) = EncodedValue(&X1, SimpleOperation(Operation(?SIMPLE_MATH_1), VMStructFieldDword($JUNK)), SimpleOperation(Operation(?SIMPLE_MATH_2), ^IMM_1))"
-    ),
-    (
-        ["VMStructFieldDword($ENCODED_VALUE_) = ((&X1 ?SIMPLE_MATH_1 ^IMM_1) ?SIMPLE_MATH_2 VMStructFieldDword($JUNK))"],
-        "VMStructFieldDword($ENCODED_VALUE_) = EncodedValue(&X1, SimpleOperation(Operation(?SIMPLE_MATH_1), ^IMM_1), SimpleOperation(Operation(?SIMPLE_MATH_2), VMStructFieldDword($JUNK)))"
-    ),
-    # TODO: Fix that for 0x404116L
-    (
-        ["VMStructFieldDword($ENCODED_VALUE_) = EncodedValue((&X1 ?SIMPLE_MATH_2 VMStructFieldDword($JUNK)), SimpleOperation(Operation(?SIMPLE_MATH_1), ^IMM_1), None)"],
-        "VMStructFieldDword($ENCODED_VALUE_) = EncodedValue(&X1, SimpleOperation(Operation(?SIMPLE_MATH_1), ^IMM_1), SimpleOperation(Operation(?SIMPLE_MATH_2), VMStructFieldDword($JUNK)))"
-    ),
-    (
-        ["VMStructFieldDword($ENCODED_VALUE_) = (&X1 ?SIMPLE_MATH_1 VMStructFieldDword($JUNK))"],
-        "VMStructFieldDword($ENCODED_VALUE_) = EncodedValue(&X1, SimpleOperation(Operation(?SIMPLE_MATH_1), VMStructFieldDword($JUNK)), None)"
-    ),
-    (
-        ["VMStructFieldDword(@JUNK) ?UPDATE_MATH_1= &X1"],
+        ["VMStructFieldDword(?O[JUNK]) $G[UPDATE_MATH:OP]= $[X]"],
         None
     ),
     (
         [
-        "VMStructFieldDword(@EIP) += &Y",
-        "Jump(*(DWORD*)(VMStructFieldDword(@HANDLERS) + ((&X & 0xFFFF) << 0x2)))"
+        "VMStructFieldDword(?O[EIP]) += $[Y]",
+        "Jump(*(DWORD*)(VMStructFieldDword(?O[HANDLERS]) + (($[X] & 0xFFFF) << 0x2)))"
         ],
-        "UpdateEipAndJump(&X, &Y)"
+        "UpdateEipAndJump($[X], $[Y])"
     ),
     (
         [
-        "^VAR_1 = *(DWORD*)(VMStructFieldDword(@HANDLERS) + ((&X & 0xFFFF) << 0x2))",
-        "VMStructFieldDword(@EIP) += &Y",
-        "Jump(^VAR_1)"
+        "$V[VAR] = *(DWORD*)(VMStructFieldDword(?O[HANDLERS]) + (($[X] & 0xFFFF) << 0x2))",
+        "VMStructFieldDword(?O[EIP]) += $[Y]",
+        "Jump($V[VAR])"
         ],
-        "UpdateEipAndJump(&X, &Y)"
+        "UpdateEipAndJump($[X], $[Y])"
     ),
     (
         [
-        "^VAR_1 = *(DWORD*)(VMStructFieldDword(@HANDLERS) + (&X << 0x2))",
-        "VMStructFieldDword(@EIP) += &Y",
-        "Jump(^VAR_1)"
+        "$V[VAR] = *(DWORD*)(VMStructFieldDword(?O[HANDLERS]) + ($[X] << 0x2))",
+        "VMStructFieldDword(?O[EIP]) += $[Y]",
+        "Jump($V[VAR])"
         ],
-        "UpdateEipAndJump(&X, &Y)"
+        "UpdateEipAndJump($[X], $[Y])"
     ),
     (
         [
-        "If(((VMStructFieldDword(@KEY2) & 0x1) != 0x0))",
+        "If(((VMStructFieldDword(?O[KEY2]) & 0x1) != 0x0))",
         ],
         "UpdateKeyCond(None)"
     ),
     (
         [
-        "If(((VMStructFieldDword(@KEY2) & 0x1) != 0x0))",
-        "    UpdateKey(VMStructFieldDword(@KEY2), &X1)"
+        "If(((VMStructFieldDword(?O[KEY2]) & 0x1) != 0x0))",
+        "    UpdateKey(VMStructFieldDword(?O[KEY2]), $[X])"
         ],
-        "UpdateKeyCond(&X1)"
+        "UpdateKeyCond($[X])"
     ),
     (
         [
-            "VMStructFieldByte(@ACC_BYTE) ?SIMPLE_MATH_1= &X"
+            "VMStructFieldByte(?O[ACC_BYTE]) $G[SIMPLE_MATH:OP]= $[X]"
         ],
-        "UpdateAccByte(SimpleOperation(Operation(?SIMPLE_MATH_1), &X))"
+        "UpdateAccByte(SimpleOperation(Operation($G[OP]), $[X]))"
     )
 ]
-
-"""
-    (
-        [
-        "^VAR_1 = ((ReadParameterWord(#NEXT_HANDLER) !SIMPLE_MATH_1 VMStructFieldDword(@KEY1)) !SIMPLE_MATH_2 ^IMM_1)",
-        "VMStructFieldDword(@KEY1) !UPDATE_MATH_3= ^VAR_1",
-        "UpdateEipAndJump(^VAR_1, ^IMM_2)"
-        ],
-        "UpdateEipAndJump(DecodeNextHandler(ReadParameterWord(#NEXT_HANDLER), ^SIMPLE_MATH_1, SimpleOperation(^SIMPLE_MATH_2, ^IMM_1), ^UPDATE_MATH_3), ^IMM_2)"
-    ),
-    (
-        [
-        "^VAR_1 = (ReadParameterWord(#NEXT_HANDLER) !SIMPLE_MATH_1 VMStructFieldDword(@KEY1))",
-        "VMStructFieldDword(@KEY1) !UPDATE_MATH_3= ^VAR_1",
-        "UpdateEipAndJump(^VAR_1, ^IMM_2)"
-        ],
-        "UpdateEipAndJump(DecodeNextHandler(ReadParameterWord(#NEXT_HANDLER), ^SIMPLE_MATH_1, None, ^UPDATE_MATH_3), ^IMM_2)"
-    ),
-    (
-        [
-        "UpdateEipAndJump(((ReadParameterWord(#NEXT_HANDLER) !SIMPLE_MATH_1 VMStructFieldDword(@KEY1)) !SIMPLE_MATH_2 ^IMM_1), ^IMM_2)"
-        ],
-        "UpdateEipAndJump(DecodeNextHandler(ReadParameterWord(#NEXT_HANDLER), ^SIMPLE_MATH_1, SimpleOperation(^SIMPLE_MATH_2, ^IMM_1), ^UPDATE_MATH_3), ^IMM_2)"
-    ),
-    (
-        [
-        "UpdateEipAndJump((ReadParameterWord(#NEXT_HANDLER) !SIMPLE_MATH_1 VMStructFieldDword(@KEY1)), ^IMM_2)",
-        ],
-        "UpdateEipAndJump(DecodeNextHandler(ReadParameterWord(#NEXT_HANDLER), ^SIMPLE_MATH_1, None, ^UPDATE_MATH_3), ^IMM_2)"
-    ),
-
-]"""
 
 OPS = {
     "+": Add,
@@ -331,9 +311,9 @@ class Params(object):
 
 
 def is_var_name(string):
-    if string[0] not in "?@#$^&":
+    if string[0] not in "$?":
         return False
-    return re.subn("[^_A-Z0-9*]","",string[1:])[1] == 0
+    return re.match("^[$?][A-Z]{0,1}\[[_A-Z0-9:*]+\]$", string) is not None
 
 
 def is_constant(string):
@@ -346,47 +326,55 @@ def match_expression(expression, match, params):
     #print expression, match
     parent = expression
     expression = expression.get_value()
-    if is_var_name(match):
-        var_type, name = match[0], match[1:]
-        if var_type == "@" or var_type == "#" or var_type == "$":
+    if is_var_name(match) and match[1] != "G":
+        if match[0] == "?":
+            assert match[1] == "O"
+        if match[1] == "[":
+            var_type = "A"
+        else:
+            var_type = match[1]
+        name = match[match.find("[")+1:-1]
+        cond = None
+        if name.find(":") != -1:
+            cond, name = name.split(":")
+        if var_type in "OP":
             if not isinstance(expression, Immediate):
                 return False
             int_value = expression.value
-            if var_type == "#":
+            if var_type == "P":
                 return params.set_param_value(name, int_value)
-            elif var_type == "@":
-                if name[-1] == "*":
+            elif match[0] == "?":
+                if cond is not None and cond[-1] == "*":
                     oname = params.get_field_name(int_value)
-                    if oname is not None and oname.startswith(name[:-1]):
+                    if oname is not None and oname.startswith(cond[:-1]):
                         params.real_field_name[name] = oname
                         return True
                     return False
                 return params.fields.has_key(name) and params.fields[name] == int_value
             else:
-                if name[-1] == "_":
-                    if params.set_field_value(name + str(int_value), int_value):
-                        params.real_field_name[name] = name + str(int_value)
+                if cond is not None and cond[-1] == "*":
+                    if params.set_field_value(cond + str(int_value), int_value):
+                        params.real_field_name[name] = cond + str(int_value)
                         return True
                     return False
                 else:
                     return params.set_field_value(name, int_value)
-        elif var_type == "&":
+        elif var_type == "A":
             return params.set_var_value(name, parent)
-        elif var_type == "^":
-            if name.startswith("VAR_"):
-                if isinstance(expression, Variable):
-                    return params.set_specific_var_value(name, parent)
-                return False
-            elif name.startswith("IMM_"):
-                if isinstance(expression, Immediate):
-                    return params.set_specific_var_value(name, expression)
-                return False
-            else:
-                return False
+        elif var_type == "V":
+            if isinstance(expression, Variable):
+                return params.set_specific_var_value(name, parent)
+            return False
+        elif var_type == "N":
+            if isinstance(expression, Immediate):
+                return params.set_specific_var_value(name, expression)
+            return False
+        else:
+            assert False
     elif is_constant(match):
         if not isinstance(expression, Immediate):
             return False
-        return int(match,16) == expression.value
+        return int(match, 16) == expression.value
     else:
         fmt = expression.get_format()
         #print fmt
@@ -425,23 +413,21 @@ def match_expression(expression, match, params):
                             return False
                     if not match_expression(child, match[start:match_index], nparams):
                         return False
-            elif match[match_index] == "?" and fmt[fmt_index] != match[match_index]:
-                match_index += 1
-                operation_name = ""
-                while ("A" <= match[match_index] <= "Z") or ("0" <= match[match_index] <= "9") or match[match_index] == "_":
-                    operation_name += match[match_index]
-                    match_index += 1
+            elif match[match_index] == "$":
+                if match[match_index:match_index+3] != "$G[":
+                    return False
+                group_name, var_name = match[match_index + 3:match.find("]", match_index)].split(":")
+                match_index = match.find("]", match_index) + 1
                 found = False
-                for group in GROUPS.iterkeys():
-                    if operation_name.startswith(group + "_"):
-                        for value in GROUPS[group]:
-                            if fmt[fmt_index:fmt_index+len(value)] == value:
-                                if not nparams.set_group_var_value(operation_name, value):
-                                    return False
-                                found = True
-                                fmt_index += len(value)
-                            # Should i have break or? or give a chance to multi groups with similiar starts?
-                            # probably the later, because even if we have some groups with common start, and we found a result, it is probably the correct one even if from the wrong group
+                if group_name not in GROUPS:
+                    assert False
+                for value in GROUPS[group_name]:
+                    if fmt[fmt_index:fmt_index+len(value)] == value:
+                        if not nparams.set_group_var_value(var_name, value):
+                            return False
+                        found = True
+                        fmt_index += len(value)
+                        break
                 if not found:
                     return False
             else:
@@ -460,25 +446,31 @@ def create_macro_result(result_line, params, left = False):
         return SetValue(create_macro_result(lvalue, params, True), create_macro_result(rvalue, params))
     else:
         if is_var_name(result_line):
-            var_type, name = result_line[0], result_line[1:]
-            if var_type == "@" or var_type == "#" or var_type == "$":
-                if var_type == "@" or var_type == "$":
-                    if name[-1] in ("_*"):
+            if result_line[0] == "?":
+                assert result_line[1] == "O"
+            if result_line[1] == "[":
+                var_type = "A"
+            else:
+                var_type = result_line[1]
+            name = result_line[result_line.find("[")+1:-1]
+            if var_type in "OP":
+                if var_type == "O":
+                    if name not in params.fields:
                         name = params.real_field_name[name]
                     int_val = params.fields[name]
                 else:
                     int_val = params.parameters[name]
                 return Immediate(int_val)
-            elif var_type == "&":
+            elif var_type == "A":
                 # TODO: return variable proxy if needed
-                if params.vars.has_key(name):
+                if name in params.vars:
                     return params.vars[name]
                 else:
                     return NoneExpression()
-            elif var_type == "?":
+            elif var_type == "G":
                 return Str(params.group_vars[name])
-            elif var_type == "^":
-                if params.specific_vars.has_key(name):
+            elif var_type in "VN":
+                if name in params.specific_vars:
                     # TODO: is it always good?
                     #if not left and name.startswith("VAR_"):
                     #    return VariableProxy(params.vars[name], None) # The None should be fixed on handler.update_instruction
@@ -486,6 +478,8 @@ def create_macro_result(result_line, params, left = False):
                 else:
                     assert False
                     #return NoneExpression()
+            else:
+                assert False
         elif is_constant(result_line):
             return Immediate(int(result_line, 16))
         elif result_line == "None":
@@ -517,19 +511,15 @@ def create_macro_result(result_line, params, left = False):
                     assert len(parameters) == 1
                     assert macro_name == ""
                     if is_var_name(op_name):
-                        if op_name[0] == "?":
-                            op_name = params.group_vars[op_name[1:]]
-                        else:
-                            assert False
+                        assert op_name[1] == "G"
+                        op_name = params.group_vars[op_name[3:-1]]
                     op = OPS[op_name]
             if op is not None:
                 assert len(parameters) == 2
                 return op(parameters[0], parameters[1])
             if is_var_name(macro_name):
-                if macro_name[0] == "?":
-                    macro_name = params.group_vars[macro_name[1:]]
-                else:
-                    assert False
+                assert macro_name[1] == "G"
+                macro_name = params.group_vars[macro_name[3:-1]]
             return Macro(macro_name, parameters)
 
 def replace_macros_in_expression(handler, macros, expression, params):
@@ -565,9 +555,7 @@ def replace_macros_in_instructions(handler, instructions, params):
 
 def match_instructions(instructions, index, lines, lines_index, params, pad=None):
     if pad is None:
-        if len(instructions) > 0:
-            s = str(instructions[0])
-            pad = ' ' * (len(s) - len(s.lstrip()))
+        pad = ''
     nparams = params.copy()
     while index < len(instructions) and lines_index < len(lines):
         if not lines[lines_index].startswith(pad):
@@ -694,10 +682,10 @@ def replace_encoded_value(handler, instructions_container, params, to_replace=No
         changed |= replace_macros_in_expression(handler, to_replace, instructions_container.instructions[i], params)
 
         nparams = params.copy()
-        if match_instructions(instructions_container.instructions, i, ["&X1 = EncodedValue(&X2, SimpleOperation(Operation(&OP1), &VAR1), &OP2T)"], 0, nparams)[0]:
+        if match_instructions(instructions_container.instructions, i, ["$[X1] = EncodedValue($[X2], SimpleOperation(Operation($[OP1]), $[VAR1]), $[OP2T])"], 0, nparams)[0]:
             current_expression = nparams.vars["X1"]
             if type(nparams.vars["OP2T"]) is not NoneExpression:
-                assert match_expression(nparams.vars["OP2T"], "SimpleOperation(Operation(&OP2), &VAR2)", nparams)
+                assert match_expression(nparams.vars["OP2T"], "SimpleOperation(Operation($[OP2]), $[VAR2])", nparams)
                 if str(nparams.vars["OP2"]) == "+":
                     neg_op = Sub
                 elif str(nparams.vars["OP2"]) == "-":
@@ -712,9 +700,11 @@ def replace_encoded_value(handler, instructions_container, params, to_replace=No
             elif str(nparams.vars["OP1"]) == "^":
                 neg_op = Xor
             current_expression = neg_op(current_expression, nparams.vars["VAR1"])
-            replace_instructions(handler, instructions_container, i, 1, [create_macro_result("&X1 = EncodedValue(&X2)", nparams)])
-            res = (str(current_expression), str(create_macro_result("DecodedValue(&X1)", nparams)))
+            print str(instructions_container.instructions[i])
+            replace_instructions(handler, instructions_container, i, 1, [create_macro_result("$[X1] = EncodedValue($[X2])", nparams)])
+            res = (str(current_expression), str(create_macro_result("DecodedValue($[X1])", nparams)))
             if res not in to_replace:
+                print res
                 to_replace.append(res)
             changed = True
         elif isinstance(instructions_container.instructions[i], ConditionBlock):
@@ -737,7 +727,7 @@ def parse_handler(handler, fields, parameters):
     changed |= replace_macros_in_instructions(handler, handler.get_instructions(), params)
     changed |= run_on_all_instructions(handler, handler, replace_instructions_macros_in_instructions, params)
     changed |= run_on_all_instructions(handler, handler, remove_unneeded_variable, params)
-    changed |= replace_encoded_value(handler, handler, params)
+    #changed |= replace_encoded_value(handler, handler, params)
     if changed:
         fields.update(params.fields)
         parameters.update(params.parameters)
