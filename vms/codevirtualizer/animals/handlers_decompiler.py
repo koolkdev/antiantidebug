@@ -5,9 +5,6 @@ class Expression(object):
     def __init__(self):
         pass
 
-    def get_value(self):
-        return self
-
     def get_all_children(self):
         return self.get_children() + sum([x.get_all_children() for x in self.get_children()], [])
 
@@ -360,38 +357,13 @@ class Variable(Expression):
     def __init__(self, name):
         self.name = name
         self.instructions = []
-        self.proxies = set()
-        self.hidden_vars = []
         self.used_instructions = []
-        self.visible_if_used = []
 
     def equals(self, other):
         return Expression.equals(self, other) and self.name== other.name
 
     def get_format(self):
         return "var_%s"  % self.name
-
-class VariableProxy(UnaryExpression):
-    def __init__(self, reg_var, value):
-        UnaryExpression.__init__(self, value)
-        self.reg_var = reg_var
-        self.show_reg = False
-        self.visible = False
-
-    def get_value(self):
-        if self.show_reg:
-            return self.reg_var
-        else:
-            return self.value.get_value()
-
-    #def get_children(self):
-    #    return [self.get_value()]
-
-    def equals(self, other):
-        return self.get_value().equals(other.get_value())
-
-    def __str__(self):
-        return str(self.get_value())
 
 class SP(Expression):
     def get_format(self):
@@ -481,11 +453,7 @@ class Std(Expression):
 def merge_variables(var1, var2):
     var = Variable(var1.name)
     var.instructions = var1.instructions + var2.instructions
-    var.proxies.update(var1.proxies)
-    var.proxies.update(var2.proxies)
-    var.hidden_vars = var1.hidden_vars + var2.hidden_vars
     var.used_instructions = var1.used_instructions + var2.used_instructions
-    var.visible_if_used = var1.visible_if_used + var2.visible_if_used
     return var
 
 class State(object):
@@ -561,7 +529,7 @@ class State(object):
         return self.mode.translate("{R:%s}" % reg)
 
     def get_register(self, reg):
-        return VariableProxy(self.registers_variables[self._get_full_register(reg)], self.registers[self._get_full_register(reg)])
+        return self.registers[self._get_full_register(reg)]
 
     def set_register(self, reg, value):
         self.registers[self._get_full_register(reg)] = value
@@ -581,127 +549,97 @@ class Handler(object):
         nstate, instructions = self._get_handler_block(function.start_block, state)
         state.invalidate_diff(nstate) # For push instructions taking effect
         self.instructions = instructions
+        self.optimize_instructions()
         self.clean_instructions()
 
     def get_instructions(self):
-         return self.instructions
+        return self.instructions
 
     def make_visible(self, instruction):
-        #if isinstance(instruction, SetValueOperation):
-        #    def print_childs(inst, pad=''):
-        #        print pad + str(inst) + ", " + repr(inst)
-        #        for child in inst.get_children():
-        #            print_childs(child, pad + '    ')
-        #    print_childs(instruction)
-        if isinstance(instruction, SetValueOperation):
-            if isinstance(instruction.lvalue, Variable):
-                for p in instruction.lvalue.proxies:
-                    p.show_reg = True
         if isinstance(instruction, NonVisible):
             if instruction.visible:
-                return # TODO fix loop
+                return
             instruction.visible = True
-        if isinstance(instruction, SetValueOperation):
-            if isinstance(instruction.lvalue, Variable):
-                for var in instruction.lvalue.hidden_vars:
-                    for i in var.instructions:
-                        #self.make_visible(i)
-                        assert isinstance(i.lvalue, Variable)
-                        i.lvalue.visible_if_used.append(instruction)
-                        for proxy in list(i.lvalue.proxies):
-                            if proxy.visible and proxy.show_reg:
-                                self.make_visible(proxy.reg_var)
-
-        if isinstance(instruction, Variable):
-            for i in instruction.instructions:
-                self.make_visible(i)
 
         for inst in instruction.get_all_children():
-            if isinstance(inst, VariableProxy):
-                inst.visible = True
-                inst.reg_var.proxies.update(set([inst]))
-                if not isinstance(inst.value.get_value(), Variable) and not isinstance(inst.value.get_value(), Immediate):
-                    if len(inst.reg_var.proxies) >= 2:
-                        for i in list(inst.reg_var.proxies):
-                            self.make_visible(i.reg_var) # In case it is linked to a different reg val
-                    #elif len(inst.reg_var.proxies) > 2:
-                    #    self.make_visible(inst.reg_var)
-                for i in list(inst.reg_var.proxies):
-                    if len(i.reg_var.visible_if_used) > 0:
-                        self.make_visible(i.reg_var)
-
             if isinstance(inst, Variable):
                 if isinstance(instruction, SetValueOperation) and instruction.lvalue == inst:
                     continue
-                inst.used_instructions.append(instruction)
-                self.make_visible(inst)
+                for i in inst.instructions:
+                    i.lvalue.used_instructions.append(instruction)
+                    self.make_visible(i)
 
-    def update_instruction(self, instruction):
-        if isinstance(instruction, SetValueOperation) and isinstance(instruction.lvalue, Variable):
-            # TODO: kinda hackish right now. Does it always work as expected?
-            # TODO: in some cases it will be visible because the result of merge_variables was made visible. We need to track it somehoe. (The visibility of the old variables depends of the visibability of the new variable)
-            # TODO: Remove old instructions on clean?
-            # TODO: Do proper replacement of set instructions
-            for proxy in instruction.lvalue.proxies:
-                # Hack to prevent further problem with make_visible/make_unvisible. It should stay variable anyway
-                if not isinstance(proxy.value, Variable):
-                    proxy.value = instruction.rvalue
-            instruction.lvalue.instructions.append(instruction)
-            if len(instruction.lvalue.visible_if_used) or len(instruction.lvalue.proxies) >= 2 or len(instruction.lvalue.used_instructions):
-                self.make_visible(instruction.lvalue)
-            else:
-                self.make_unvisible(instruction.lvalue)
-        else:
-            self.make_visible(instruction)
-
-            if isinstance(instruction, ConditionBlock):
-                for inst in instruction.instructions:
-                    self.update_instruction(inst)
-
-
-    def make_unvisible(self, instruction):
-        if isinstance(instruction, SetValueOperation):
-            if isinstance(instruction.lvalue, Variable):
-                for p in instruction.lvalue.proxies:
-                    p.show_reg = False
+    def make_unvisible(self, instruction, recursive=False):
         if isinstance(instruction, NonVisible):
             if not instruction.visible:
                 return
             instruction.visible = False
-        if isinstance(instruction, SetValueOperation):
-            if isinstance(instruction.lvalue, Variable):
-                for var in instruction.lvalue.hidden_vars:
-                    for i in var.instructions:
-                        assert isinstance(i.lvalue, Variable)
-                        i.lvalue.visible_if_used.remove(instruction)
-                        if len(i.lvalue.visible_if_used) == 0:
-                            for proxy in list(i.lvalue.proxies):
-                                if proxy.visible and proxy.show_reg:
-                                    self.make_unvisible(proxy.reg_var)
-
-        if isinstance(instruction, Variable):
-            for i in instruction.instructions:
-                self.make_unvisible(i)
 
         for inst in instruction.get_all_children():
-            if isinstance(inst, VariableProxy):
-                if inst.visible:
-                    inst.visible = False
-                    inst.reg_var.proxies.remove(inst)
-                for i in list(inst.reg_var.proxies):
-                    if len(i.reg_var.visible_if_used) == 0 and len(i.reg_var.proxies) < 2 and len(i.reg_var.used_instructions) == 0:
-                        self.make_unvisible(i.reg_var)
-
             if isinstance(inst, Variable):
                 if isinstance(instruction, SetValueOperation) and instruction.lvalue == inst:
                     continue
-                inst.used_instructions.remove(instruction)
-                if len(inst.visible_if_used) == 0 and len(inst.proxies) < 2 and len(inst.used_instructions) == 0:
-                    self.make_unvisible(inst)
+                for i in inst.instructions:
+                    i.lvalue.used_instructions.remove(instruction)
+                    if len(i.lvalue.used_instructions) == 0:
+                        self.make_unvisible(i)
         # Notice that it isn't the same behaviour as in make_visible, but that is how we are going to use it
-        if isinstance(instruction, ConditionBlock):
-            for inst in instruction.instructions:
-                self.make_unvisible(inst)
+        if recursive:
+            if isinstance(instruction, ConditionBlock):
+                for inst in instruction.instructions:
+                    self.make_unvisible(inst)
+
+    def _optimize_instructions(self, instructions_container, to_replace):
+        # TODO: Because we don't do it in one run, we may miss some memory changes because we won't compare against
+        # the real memory reference. II don't really care about that right now, because the only case when it happens
+        # it at the end of the handler. So there isn't any reason that it will fail there.
+        # But it is better to optimize it in one run because performance anyway.
+        changed = False
+        for instruction in instructions_container.instructions:
+            if isinstance(instruction, NonVisible):
+                if not instruction.visible:
+                    continue
+
+            if instruction in to_replace:
+                for inst in to_replace[instruction]:
+                    if inst.lvalue not in instruction.get_all_children():
+                        # It is a merged variable, so the usage count isn't really 1
+                        break
+                    self.make_unvisible(instruction)
+                    for c in [instruction] + instruction.get_all_children():
+                        c.replace_child(inst.lvalue, inst.rvalue)
+                    self.make_visible(instruction)
+                    changed = True
+                    assert not inst.visible
+                to_replace.pop(instruction)
+
+            if isinstance(instruction, SetValueOperation):
+                inst = None
+                if isinstance(instruction.lvalue, Variable):
+                    var = instruction.lvalue
+                    assert instruction in var.instructions
+                    if len(var.instructions) == 1 and len(var.used_instructions) == 1:
+                        inst = var.used_instructions[0]
+                        if inst not in to_replace:
+                            to_replace[inst] = []
+                        to_replace[inst].append(instruction)
+
+                items_to_remove = set()
+                for k, v in to_replace.iteritems():
+                    if k != inst:
+                        for i in v:
+                            if i.rvalue.contains(instruction.lvalue):
+                                items_to_remove.add(k)
+                for i in items_to_remove:
+                    to_replace.pop(i)
+
+            if isinstance(instruction, ConditionBlock):
+                changed |= self._optimize_instructions(instruction, to_replace)
+        return changed
+
+    def optimize_instructions(self):
+        while self._optimize_instructions(self, {}):
+            pass
 
     def _get_handler_block(self, block, state, end = None, one_block = False):
         instructions = []
@@ -718,25 +656,15 @@ class Handler(object):
             return None
 
         def set_register_value(reg, value):
-            hidden_vars = []
-            for k, v in state.registers.iteritems():
-                if state._get_full_register(reg) != k and v.contains(state.get_register_variable(reg)):
-                    hidden_vars.append(state.get_register_variable(k))
-            state.set_register(reg, value)
             op = SetValue(state.new_register_variable(reg), value)
             op.lvalue.instructions.append(op)
-            op.lvalue.hidden_vars = hidden_vars
+            if not isinstance(value, Immediate) and not isinstance(value, Register):
+                value = op.lvalue
+            state.set_register(reg, value)
             instructions.append(op)
 
         def set_value(lvalue, value):
             if isinstance(lvalue, ValueOf):
-                for k, v in state.registers.iteritems():
-                    if v.contains(lvalue):
-                        #state.get_register_variable(k).visible_if_used_always.append(value)
-                        state.registers[k] = state.get_register_variable(k)
-                for i in xrange(len(state.stack)):
-                    if state.stack[i].contains(lvalue):
-                        state.stack[i] = state.stack_variables[i]
                 instructions.append(value)
                 self.make_visible(value)
 
@@ -760,8 +688,6 @@ class Handler(object):
                             value = Xor(lvalue, value)
                         elif inst.opcode == "and":
                             value = And(lvalue, value)
-                        elif inst.opcode == "and":
-                            value = Add(lvalue, value)
                         elif inst.opcode == "or":
                             value = Or(lvalue, value)
                         elif inst.opcode == "shl":
@@ -886,15 +812,16 @@ class Handler(object):
                     else:
                         assert False # TODO others? for most of them should be same as for and
 
-                    self.make_visible(cond)
                     if one_block:
                         instructions.append(If(cond, []))
+                        self.make_visible(instructions[-1])
                         break
 
                     if next_block == block.next_cond:
                         # Only if
                         new_state, new_instructions = self._get_handler_block(block.next, state, next_block)
                         instructions.append(If(cond, new_instructions))
+                        self.make_visible(instructions[-1])
                         state.invalidate_diff(new_state)
                     else:
                         # If else
@@ -924,6 +851,7 @@ class Handler(object):
                         state1, instructions1 = self._get_handler_block(if_block, state, next_block)
                         state2, instructions2 = self._get_handler_block(else_block, state, next_block)
                         instructions.append(If(cond, instructions1))
+                        self.make_visible(instructions[-1])
                         # TODO check for visibile instructions
                         if len(instructions2) > 0:
                             instructions.append(Else(instructions2))
