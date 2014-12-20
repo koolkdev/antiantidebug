@@ -1,7 +1,8 @@
 from handlers_decompiler import *
-import fish_handlers
 import re
+import os
 
+"""
 GROUPS = {
     "SIMPLE_MATH": ["+", "-", "^"],
     "UPDATE_MATH": ["+", "-", "^", "&", "|"],
@@ -9,18 +10,6 @@ GROUPS = {
     "READ_PARAMETER": ["ReadParameterByte", "ReadParameterWord", "ReadParameterDword"],
     "STRUCT_FIELD": ["VMStructFieldByte", "VMStructFieldWord", "VMStructFieldDword"],
 }
-
-# $X[...] - variable
-# Readings: (X)
-#  - any
-# N - number
-# V - variable
-# G - group
-# O - offset
-# ?O - offset that is already set
-# P - handler parameter
-# H - handler vars
-
 
 EXPRESSIONS_MACROS = [
     (
@@ -198,6 +187,7 @@ MACROS = [
         "UpdateAccByte(SimpleOperation(Operation($G[OP]), $[X]))"
     )
 ]
+"""
 
 OPS = {
     "+": Add,
@@ -250,15 +240,11 @@ class Params(object):
         self.real_field_name = dict()
         self.parameters = dict(parameters)
         self.vars = {}
-        self.specific_vars = {}
-        self.group_vars = {}
 
     def copy(self):
         nparams = Params(self.fields, self.parameters)
         nparams.real_field_name = dict(self.real_field_name)
         nparams.vars = dict(self.vars)
-        nparams.specific_vars = dict(self.specific_vars)
-        nparams.group_vars = dict(self.group_vars)
         return nparams
 
     def update(self, other):
@@ -266,8 +252,6 @@ class Params(object):
         self.real_field_name.update(other.real_field_name)
         self.parameters.update(other.parameters)
         self.vars.update(other.vars)
-        self.specific_vars.update(other.specific_vars)
-        self.group_vars.update(other.group_vars)
 
     def update_global(self, other):
         self.fields.update(other.fields)
@@ -302,13 +286,6 @@ class Params(object):
     def set_var_value(self, name, value):
         return self._set_dict_value(self.vars, name, value, comp = lambda x,y: x.equals(y))
 
-    def set_specific_var_value(self, name, value):
-        # The get value is important for some comprasions with vars (TODO: same for self.vars?)
-        return self._set_dict_value(self.specific_vars, name, value, comp = lambda x,y: x.get_value().equals(y.get_value()))
-
-    def set_group_var_value(self, name, value):
-        return self._set_dict_value(self.group_vars, name, value, comp = lambda x,y: x.equals(y))
-
 
 def is_var_name(string):
     if string[0] not in "$?":
@@ -316,361 +293,479 @@ def is_var_name(string):
     return re.match("^[$?][A-Z]{0,1}\[[_A-Z0-9:*]+\]$", string) is not None
 
 
+def parse_var_name(string):
+    if string[0] == "?":
+        assert string[1] == "O"
+    if string[1] == "[":
+        var_type = "A"
+    else:
+        var_type = string[1]
+    name = string[string.find("[")+1:-1]
+    cond = None
+    if name.find(":") != -1:
+        cond, name = name.split(":")
+    return var_type, cond, name
+
 def is_constant(string):
     if not string.startswith("0x"):
         return False
     return re.subn("[^A-F0-9]", "", string[2:])[1] == 0
 
+# $X[...] - variable
+# Readings: (X)
+#  - any
+# N - number
+# V - variable
+# G - group
+# O - offset
+# ?O - offset that is already set
+# P - handler parameter
+# H - handler vars
 
-def match_expression(expression, match, params):
-    #print expression, match
-    parent = expression
-    expression = expression.get_value()
-    if is_var_name(match) and match[1] != "G":
-        if match[0] == "?":
-            assert match[1] == "O"
-        if match[1] == "[":
-            var_type = "A"
-        else:
-            var_type = match[1]
-        name = match[match.find("[")+1:-1]
-        cond = None
-        if name.find(":") != -1:
-            cond, name = name.split(":")
-        if var_type in "OP":
-            if not isinstance(expression, Immediate):
-                return False
-            int_value = expression.value
-            if var_type == "P":
-                return params.set_param_value(name, int_value)
-            elif match[0] == "?":
-                if cond is not None and cond[-1] == "*":
-                    oname = params.get_field_name(int_value)
-                    if oname is not None and oname.startswith(cond[:-1]):
-                        params.real_field_name[name] = oname
-                        return True
-                    return False
-                return params.fields.has_key(name) and params.fields[name] == int_value
-            else:
-                if cond is not None and cond[-1] == "*":
-                    if params.set_field_value(cond + str(int_value), int_value):
-                        params.real_field_name[name] = cond + str(int_value)
-                        return True
-                    return False
-                else:
-                    return params.set_field_value(name, int_value)
-        elif var_type == "A":
-            return params.set_var_value(name, parent)
-        elif var_type == "V":
-            if isinstance(expression, Variable):
-                return params.set_specific_var_value(name, parent)
-            return False
-        elif var_type == "N":
-            if isinstance(expression, Immediate):
-                return params.set_specific_var_value(name, expression)
-            return False
-        else:
-            assert False
-    elif is_constant(match):
-        if not isinstance(expression, Immediate):
-            return False
-        return int(match, 16) == expression.value
-    else:
-        fmt = expression.get_format()
-        #print fmt
-        # Try to match the expression with the format
-        match_index = 0
-        fmt_index = 0
-        nparams = params.copy()
-        while fmt_index < len(fmt) and match_index < len(match):
-            if fmt[fmt_index] == "{":
-                n = ''
-                fmt_index += 1
-                while fmt[fmt_index].isdigit():
-                    n += fmt[fmt_index]
-                    fmt_index += 1
-                assert fmt[fmt_index] == "}"
-                fmt_index += 1
-                child = expression.get_children()[int(n)]
-                #print "Child: " + str(child)
-                if fmt_index == len(fmt):
-                    if match_expression(child, match[match_index:], nparams):
-                        params.update(nparams)
-                        return True
-                    return False
-                else:
-                    depth = 0
-                    start = match_index
-                    while depth != 0 or fmt[fmt_index] != match[match_index]:
-                        if match[match_index] == "(":
-                            depth += 1
-                        elif match[match_index] == ")":
-                            depth -= 1
-                            if depth < 0:
-                                return False
-                        match_index += 1
-                        if match_index == len(match):
-                            return False
-                    if not match_expression(child, match[start:match_index], nparams):
-                        return False
-            elif match[match_index] == "$":
-                if match[match_index:match_index+3] != "$G[":
-                    return False
-                group_name, var_name = match[match_index + 3:match.find("]", match_index)].split(":")
-                match_index = match.find("]", match_index) + 1
-                found = False
-                if group_name not in GROUPS:
-                    assert False
-                for value in GROUPS[group_name]:
-                    if fmt[fmt_index:fmt_index+len(value)] == value:
-                        if not nparams.set_group_var_value(var_name, value):
-                            return False
-                        found = True
-                        fmt_index += len(value)
-                        break
-                if not found:
-                    return False
-            else:
-                if fmt[fmt_index] != match[match_index]:
-                    return False
-                fmt_index += 1
-                match_index += 1
-        if fmt_index == len(fmt) and match_index == len(match):
-            params.update(nparams)
-            return True
-        return False
+class HandlerParser(object):
+    cache = {}
 
-def create_macro_result(result_line, params, left = False):
-    if result_line.find(" = ") != -1:
-        lvalue, rvalue = result_line.split(" = ")
-        return SetValue(create_macro_result(lvalue, params, True), create_macro_result(rvalue, params))
-    else:
-        if is_var_name(result_line):
-            if result_line[0] == "?":
-                assert result_line[1] == "O"
-            if result_line[1] == "[":
-                var_type = "A"
+    @classmethod
+    def get_default_parser(cls):
+        return cls(None, None)
+
+    @classmethod
+    def get_parser(cls, name, mode):
+        if cls.cache.has_key(name):
+            return cls.cache[name]
+        res = cls(open(r"%s\%s" % (os.path.dirname(os.path.abspath(__file__)), name), "r"), mode)
+        cls.cache[name] = res
+        return res
+
+    def __init__(self, data_reader, mode):
+        self.groups = {}
+        self.macros = {}
+        self.templates = []
+        self.expression_templates = []
+        self.optimize_last = False
+
+        if data_reader is not None:
+            self.mode = mode
+
+            # Parse the file first
+            self._parse_file(data_reader)
+
+    def _parse_file(self, data_reader):
+        while True:
+            line = data_reader.readline()
+            if not line:
+                break
+            line = line.strip()
+            if not line:
+                continue
+            if line[0] == "#":
+                continue  # Comment
+
+            tokens = line.split(" ")
+
+            command = tokens[0]
+            ignore = False
+            if command.endswith("[32]"):
+                if self.mode != 32:
+                    ignore = True
+                command = command[:-4]
+            elif command.endswith("[64]"):
+                if self.mode != 64:
+                    ignore = True
+                command = command[:-4]
+
+            if command == "OPTION":
+                if len(tokens) != 2:
+                    raise Exception("Invalid OPTION")
+                if not ignore:
+                    option = tokens[1]
+                    if option == "OPTIMIZE_LAST":
+                        self.optimize_last = True
+                    else:
+                        raise Exception("Unrecognized option %s" % option)
+            elif command == "DEFINE_GROUP":
+                if len(tokens) < 3:
+                    raise Exception("Invalid DEFINE_GROUP")
+                group_name = tokens[1]
+                group = []
+                if group_name in self.groups:
+                    group = self.groups[group_name]
+                group.extend(tokens[2:])
+                if not ignore:
+                    self.groups[group_name] = group
+            elif command == "DEFINE_MACRO":
+                if len(tokens) != 3:
+                    raise Exception("Invalid DEFINE_MACRO")
+                macro_name = tokens[1]
+                if not ignore and macro_name in self.macros:
+                    raise Exception("Macro name already used")
+                if not ignore:
+                    self.macros[macro_name] = tokens[2]
+            elif command == "DEFINE_TEMPLATE":
+                if len(tokens) != 1:
+                    raise Exception("Invalid DEFINE_TEMPLATE")
+                lines = self._get_template_lines(data_reader, "=>")
+                result = self._get_template_lines(data_reader)
+                assert len(result) == 1
+                result = result[0]
+                if not ignore:
+                    self.templates.append((lines, result))
+            elif command == "DEFINE_EXPRESSION_TEMPLATE":
+                if len(tokens) != 1:
+                    raise Exception("Invalid DEFINE_EXPRESSION_TEMPLATE")
+                line = self._get_template_lines(data_reader, "=>")
+                assert len(line) == 1
+                line = line[0]
+                result = self._get_template_lines(data_reader)
+                assert len(result) == 1
+                result = result[0]
+                if not ignore:
+                    self.expression_templates.append((line, result))
             else:
-                var_type = result_line[1]
-            name = result_line[result_line.find("[")+1:-1]
+                raise Exception("Invalid command %s" % command)
+
+    def _get_template_lines(self, data_reader, end=''):
+        lines = []
+        while True:
+            line = data_reader.readline()
+            if not line:
+                if not end:
+                    return lines
+                else:
+                    raise Exception("Template EOF")
+            line = line.strip()
+            if line == end:
+                return lines
+            nline = ''
+            p = 0
+            while line.find("@", p) != -1:
+                ps = line.find("@", p)
+                nline += line[p:ps]
+                pe = line.find("@", ps+1)
+                if pe == -1:
+                    raise Exception("Invalid template line %s" % line)
+                nline += self.macros[line[ps+1:pe]]
+                p = pe+1
+            nline += line[p:]
+            lines.append(nline)
+
+    def match_expression(self, expression, match, params):
+        #print expression, match
+        if is_var_name(match) and match[1] != "G":
+            var_type, cond, name = parse_var_name(match)
             if var_type in "OP":
-                if var_type == "O":
-                    if name not in params.fields:
-                        name = params.real_field_name[name]
-                    int_val = params.fields[name]
+                if not isinstance(expression, Immediate):
+                    return False
+                int_value = expression.value
+                if var_type == "P":
+                    return params.set_param_value(name, int_value)
+                elif match[0] == "?":
+                    if cond is not None and cond[-1] == "*":
+                        oname = params.get_field_name(int_value)
+                        if oname is not None and oname.startswith(cond[:-1]):
+                            params.real_field_name[name] = oname
+                            return True
+                        return False
+                    return params.fields.has_key(name) and params.fields[name] == int_value
                 else:
-                    int_val = params.parameters[name]
-                return Immediate(int_val)
-            elif var_type == "A":
-                # TODO: return variable proxy if needed
-                if name in params.vars:
-                    return params.vars[name]
-                else:
-                    return NoneExpression()
-            elif var_type == "G":
-                return Str(params.group_vars[name])
-            elif var_type in "VN":
-                if name in params.specific_vars:
-                    # TODO: is it always good?
-                    #if not left and name.startswith("VAR_"):
-                    #    return VariableProxy(params.vars[name], None) # The None should be fixed on handler.update_instruction
-                    return params.specific_vars[name]
-                else:
-                    assert False
-                    #return NoneExpression()
+                    if cond is not None and cond[-1] == "*":
+                        if params.set_field_value(cond + str(int_value), int_value):
+                            params.real_field_name[name] = cond + str(int_value)
+                            return True
+                        return False
+                    else:
+                        return params.set_field_value(name, int_value)
+            elif var_type in "AVN":
+                if var_type == "V":
+                    if not isinstance(expression, Variable):
+                        return False
+                if var_type == "N":
+                    if not isinstance(expression, Immediate):
+                        return False
+                return params.set_var_value(name, expression)
             else:
                 assert False
-        elif is_constant(result_line):
-            return Immediate(int(result_line, 16))
-        elif result_line == "None":
-            return NoneExpression()
+        elif is_constant(match):
+            if not isinstance(expression, Immediate):
+                return False
+            return int(match, 16) == expression.value
         else:
-            macro_name = result_line[:result_line.index("(")]
-            index = result_line.index("(") + 1
-            parameters = []
-            op = None
-            while result_line[index] != ")":
-                # Find end
-                depth = 0
-                param = ''
-                while depth > 0 or (result_line[index:index+2] != ", " and result_line[index] != " " and result_line[index] !=")"):
-                    param += result_line[index]
-                    if result_line[index] == "(":
-                        depth += 1
-                    elif result_line[index] == ")":
-                        depth -= 1
-                        assert depth >= 0
-                    index += 1
-                parameters.append(create_macro_result(param, params))
-                if result_line[index:index+2] == ", ":
-                    index += 2
-                elif result_line[index] != ")":
-                    assert result_line[index] == " "
-                    op_name = result_line[index+1:result_line.find(" ", index + 1)]
-                    index += 2 + len(op_name)
-                    assert len(parameters) == 1
-                    assert macro_name == ""
-                    if is_var_name(op_name):
-                        assert op_name[1] == "G"
-                        op_name = params.group_vars[op_name[3:-1]]
-                    op = OPS[op_name]
-            if op is not None:
-                assert len(parameters) == 2
-                return op(parameters[0], parameters[1])
-            if is_var_name(macro_name):
-                assert macro_name[1] == "G"
-                macro_name = params.group_vars[macro_name[3:-1]]
-            return Macro(macro_name, parameters)
-
-def replace_macros_in_expression(handler, macros, expression, params):
-    changed = False
-
-    for child in expression.get_children():
-        if isinstance(child, VariableProxy) and child.show_reg:
-            # It is an hidden var, so no need to replace macros in it anyway
-            continue
-        changed |= replace_macros_in_expression(handler, macros, child, params)
-        if isinstance(child, VariableProxy):
-            # We don't want to match expressions for proxy, because the expression will match to their child anyway, and we want to keep the proxy wrapper
-            continue
-        for macro_line, macro_result in macros:
+            fmt = expression.get_format()
+            #print fmt
+            # Try to match the expression with the format
+            match_index = 0
+            fmt_index = 0
             nparams = params.copy()
-            if match_expression(child, macro_line, nparams):
-                new_child = create_macro_result(macro_result, nparams)
-                params.update_global(nparams)
-                #handler.make_unvisible(child.get_value())
-                #handler.make_visible(new_child)
-                expression.replace_child(child, new_child)
-                changed = True
-    return changed
-
-def replace_macros_in_instructions(handler, instructions, params):
-    changed = False
-    for instruction in instructions:
-        while replace_macros_in_expression(handler, EXPRESSIONS_MACROS, instruction, params):
-            changed = True
-        if isinstance(instruction, ConditionBlock):
-            changed |= replace_macros_in_instructions(handler, instruction.instructions, params)
-    return changed
-
-def match_instructions(instructions, index, lines, lines_index, params, pad=None):
-    if pad is None:
-        pad = ''
-    nparams = params.copy()
-    while index < len(instructions) and lines_index < len(lines):
-        if not lines[lines_index].startswith(pad):
-            return False, index, lines_index
-        # Now, If we still in the wrong indentation, we will return error because the line will starts with padding
-        line = lines[lines_index][len(pad):]
-        if line.startswith(" "):
-            # Wrong indentation
-            return False, index, lines_index
-        optional_line = False
-        #if line.startswith("["): # TODO: maybe add support for optional lines. if we add, need to fix instructions replacement code
-        #    optional_line = True
-        #    line = line[1:-1]
-        if not match_expression(instructions[index], line, nparams):
-            if optional_line:
-                lines_index += 1
-                continue
-            return False, index, lines_index
-        index += 1
-        lines_index += 1
-        if isinstance(instructions[index-1], ConditionBlock):
-            match, nindex, lines_index = match_instructions(instructions[index-1].instructions, 0, lines, lines_index, nparams, pad + ' '*4)
-            # Should match all the lines in the condition
-            if not match or nindex != len(instructions[index-1].instructions):
-                return False, index, lines_index
-    params.update(nparams)
-    return True, index, lines_index
-
-def replace_instructions(handler, instructions_container, index, count, new_instructions):
-    for line in instructions_container.instructions[index:index+count]:
-        handler.make_unvisible(line)
-    instructions_container.instructions[index:index+count] = new_instructions
-    for inst in new_instructions:
-        handler.update_instruction(inst)
-    handler.clean_instructions()
-    return instructions_container.instructions
-
-def replace_instructions_macros(handler, instructions_container, index, params):
-    changed = False
-    instructions = instructions_container.instructions
-    # TODO: if and else conditions
-    for lines, result in MACROS:
-        if len(lines) + index > len(instructions):
-            continue
-        nparams = params.copy()
-        match, end_index, lines_end_index = match_instructions(instructions, index, lines, 0, nparams)
-        if lines_end_index != len(lines):
-            continue
-        if match:
-            if result is not None:
-                nlines = [create_macro_result(result, nparams)]
-            else:
-                nlines = []
-            instructions = replace_instructions(handler, instructions_container, index, len([l for l in lines if not l.startswith(" ")]), nlines)
-            params.update_global(nparams)
-            changed = True
-    return changed
-
-def replace_instructions_macros_in_instructions(handler, instructions_container, params):
-    changed = False
-    nchanged = True
-    while nchanged:
-        nchanged = False
-        for i in xrange(len(instructions_container.instructions)):
-            if replace_instructions_macros(handler, instructions_container, i, params):
-                nchanged = True
-                changed = True
-                break # We changed the lines count
-    return changed
-
-# Hackish solution for the used instructions bug
-def get_used_instructions(reg):
-    used = []
-    for i in reg.used_instructions:
-        if is_instruction_contains(i, reg):
-            used.append(i)
-    return used
-
-def is_instruction_contains(inst, reg):
-    for child in inst.get_children():
-        if child == inst:
-            return True
-        if isinstance(child, VariableProxy) and child.show_reg:
-            if child.reg_var == reg:
+            while fmt_index < len(fmt) and match_index < len(match):
+                if fmt[fmt_index] == "{":
+                    n = ''
+                    fmt_index += 1
+                    while fmt[fmt_index].isdigit():
+                        n += fmt[fmt_index]
+                        fmt_index += 1
+                    assert fmt[fmt_index] == "}"
+                    fmt_index += 1
+                    child = expression.get_children()[int(n)]
+                    #print "Child: " + str(child)
+                    if fmt_index == len(fmt):
+                        if self.match_expression(child, match[match_index:], nparams):
+                            params.update(nparams)
+                            return True
+                        return False
+                    else:
+                        depth = 0
+                        start = match_index
+                        while depth != 0 or fmt[fmt_index] != match[match_index]:
+                            if match[match_index] == "(":
+                                depth += 1
+                            elif match[match_index] == ")":
+                                depth -= 1
+                                if depth < 0:
+                                    return False
+                            match_index += 1
+                            if match_index == len(match):
+                                return False
+                        if not self.match_expression(child, match[start:match_index], nparams):
+                            return False
+                elif match[match_index] == "$":
+                    if match[match_index:match_index+3] != "$G[":
+                        return False
+                    group_name, var_name = match[match_index + 3:match.find("]", match_index)].split(":")
+                    match_index = match.find("]", match_index) + 1
+                    found = False
+                    if group_name not in self.groups:
+                        assert False
+                    for value in self.groups[group_name]:
+                        if fmt[fmt_index:fmt_index+len(value)] == value:
+                            if not nparams.set_var_value(var_name, Str(value)):
+                                return False
+                            found = True
+                            fmt_index += len(value)
+                            break
+                    if not found:
+                        return False
+                else:
+                    if fmt[fmt_index] != match[match_index]:
+                        return False
+                    fmt_index += 1
+                    match_index += 1
+            if fmt_index == len(fmt) and match_index == len(match):
+                params.update(nparams)
                 return True
+            return False
+
+    def create_macro_result(self, result_line, params):
+        if result_line.find(" = ") != -1:
+            lvalue, rvalue = result_line.split(" = ")
+            return SetValue(self.create_macro_result(lvalue, params), self.create_macro_result(rvalue, params))
         else:
-            if is_instruction_contains(child, reg):
-                return True
-    return False
+            if is_var_name(result_line):
+                var_type, cond, name =  parse_var_name(result_line)
+                assert cond is None
+                if var_type in "OP":
+                    if var_type == "O":
+                        if name not in params.fields:
+                            name = params.real_field_name[name]
+                        int_val = params.fields[name]
+                    else:
+                        int_val = params.parameters[name]
+                    return Immediate(int_val)
+                elif var_type in "AVNG":
+                    if name in params.vars:
+                        return params.vars[name]
+                    else:
+                        assert False
+                else:
+                    assert False
+            elif is_constant(result_line):
+                return Immediate(int(result_line, 16))
+            elif result_line == "None":
+                return NoneExpression()
+            else:
+                macro_name = result_line[:result_line.index("(")]
+                index = result_line.index("(") + 1
+                parameters = []
+                op = None
+                while result_line[index] != ")":
+                    # Find end
+                    depth = 0
+                    param = ''
+                    while depth > 0 or (result_line[index:index+2] != ", " and result_line[index] != " " and result_line[index] !=")"):
+                        param += result_line[index]
+                        if result_line[index] == "(":
+                            depth += 1
+                        elif result_line[index] == ")":
+                            depth -= 1
+                            assert depth >= 0
+                        index += 1
+                    parameters.append(self.create_macro_result(param, params))
+                    if result_line[index:index+2] == ", ":
+                        index += 2
+                    elif result_line[index] != ")":
+                        assert result_line[index] == " "
+                        op_name = result_line[index+1:result_line.find(" ", index + 1)]
+                        index += 2 + len(op_name)
+                        assert len(parameters) == 1
+                        assert macro_name == ""
+                        if is_var_name(op_name):
+                            var_type, cond, name = parse_var_name(op_name)
+                            assert cond is None
+                            assert type(params.vars[name]) is Str
+                            op_name = params.vars[name].value
+                        op = OPS[op_name]
+                if op is not None:
+                    assert len(parameters) == 2
+                    return op(parameters[0], parameters[1])
+                if is_var_name(macro_name):
+                    var_type, cond, name = parse_var_name(macro_name)
+                    assert cond is None
+                    assert type(params.vars[name]) is Str
+                    macro_name = params.vars[name].value
+                return Macro(macro_name, parameters)
 
-def remove_unneeded_variable(handler, instructions_container, params):
-    changed = False
-    instructions = instructions_container.instructions
-    i = 0
-    while i < len(instructions) - 1:
-        if isinstance(instructions[i], SetValue) and isinstance(instructions[i].lvalue, Variable) and len(get_used_instructions(instructions[i].lvalue))  == 1 and \
-            len(instructions[i].lvalue.visible_if_used) == 0 and len(instructions[i].lvalue.proxies) == 1 and get_used_instructions(instructions[i].lvalue)[0] == instructions[i + 1]:
+    def replace_macros_in_expression(self, handler, macros, expression, params):
+        changed = False
+        for child in expression.get_children():
+            changed |= self.replace_macros_in_expression(handler, macros, child, params)
+            for macro_line, macro_result in macros:
+                nparams = params.copy()
+                if self.match_expression(child, macro_line, nparams):
+                    new_child = self.create_macro_result(macro_result, nparams)
+                    params.update_global(nparams)
+                    #handler.make_unvisible(child.get_value())
+                    #handler.make_visible(new_child)
+                    expression.replace_child(child, new_child)
+                    changed = True
+        return changed
+
+    def replace_expression_templates(self, handler, instructions_container, index, params):
+        changed = False
+        # TODO: make_unvisible/make_visible?
+        while self.replace_macros_in_expression(handler, self.expression_templates, instructions_container.instructions[index], params):
             changed = True
-            handler.make_unvisible(instructions[i+1])
-            handler.make_unvisible(instructions[i])
-            def find_and_replace(obj):
-                for child in obj.get_children():
-                    if isinstance(instructions[i+1], SetValueOperation) and instructions[i+1].lvalue == child:
-                        continue
-                    if isinstance(child, VariableProxy):
-                        if child.reg_var == instructions[i].lvalue:
-                            child.value = instructions[i].rvalue
-                            child.show_reg = False
-                    find_and_replace(child)
-            find_and_replace(instructions[i+1])
-            handler.make_visible(instructions[i+1])
-            instructions[i:i+1] = []
-        i += 1
-    return changed
+        return changed
 
+    def match_instructions(self, instructions, index, lines, lines_index, params, pad=None):
+        if pad is None:
+            pad = ''
+        nparams = params.copy()
+        while index < len(instructions) and lines_index < len(lines):
+            if not lines[lines_index].startswith(pad):
+                return False, index, lines_index
+            # Now, If we still in the wrong indentation, we will return error because the line will starts with padding
+            line = lines[lines_index][len(pad):]
+            if line.startswith(" "):
+                # Wrong indentation
+                return False, index, lines_index
+            optional_line = False
+            #if line.startswith("["): # TODO: maybe add support for optional lines. if we add, need to fix instructions replacement code
+            #    optional_line = True
+            #    line = line[1:-1]
+            if not self.match_expression(instructions[index], line, nparams):
+                if optional_line:
+                    lines_index += 1
+                    continue
+                return False, index, lines_index
+            index += 1
+            lines_index += 1
+            if isinstance(instructions[index-1], ConditionBlock):
+                match, nindex, lines_index = self.match_instructions(instructions[index-1].instructions, 0, lines, lines_index, nparams, pad + ' '*4)
+                # Should match all the lines in the condition
+                if not match or nindex != len(instructions[index-1].instructions):
+                    return False, index, lines_index
+        params.update(nparams)
+        return True, index, lines_index
+
+    def replace_instructions(self, handler, instructions_container, index, count, new_instructions):
+        for inst in instructions_container.instructions[index:index+count]:
+            handler.make_unvisible(inst, True)
+        for inst in instructions_container.instructions[index:index+count]:
+            if isinstance(inst, SetValueOperation) and isinstance(inst.lvalue, Variable):
+                inst.lvalue.instructions.remove(inst)
+        instructions_container.instructions[index:index+count] = new_instructions
+        for inst in new_instructions:
+            if isinstance(inst, SetValueOperation) and isinstance(inst.lvalue, Variable):
+                inst.lvalue.instructions.append(inst)
+            handler.make_visible(inst)
+        if not self.optimize_last:
+            handler.optimize_instructions()
+        handler.clean_instructions()
+        return instructions_container.instructions
+
+    def replace_templates(self, handler, instructions_container, index, params):
+        changed = False
+        instructions = instructions_container.instructions
+        # TODO: if and else conditions
+        for lines, result in self.templates:
+            if len(lines) + index > len(instructions):
+                continue
+            nparams = params.copy()
+            match, end_index, lines_end_index = self.match_instructions(instructions, index, lines, 0, nparams)
+            if lines_end_index != len(lines):
+                continue
+            if match:
+                nlines = [self.create_macro_result(result, nparams)]
+                instructions = self.replace_instructions(handler, instructions_container, index, len([l for l in lines if not l.startswith(" ")]), nlines)
+                params.update_global(nparams)
+                changed = True
+        return changed
+
+
+    def clean_instructions_container(self, handler, instructions_container, params, funcs, reverse=True):
+        if reverse:
+            i = len(instructions_container.instructions) - 1
+        else:
+            i = 0
+        while 0 <= i < len(instructions_container.instructions):
+            if i == 0:
+                pass
+            if isinstance(instructions_container.instructions[i], ConditionBlock):
+                # Clean inner block first
+                self.clean_instructions_container(handler, instructions_container.instructions[i], params, funcs, reverse)
+            if i >= len(instructions_container.instructions):
+                i = len(instructions_container.instructions) - 1
+
+            changed = True
+            while changed:
+                while changed:
+                    changed = False
+                    for func in funcs:
+                        changed |= func(handler, instructions_container, i, params)
+                        # TODO: Do it proper
+                        if i >= len(instructions_container.instructions):
+                            i = len(instructions_container.instructions) - 1
+                if self.optimize_last:
+                    handler.optimize_instructions()
+                    handler.clean_instructions()
+                else:
+                    break
+
+            if reverse:
+                i -= 1
+            else:
+                i += 1
+
+    def clean_handler(self, handler, fields, parameters, funcs=None, reverse=True):
+        if funcs is None:
+            funcs = [self.replace_expression_templates, self.replace_templates]
+        params = Params(fields, parameters)
+        self.clean_instructions_container(handler, handler, params, funcs, reverse)
+        fields.update(params.fields)
+        parameters.update(params.parameters)
+
+    def match_handlers(self, handler, fields, parameters, handlers):
+        instructions = handler.get_instructions()
+        for name, lines in handlers:
+            params = Params(fields, parameters)
+            match, index, lines_index = self.match_instructions(instructions, 0, lines, 0, params)
+            if match and index == len(instructions) and lines_index == len(lines):
+                fields.update(params.fields)
+                parameters.update(params.parameters)
+                # TODO return more stuffs (parameters read cases etc..)
+                return name
+        return None
+
+"""
 def replace_encoded_value(handler, instructions_container, params, to_replace=None):
     changed = False
     if to_replace is None:
@@ -745,6 +840,6 @@ def parse_fish_handler(handler, fields, parameters):
             return name
     return None
 
-
+"""
 
 

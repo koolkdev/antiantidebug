@@ -5,13 +5,22 @@ from vms import templates
 
 import handlers_decompiler
 import handlers_parser
+import fish_handlers_cleaner
+import fish_handlers
 
 import instruction
 import Queue
 
 import os
+import sys
 import tempfile
 import subprocess
+
+try:
+    import progressbar
+    PROGRESSBAR = True
+except ImportError:
+    PROGRESSBAR = False
 
 class VMHandler(object):
     def __init__(self, reader):
@@ -170,35 +179,79 @@ class VMHandlers(object):
     def __init__(self, file, vm_info):
         #clean = cleaner.Cleaner(executable)
         fix_handlers = file.read_dword(vm_info.init_handler.vm_struct + vm_info.struct_fields["HANDLERS"]) != vm_info.init_handler.handlers_address
-        mode = file.get_arch()
+        self.mode = file.mode
+        arch = file.get_arch()
 
         self.handlers = {}
         addrs = {}
-        handlers_to_process = Queue.Queue()
         # Let's find all the handlers now
+        print "Decompiling handlers..."
+        if PROGRESSBAR:
+            prog = progressbar.ProgressBar(maxval=vm_info.init_handler.handlers_count, fd=sys.stdout).start()
         for i in xrange(vm_info.init_handler.handlers_count):
-            handler_address = file.read_pointer(vm_info.init_handler.handlers_address + i * mode.native_size())
+            if PROGRESSBAR:
+                prog.update(i)
+            handler_address = file.read_pointer(vm_info.init_handler.handlers_address + i * arch.native_size())
             if fix_handlers:
                 handler_address = handler_address + vm_info.init_handler.base_address
-            #if handler_address == 0x407c06:
-            #if handler_address in (0x4030abL, 0x040983E):
-            #print hex(handler_address)
+            # if handler_address == 0x41f3cc:
+            # if handler_address in (0x4034d7L, 0x040983E):
             func = handlers_decompiler.Handler(instruction.Function(file, handler_address))
+            # func.make_unvisible(func.instructions[-1].instructions[-4])
+            # func.make_unvisible(func.instructions[57].instructions[4].instructions[0])
+            # func.optimize_instructions()
+            # func.clean_instructions()
             self.handlers[i] = VMOpcodeHandler(func)
             addrs[i] = handler_address
-        print "Finish decompiling handles"
+        if PROGRESSBAR:
+            prog.finish()
+        print "Decompiling handlers... SUCCESS"
 
         fields = dict(vm_info.struct_fields)
 
+        fish_handlers_cleaner.clean_junk_field(self.handlers.values(), fields, arch)
+        if self.mode == 64:
+            fish_handlers_cleaner.fix_64_junk_bool_field(self.handlers.values(), fields)
+
+        parser = handlers_parser.HandlerParser.get_parser(r"handlers\handlers_basic.txt", self.mode)
+        print "Analyzing with handlers_basic.txt..."
+        if PROGRESSBAR: prog.start()
+        for i in xrange(vm_info.init_handler.handlers_count):
+            if PROGRESSBAR: prog.update(i)
+            parser.clean_handler(self.handlers[i].handler, fields, self.handlers[i].parameters)
+        if PROGRESSBAR: prog.finish()
+
+        parser = handlers_parser.HandlerParser.get_default_parser()
+        print "Looking for VM_INIT...",
+        found = False
+        for handler in self.handlers.itervalues():
+            handler_info = parser.match_handlers(handler.handler, fields, self.handlers[i].parameters, [("VM_INIT", fish_handlers.HANDLERS["VM_INIT"])])
+            if handler_info is not None:
+                handler.name = handler_info
+                assert not found
+                found = True
+        assert found
+        print "SUCCESS"
+
+        parser = handlers_parser.HandlerParser.get_parser(r"handlers\handlers_encoding.txt", self.mode)
+        print "Analyzing with handlers_encoding.txt..."
+        if PROGRESSBAR: prog.start()
+        for i in xrange(vm_info.init_handler.handlers_count):
+            if PROGRESSBAR: prog.update(i)
+            parser.clean_handler(self.handlers[i].handler, fields, self.handlers[i].parameters)
+        if PROGRESSBAR: prog.finish()
+
+        """
         changed = True
         while changed:
             changed = False
             for handler in self.handlers.itervalues():
                 if handler.name == None:
-                    changed |= handlers_parser.parse_handler(handler.handler, fields, handler.parameters)
+                    #changed |= handlers_parser.parse_handler(handler.handler, fields, handler.parameters)
                     handler_info = handlers_parser.parse_fish_handler(handler.handler, fields, handler.parameters)
                     if handler_info != None:
                         handler.name = handler_info
+        """
 
         for index, handler in self.handlers.iteritems():
             print "---------------------------------------------------"

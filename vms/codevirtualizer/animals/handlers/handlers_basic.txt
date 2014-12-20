@@ -1,0 +1,70 @@
+DEFINE_GROUP SIZES Byte Word Dword
+DEFINE_GROUP[64] SIZES Qword
+
+DEFINE_MACRO[32] VM_REG ebp
+DEFINE_MACRO[64] VM_REG rbp
+
+DEFINE_MACRO[32] SIZE_WORD Dword
+DEFINE_MACRO[64] SIZE_WORD Qword
+DEFINE_MACRO[32] SIZE_WORD_B DWORD
+DEFINE_MACRO[64] SIZE_WORD_B QWORD
+DEFINE_MACRO[32] LOG_SIZE 0x2
+DEFINE_MACRO[64] LOG_SIZE 0x3
+
+
+DEFINE_EXPRESSION_TEMPLATE
+(@VM_REG@ + $[X])
+=>
+VMStructOffset($[X])
+
+DEFINE_EXPRESSION_TEMPLATE
+($[X] + @VM_REG@)
+=>
+VMStructOffset($[X])
+
+DEFINE_EXPRESSION_TEMPLATE
+*(BYTE*)VMStructOffset($[X])
+=>
+VMStructFieldByte($[X])
+
+DEFINE_EXPRESSION_TEMPLATE
+*(WORD*)VMStructOffset($[X])
+=>
+VMStructFieldWord($[X])
+
+DEFINE_EXPRESSION_TEMPLATE
+*(DWORD*)VMStructOffset($[X])
+=>
+VMStructFieldDword($[X])
+
+DEFINE_EXPRESSION_TEMPLATE[64]
+*(QWORD*)VMStructOffset($[X])
+=>
+VMStructFieldQword($[X])
+
+DEFINE_EXPRESSION_TEMPLATE
+*(BYTE*)(VMStructField@SIZE_WORD@(?O[EIP]) + $[X])
+=>
+ReadParameterByte($[X], None)
+
+DEFINE_EXPRESSION_TEMPLATE
+*(WORD*)(VMStructField@SIZE_WORD@(?O[EIP]) + $[X])
+=>
+ReadParameterWord($[X], None)
+
+DEFINE_EXPRESSION_TEMPLATE
+*(DWORD*)(VMStructField@SIZE_WORD@(?O[EIP]) + $[X])
+=>
+ReadParameterDword($[X], None)
+
+DEFINE_EXPRESSION_TEMPLATE[64]
+*(QWORD*)(VMStructField@SIZE_WORD@(?O[EIP]) + $[X])
+=>
+ReadParameterQword($[X], None)
+
+DEFINE_TEMPLATE
+$V[VAR] = *(@SIZE_WORD_B@*)(VMStructField@SIZE_WORD@(?O[HANDLERS]) + (ReadParameterWord($N[OFFSET], None) << @LOG_SIZE@))
+VMStructField@SIZE_WORD@(?O[EIP]) += $N[SIZE]
+Jump($V[VAR])
+=>
+UpdateEipAndJump(ReadParameterWord($[OFFSET], None), $[SIZE])

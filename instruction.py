@@ -74,7 +74,7 @@ class Arch(object):
         special = False
         times = 1
 
-        if type in ("S", "SB", "N"):
+        if type in ("S", "SU", "SB", "N"):
             expected_fields = 1
         elif type in ("R", "RS"):
             expected_fields = 2
@@ -99,6 +99,8 @@ class Arch(object):
 
         if type == "S":
             return self.SIZES[size]
+        elif type == "SU":
+            return self.SIZES[size].upper()
         elif type == "SB":
             return self.SIZES[size][0]
         elif type == "N":
@@ -127,6 +129,7 @@ class Arch(object):
         """
         :param s: the format string. Syntax:
                     {S} - native size word (dword/qword)
+                    {SU} - native size word uppercase
                     {SB} - native size letter {d/q}
                     {S:size} - specific size word
                     {SB:size} - specific size letter {d/q}

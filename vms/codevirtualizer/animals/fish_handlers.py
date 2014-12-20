@@ -1,5 +1,5 @@
 HANDLERS = {
-    "INIT_HANDLER":
+    "VM_INIT":
         [
             "VMStructFieldDword($O[KEY1]) = 0x0",
             "VMStructFieldDword($O[KEY2]) = 0x0",

@@ -92,7 +92,7 @@ class Templates(object):
             line = data_reader.readline()
             if not line:
                 break
-            line = line.strip()
+            line = line.rstrip()
             if not line:
                 continue
             if line[0] == "#":
@@ -180,7 +180,7 @@ class Templates(object):
                     return lines
                 else:
                     raise Exception("Template EOF")
-            line = line.strip()
+            line = line.rstrip()
             if line == end:
                 return lines
             if line.startswith("@") and line.count("@") == 1:

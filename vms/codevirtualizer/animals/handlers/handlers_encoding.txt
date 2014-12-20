@@ -1,0 +1,149 @@
+OPTION OPTIMIZE_LAST
+
+DEFINE_GROUP SIMPLE_MATH + - ^
+DEFINE_GROUP UPDATE_MATH + - ^ & |
+DEFINE_GROUP COMPARE == !=
+DEFINE_GROUP READ_PARAMETER ReadParameterByte ReadParameterWord ReadParameterDword
+DEFINE_GROUP[64] READ_PARAMETER ReadParameterQword
+
+#### DecodingInfo ####
+
+# DecodingInfo[0]:
+# R + KEY1
+DEFINE_EXPRESSION_TEMPLATE
+($G[READ_PARAMETER:READ_OP]($N[OFFSET], None) $G[SIMPLE_MATH:OP] VMStructFieldDword(?O[KEY1]))
+=>
+$[READ_OP]($[OFFSET], DecodingInfo(Operation($[OP]), None, None, None, None, None, None, None, None))
+
+
+# DecodingInfo[1]:
+# R + KEY2
+DEFINE_EXPRESSION_TEMPLATE
+($G[READ_PARAMETER:READ_OP]($N[OFFSET], None) $G[SIMPLE_MATH:OP] VMStructFieldDword(?O[KEY2]))
+=>
+$[READ_OP]($[OFFSET], DecodingInfo(None, Operation($G[OP]), None, None, None, None, None, None, None))
+
+DEFINE_EXPRESSION_TEMPLATE
+($G[READ_PARAMETER:READ_OP]($N[OFFSET], DecodingInfo($[X1], None, None, None, None, None, None, None, None)) $G[SIMPLE_MATH:OP] VMStructFieldDword(?O[KEY2]))
+=>
+$[READ_OP]($[OFFSET], DecodingInfo($[X1], Operation($[OP]), None, None, None, None, None, None, None))
+
+
+# DecodingInfo[2]:
+# R + KEY4
+DEFINE_EXPRESSION_TEMPLATE
+($G[READ_PARAMETER:READ_OP]($N[OFFSET], None) $G[SIMPLE_MATH:OP] VMStructFieldDword(?O[KEY4]))
+=>
+$[READ_OP]($[OFFSET], DecodingInfo(None, None, Operation($G[OP]), None, None, None, None, None, None))
+
+DEFINE_EXPRESSION_TEMPLATE
+($G[READ_PARAMETER:READ_OP]($N[OFFSET], DecodingInfo($[X1], None, None, None, None, None, None, None, None)) $G[SIMPLE_MATH:OP] VMStructFieldDword(?O[KEY4]))
+=>
+$[READ_OP]($[OFFSET], DecodingInfo($[X1], None, Operation($G[OP]), None, None, None, None, None, None))
+
+
+# DecodingInfo[3]:
+# R + KEY6
+DEFINE_EXPRESSION_TEMPLATE
+($G[READ_PARAMETER:READ_OP]($N[OFFSET], None) $G[SIMPLE_MATH:OP] VMStructFieldDword(?O[KEY6]))
+=>
+$G[READ_OP]($N[OFFSET], DecodingInfo(None, None, None, Operation($[OP]), None, None, None, None, None))
+
+DEFINE_EXPRESSION_TEMPLATE
+($G[READ_PARAMETER:READ_OP]($N[OFFSET], DecodingInfo($[X1], $[X2], None, None, None, None, None, None, None)) $G[SIMPLE_MATH:OP] VMStructFieldDword(?O[KEY6]))
+=>
+$G[READ_OP]($N[OFFSET], DecodingInfo($[X1], $[X2], None, Operation($[OP]), None, None, None, None, None))
+
+
+# DecodingInfo[4]:
+# R + NUMBER
+DEFINE_EXPRESSION_TEMPLATE
+($G[READ_PARAMETER:READ_OP]($N[OFFSET], None) $G[SIMPLE_MATH:OP] $N[NUMBER])
+=>
+$[READ_OP]($[OFFSET], DecodingInfo(None, None, None, None, SimpleOperation(Operation($[OP]), $[NUMBER]), None, None, None, None))
+
+DEFINE_EXPRESSION_TEMPLATE
+($G[READ_PARAMETER:READ_OP]($N[OFFSET], DecodingInfo($[X1], None, None, None, None, None, None, None, None)) $G[SIMPLE_MATH:OP] $N[NUMBER])
+=>
+$[READ_OP]($[OFFSET], DecodingInfo($[X1], None, None, None, SimpleOperation(Operation($[OP]), $[NUMBER]), None, None, None, None))
+
+
+# DecodingInfo[5]:
+# KEY1 += R
+DEFINE_TEMPLATE
+$V[VAR] = $G[READ_PARAMETER:READ_OP]($N[OFFSET], DecodingInfo($[X1], $[X2], $[X3], $[X4], $[X5], None, None, None, None))
+VMStructFieldDword(?O[KEY1]) $G[UPDATE_MATH:OP]= $V[VAR]
+=>
+$[VAR] = $[READ_OP]($[OFFSET], DecodingInfo($[X1], $[X2], $[X3], $[X4], $[X5], Operation($[OP]), None, None, None))
+
+# DecodingInfo[6]:
+# KEY2 += NUMBER
+DEFINE_TEMPLATE
+$V[VAR] = $G[READ_PARAMETER:READ_OP]($N[OFFSET], DecodingInfo($[X1], $[X2], $[X3], $[X4], $[X5], $[X6], None, None, None))
+UpdateKey(VMStructFieldDword(?O[KEY2]), $[Y1])
+=>
+$[VAR] = $[READ_OP]($[OFFSET], DecodingInfo($[X1], $[X2], $[X3], $[X4], $[X5], $[X6], $[Y1], None, None))
+
+
+# DecodingInfo[7]:
+# R + KEY3
+DEFINE_EXPRESSION_TEMPLATE
+($G[READ_PARAMETER:READ_OP]($N[OFFSET], DecodingInfo($[X1], $[X2], $[X3], $[X4], $[X5], $[X6], $[X7], None, None)) $G[SIMPLE_MATH:OP] VMStructFieldDword(?O[KEY3]))
+=>
+$[READ_OP]($[OFFSET], DecodingInfo($[X1], $[X2], $[X3], $[X4], $[X5], $[X6], $[X7], Operation($[OP]), None))
+
+
+# DecodingInfo[8]:
+# KEY3 += NUMBER
+DEFINE_TEMPLATE
+$V[VAR] = $G[READ_PARAMETER:READ_OP]($N[OFFSET], DecodingInfo($[X1], $[X2], $[X3], $[X4], $[X5], $[X6], $[X7], $[X8], None))
+UpdateKey(VMStructFieldDword(?O[KEY3]), $[Y1])
+=>
+$[VAR] = $[READ_OP]($[OFFSET], DecodingInfo($[X1], $[X2], $[X3], $[X4], $[X5], $[X6], $[X7], $[X8], $[Y1]))
+
+
+### Key Updates ###
+DEFINE_TEMPLATE
+VMStructFieldDword(?O[KEY*:KEY]) $G[UPDATE_MATH:OP]= $N[NUMBER]
+=>
+UpdateKey(VMStructFieldDword(?O[KEY]), SimpleOperation(Operation($[OP]), $[NUMBER]))
+
+DEFINE_TEMPLATE
+If(((VMStructFieldDword(?O[KEY2]) & 0x1) != 0x0))
+=>
+UpdateKeyCond(None)
+
+DEFINE_TEMPLATE
+If(((VMStructFieldDword(?O[KEY2]) & 0x1) != 0x0))
+    UpdateKey(VMStructFieldDword(?O[KEY2]), $[X])
+=>
+UpdateKeyCond($[X])
+
+
+#### Misc ####
+DEFINE_EXPRESSION_TEMPLATE
+(($[X] & 0xF0) >> 0x4)
+=>
+HIGH_NIBBLE($[X])
+
+DEFINE_EXPRESSION_TEMPLATE
+($[X] & 0xF)
+=>
+LOW_NIBBLE($[X])
+
+
+### Acc Byte ###
+DEFINE_EXPRESSION_TEMPLATE
+(((VMStructFieldByte(?O[ACC_BYTE]) $G[SIMPLE_MATH:OP] $N[NUMBER]) - $N[VALUE]) $G[COMPARE:COMP_OP] 0x0)
+=>
+(DecodedAccByte(SimpleOperation(Operation($[OP]), $[NUMBER]), None) $[COMP_OP] $[VALUE])
+
+DEFINE_EXPRESSION_TEMPLATE
+((((VMStructFieldByte(?O[ACC_BYTE]) $G[SIMPLE_MATH:OP1] $N[NUMBER1]) $G[SIMPLE_MATH:OP2] $N[NUMBER2]) - $N[VALUE]) $G[COMPARE:COMP_OP] 0x0)
+=>
+(DecodedAccByte(SimpleOperation(Operation($[OP1]), $[NUMBER1]), SimpleOperation(Operation($[OP2]), $[NUMBER2])) $[COMP_OP] $[VALUE])
+
+DEFINE_TEMPLATE
+VMStructFieldByte(?O[ACC_BYTE]) $G[SIMPLE_MATH:OP]= $[X]
+=>
+UpdateAccByte(SimpleOperation(Operation($G[OP]), $[X]))
