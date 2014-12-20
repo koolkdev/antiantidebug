@@ -452,8 +452,8 @@ class Std(Expression):
 
 def merge_variables(var1, var2):
     var = Variable(var1.name)
-    var.instructions = var1.instructions + var2.instructions
-    var.used_instructions = var1.used_instructions + var2.used_instructions
+    var.instructions = list(set(var1.instructions + var2.instructions))
+    var.used_instructions = list(set(var1.used_instructions + var2.used_instructions))
     return var
 
 class State(object):
