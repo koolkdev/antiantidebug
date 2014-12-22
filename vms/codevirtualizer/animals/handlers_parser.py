@@ -355,7 +355,7 @@ class HandlerParser(object):
             line = data_reader.readline()
             if not line:
                 break
-            line = line.strip()
+            line = line.rstrip()
             if not line:
                 continue
             if line[0] == "#":
@@ -433,7 +433,7 @@ class HandlerParser(object):
                     return lines
                 else:
                     raise Exception("Template EOF")
-            line = line.strip()
+            line = line.rstrip()
             if line == end:
                 return lines
             nline = ''
@@ -727,14 +727,17 @@ class HandlerParser(object):
 
             changed = True
             while changed:
-                while changed:
-                    changed = False
+                changed = False
+                nchanged = True
+                while nchanged:
+                    nchanged = False
                     for func in funcs:
-                        changed |= func(handler, instructions_container, i, params)
+                        nchanged |= func(handler, instructions_container, i, params)
                         # TODO: Do it proper
                         if i >= len(instructions_container.instructions):
                             i = len(instructions_container.instructions) - 1
-                if self.optimize_last:
+                    changed |= nchanged
+                if self.optimize_last and changed:
                     handler.optimize_instructions()
                     handler.clean_instructions()
                 else:

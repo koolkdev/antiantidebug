@@ -852,11 +852,13 @@ class Handler(object):
                         state2, instructions2 = self._get_handler_block(else_block, state, next_block)
                         instructions.append(If(cond, instructions1))
                         self.make_visible(instructions[-1])
-                        # TODO check for visibile instructions
+                        # TODO check for visible instructions
+                        if next_block is None:
+                            # No else if not needed
+                            instructions.extend(instructions2)
+                            break
                         if len(instructions2) > 0:
                             instructions.append(Else(instructions2))
-                        if next_block == None:
-                            break
                         state2.invalidate_diff(state1)
                         # Update state
                         state = state2

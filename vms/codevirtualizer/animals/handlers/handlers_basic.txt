@@ -57,10 +57,10 @@ DEFINE_EXPRESSION_TEMPLATE
 =>
 ReadParameterDword($[X], None)
 
-DEFINE_EXPRESSION_TEMPLATE[64]
-*(QWORD*)(VMStructField@SIZE_WORD@(?O[EIP]) + $[X])
-=>
-ReadParameterQword($[X], None)
+#DEFINE_EXPRESSION_TEMPLATE[64]
+#*(QWORD*)(VMStructField@SIZE_WORD@(?O[EIP]) + $[X])
+#=>
+#ReadParameterQword($[X], None)
 
 DEFINE_TEMPLATE
 $V[VAR] = *(@SIZE_WORD_B@*)(VMStructField@SIZE_WORD@(?O[HANDLERS]) + (ReadParameterWord($N[OFFSET], None) << @LOG_SIZE@))

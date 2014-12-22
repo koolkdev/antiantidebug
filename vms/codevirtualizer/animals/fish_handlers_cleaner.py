@@ -18,6 +18,7 @@ def clean_junk_field(handlers, fields, arch):
     junk_offset = list(candidates.difference(blacklist))
     assert len(junk_offset) == 1
     junk_offset, = junk_offset
+    print hex(junk_offset)
     fields["JUNK"] = junk_offset
     cparams = handlers_parser.Params(fields, {})
 
@@ -48,3 +49,25 @@ def fix_64_junk_bool_field(handlers, fields):
         parser.clean_handler(handler.handler, fields, handler.parameters, [fix_func])
 
     assert "RESET_HIGH_DWORD_BOOL" in fields
+
+
+def clean_junk_check(handlers, fields, arch):
+    parser = handlers_parser.HandlerParser.get_default_parser()
+    parser.groups["SIMPLE_MATH"] = ["+", "-", "^"]
+
+    lines = ["If(($[X] == 0x0))",
+             "    $V[VAR] = Flags(Compare($V[V1], $V[V2]))",
+             arch.translate("    *({SU}*)({R:bp} + $O[ENCODED_VALUE_3]) = ((~((*({SU}*)({R:bp} + $O[ENCODED_VALUE_1]) $G[SIMPLE_MATH:OP3] *({SU}*)({R:bp} + ?O[JUNK])) $G[SIMPLE_MATH:OP1] $N[NUMBER1])) $G[SIMPLE_MATH:OP2] $N[NUMBER2])")]
+
+    def fix_func(handler, instructions_container, index, params):
+        nparams = params.copy()
+        if parser.match_instructions(instructions_container.instructions, index, lines, 0, nparams)[0]:
+            params.update_global(nparams)
+            parser.replace_instructions(handler, instructions_container.instructions[index], 0, 1, [parser.create_macro_result("$[VAR] = FlagsOfCompareRandom()", nparams)])
+            return True
+        return False
+
+    for handler in handlers:
+        parser.clean_handler(handler.handler, fields, handler.parameters, [fix_func])
+
+    assert "ENCODED_VALUE_3" in fields

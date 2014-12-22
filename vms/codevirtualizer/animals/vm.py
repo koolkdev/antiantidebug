@@ -194,8 +194,8 @@ class VMHandlers(object):
             handler_address = file.read_pointer(vm_info.init_handler.handlers_address + i * arch.native_size())
             if fix_handlers:
                 handler_address = handler_address + vm_info.init_handler.base_address
-            # if handler_address == 0x41f3cc:
-            # if handler_address in (0x4034d7L, 0x040983E):
+            #if handler_address == 0x426e22:
+            # if handler_address in (0x426e22, 0x41c86a):
             func = handlers_decompiler.Handler(instruction.Function(file, handler_address))
             # func.make_unvisible(func.instructions[-1].instructions[-4])
             # func.make_unvisible(func.instructions[57].instructions[4].instructions[0])
@@ -210,6 +210,7 @@ class VMHandlers(object):
         fields = dict(vm_info.struct_fields)
 
         fish_handlers_cleaner.clean_junk_field(self.handlers.values(), fields, arch)
+        fish_handlers_cleaner.clean_junk_check(self.handlers.values(), fields, arch)
         if self.mode == 64:
             fish_handlers_cleaner.fix_64_junk_bool_field(self.handlers.values(), fields)
 
@@ -238,6 +239,7 @@ class VMHandlers(object):
         if PROGRESSBAR: prog.start()
         for i in xrange(vm_info.init_handler.handlers_count):
             if PROGRESSBAR: prog.update(i)
+            #if addrs[i] == 0x407c06L:
             parser.clean_handler(self.handlers[i].handler, fields, self.handlers[i].parameters)
         if PROGRESSBAR: prog.finish()
 
