@@ -504,7 +504,11 @@ class State(object):
             if self.has_flags:
                 assert len(self.stack) + 1 == len(other.stack)
                 assert len(self.stack) == 0 or len(self.stack) == 1
-                self.handler.make_visible(other.stack[-1])
+                # I think that I don't want this becuse I don't want to make the condition visible
+                # The whole instruction will be made visible (so it will be double visible)
+                # Only full instructions should be made visible
+                # TODO: Fix this in other cases (Push()..)
+                #self.handler.make_visible(other.stack[-1])
                 assert isinstance(other.stack[-1], FlagsOf) or isinstance(other.stack[-1], Variable)
                 #other.stack_variables[-1].name = 1
                 for i in other.stack_variables[-1].instructions:
@@ -587,15 +591,15 @@ class Handler(object):
         if recursive:
             if isinstance(instruction, ConditionBlock):
                 for inst in instruction.instructions:
-                    self.make_unvisible(inst)
+                    self.make_unvisible(inst, True)
 
-    def _optimize_instructions(self, instructions_container, to_replace):
+    def _optimize_instructions(self, instructions, to_replace):
         # TODO: Because we don't do it in one run, we may miss some memory changes because we won't compare against
         # the real memory reference. II don't really care about that right now, because the only case when it happens
         # it at the end of the handler. So there isn't any reason that it will fail there.
         # But it is better to optimize it in one run because performance anyway.
         changed = False
-        for instruction in instructions_container.instructions:
+        for instruction in instructions:
             if isinstance(instruction, NonVisible):
                 if not instruction.visible:
                     continue
@@ -604,7 +608,7 @@ class Handler(object):
                 for inst in to_replace[instruction]:
                     if inst.lvalue not in instruction.get_all_children():
                         # It is a merged variable, so the usage count isn't really 1
-                        break
+                        continue
                     self.make_unvisible(instruction)
                     for c in [instruction] + instruction.get_all_children():
                         c.replace_child(inst.lvalue, inst.rvalue)
@@ -634,11 +638,11 @@ class Handler(object):
                     to_replace.pop(i)
 
             if isinstance(instruction, ConditionBlock):
-                changed |= self._optimize_instructions(instruction, to_replace)
+                changed |= self._optimize_instructions(instruction.instructions, to_replace)
         return changed
 
     def optimize_instructions(self):
-        while self._optimize_instructions(self, {}):
+        while self._optimize_instructions(self.instructions, {}):
             pass
 
     def _get_handler_block(self, block, state, end = None, one_block = False):

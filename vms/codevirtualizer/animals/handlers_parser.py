@@ -342,7 +342,8 @@ class HandlerParser(object):
         self.macros = {}
         self.templates = []
         self.expression_templates = []
-        self.optimize_last = False
+        self.dont_optimize = False
+        self.default_funcs = [self.replace_expression_templates, self.replace_templates]
 
         if data_reader is not None:
             self.mode = mode
@@ -379,8 +380,8 @@ class HandlerParser(object):
                     raise Exception("Invalid OPTION")
                 if not ignore:
                     option = tokens[1]
-                    if option == "OPTIMIZE_LAST":
-                        self.optimize_last = True
+                    if option == "DONT_OPTIMIZE":
+                        self.dont_optimize = True
                     else:
                         raise Exception("Unrecognized option %s" % option)
             elif command == "DEFINE_GROUP":
@@ -687,7 +688,7 @@ class HandlerParser(object):
             if isinstance(inst, SetValueOperation) and isinstance(inst.lvalue, Variable):
                 inst.lvalue.instructions.append(inst)
             handler.make_visible(inst)
-        if not self.optimize_last:
+        if not self.dont_optimize:
             handler.optimize_instructions()
         handler.clean_instructions()
         return instructions_container.instructions
@@ -728,20 +729,11 @@ class HandlerParser(object):
             changed = True
             while changed:
                 changed = False
-                nchanged = True
-                while nchanged:
-                    nchanged = False
-                    for func in funcs:
-                        nchanged |= func(handler, instructions_container, i, params)
-                        # TODO: Do it proper
-                        if i >= len(instructions_container.instructions):
-                            i = len(instructions_container.instructions) - 1
-                    changed |= nchanged
-                if self.optimize_last and changed:
-                    handler.optimize_instructions()
-                    handler.clean_instructions()
-                else:
-                    break
+                for func in funcs:
+                    changed |= func(handler, instructions_container, i, params)
+                    # TODO: Do it proper
+                    if i >= len(instructions_container.instructions):
+                        i = len(instructions_container.instructions) - 1
 
             if reverse:
                 i -= 1
@@ -750,7 +742,7 @@ class HandlerParser(object):
 
     def clean_handler(self, handler, fields, parameters, funcs=None, reverse=True):
         if funcs is None:
-            funcs = [self.replace_expression_templates, self.replace_templates]
+            funcs = self.default_funcs
         params = Params(fields, parameters)
         self.clean_instructions_container(handler, handler, params, funcs, reverse)
         fields.update(params.fields)

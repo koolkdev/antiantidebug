@@ -18,7 +18,7 @@ def clean_junk_field(handlers, fields, arch):
     junk_offset = list(candidates.difference(blacklist))
     assert len(junk_offset) == 1
     junk_offset, = junk_offset
-    print hex(junk_offset)
+
     fields["JUNK"] = junk_offset
     cparams = handlers_parser.Params(fields, {})
 
@@ -56,7 +56,7 @@ def clean_junk_check(handlers, fields, arch):
     parser.groups["SIMPLE_MATH"] = ["+", "-", "^"]
 
     lines = ["If(($[X] == 0x0))",
-             "    $V[VAR] = Flags(Compare($V[V1], $V[V2]))",
+             "    $V[VAR] = Flags(Compare($[V1], $[V2]))",
              arch.translate("    *({SU}*)({R:bp} + $O[ENCODED_VALUE_3]) = ((~((*({SU}*)({R:bp} + $O[ENCODED_VALUE_1]) $G[SIMPLE_MATH:OP3] *({SU}*)({R:bp} + ?O[JUNK])) $G[SIMPLE_MATH:OP1] $N[NUMBER1])) $G[SIMPLE_MATH:OP2] $N[NUMBER2])")]
 
     def fix_func(handler, instructions_container, index, params):
@@ -71,3 +71,11 @@ def clean_junk_check(handlers, fields, arch):
         parser.clean_handler(handler.handler, fields, handler.parameters, [fix_func])
 
     assert "ENCODED_VALUE_3" in fields
+
+def simple_optimization(handler, instructions_container, index, params):
+    olen = len(instructions_container.instructions)
+    if index + 1 >= olen:
+        return False
+    handler._optimize_instructions(instructions_container.instructions[index:index+2], {})
+    handler.clean_instructions()
+    return olen != len(instructions_container.instructions)
