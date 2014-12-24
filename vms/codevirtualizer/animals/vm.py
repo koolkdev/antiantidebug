@@ -239,8 +239,9 @@ class VMHandlers(object):
         if PROGRESSBAR: prog.start()
         for i in xrange(vm_info.init_handler.handlers_count):
             if PROGRESSBAR: prog.update(i)
-            #if addrs[i] == 0x4173d3:
+            #if addrs[i] == 0x42f9d2:
             parser.clean_handler(self.handlers[i].handler, fields, self.handlers[i].parameters, parser.default_funcs + [fish_handlers_cleaner.simple_optimization])
+            fish_handlers_cleaner.fix_encoding_values(self.handlers[i], fields)
         if PROGRESSBAR: prog.finish()
 
         """

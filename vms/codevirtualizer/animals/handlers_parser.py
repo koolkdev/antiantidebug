@@ -693,11 +693,11 @@ class HandlerParser(object):
         handler.clean_instructions()
         return instructions_container.instructions
 
-    def replace_templates(self, handler, instructions_container, index, params):
+    def replace_instructions_templates(self, handler, templates, instructions_container, index, params):
         changed = False
         instructions = instructions_container.instructions
         # TODO: if and else conditions
-        for lines, result in self.templates:
+        for lines, result in templates:
             if len(lines) + index > len(instructions):
                 continue
             nparams = params.copy()
@@ -711,6 +711,8 @@ class HandlerParser(object):
                 changed = True
         return changed
 
+    def replace_templates(self, handler, instructions_container, index, params):
+        return self.replace_instructions_templates(handler, self.templates, instructions_container, index, params)
 
     def clean_instructions_container(self, handler, instructions_container, params, funcs, reverse=True):
         if reverse:

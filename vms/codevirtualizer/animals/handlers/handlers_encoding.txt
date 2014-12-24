@@ -250,14 +250,19 @@ DEFINE_TEMPLATE
 DEFINE_TEMPLATE
 @NATIVE_FIELD@($O[ENCODED_VALUE_3]) = ($V[VAR] $G[SIMPLE_MATH:OP] $N[NUMBER])
 =>
-@NATIVE_FIELD@($O[ENCODED_VALUE_3]) = EncodedValue($[VAR])
+@NATIVE_FIELD@($O[ENCODED_VALUE_3]) = EncodedValue($[VAR], SimpleOperation(Operation($[OP]), $N[NUMBER]), None)
 
 DEFINE_TEMPLATE
 @NATIVE_FIELD@(?O[ENCODED_VALUE_3]) = ($[VAR] $G[SIMPLE_MATH:OP] $N[NUMBER])
 =>
-@NATIVE_FIELD@(?O[ENCODED_VALUE_3]) = EncodedValue($[VAR])
+@NATIVE_FIELD@(?O[ENCODED_VALUE_3]) = EncodedValue($[VAR], SimpleOperation(Operation($[OP]), $N[NUMBER]), None)
 
 DEFINE_TEMPLATE
 @NATIVE_FIELD@($O[ENCODED_VALUE_4]) = ($V[VAR] $G[SIMPLE_MATH:OP] $N[NUMBER])
 =>
-@NATIVE_FIELD@($O[ENCODED_VALUE_4]) = EncodedValue($[VAR])
+@NATIVE_FIELD@($O[ENCODED_VALUE_4]) = EncodedValue($[VAR], SimpleOperation(Operation($[OP]), $N[NUMBER]), None)
+
+DEFINE_TEMPLATE
+@NATIVE_FIELD@($O[ENCODED_VALUE_5]) = ($V[VAR] $G[SIMPLE_MATH:OP] $N[NUMBER])
+=>
+@NATIVE_FIELD@($O[ENCODED_VALUE_5]) = EncodedValue($[VAR], SimpleOperation(Operation($[OP]), $N[NUMBER]), None)
