@@ -350,7 +350,7 @@ class Else(Expression, ConditionBlock):
     def __init__(self, instructions):
         ConditionBlock.__init__(self, instructions)
 
-    def __str__(self):
+    def get_format(self):
         return "Else"
 
 class Variable(Expression):
