@@ -360,7 +360,7 @@ class Variable(Expression):
         self.used_instructions = []
 
     def equals(self, other):
-        return Expression.equals(self, other) and self.name== other.name
+        return Expression.equals(self, other) and self.name == other.name
 
     def get_format(self):
         return "var_%s"  % self.name
@@ -449,6 +449,48 @@ class SignedConversion(Conversion):
 class Std(Expression):
     def get_format(self):
         return "Std()"
+
+MATH_OP = {
+    "add": Add,
+    "sub": Sub,
+    "xor": Xor,
+    "and": And,
+    "or": Or,
+    "shl": Shl,
+    "shr": Shr,
+    "rcr": Rcr,
+    "rcl": Rcl,
+    "ror": Ror,
+    "rol": Rol,
+    "imul": Mul,
+}
+MATH_OP_UNARY = {
+    "inc": Inc,
+    "dec": Dec,
+    "not": Not,
+    "neg": Neg,
+}
+
+MATH_OP_VALUE = {
+    "add": AddValue,
+    "sub": SubValue,
+    "xor": XorValue,
+    "and": AndValue,
+    "or": OrValue,
+    "shl": ShlValue,
+    "shr": ShrValue,
+    "rcr": RcrValue,
+    "rcl": RclValue,
+    "ror": RorValue,
+    "rol": RolValue,
+    "imul": MulValue,
+}
+MATH_OP_UNARY_VALUE = {
+    "inc": IncValue,
+    "dec": DecValue,
+    "not": NotValue,
+    "neg": NegValue,
+}
 
 def merge_variables(var1, var2):
     var = Variable(var1.name)
@@ -553,6 +595,7 @@ class Handler(object):
         nstate, instructions = self._get_handler_block(function.start_block, state)
         state.invalidate_diff(nstate) # For push instructions taking effect
         self.instructions = instructions
+        self.clean_instructions()
         self.optimize_instructions()
         self.clean_instructions()
 
@@ -614,7 +657,14 @@ class Handler(object):
                         c.replace_child(inst.lvalue, inst.rvalue)
                     self.make_visible(instruction)
                     changed = True
-                    assert not inst.visible
+                    # For debugging
+                    # c = 0
+                    # for insts in to_replace.itervalues():
+                    #     if inst in insts:
+                    #         c += 1
+                    # if c == 1:
+                    #     # If we replace all the instances of it, it should disappear
+                    #     assert not inst.visible
                 to_replace.pop(instruction)
 
             if isinstance(instruction, SetValueOperation):
@@ -622,11 +672,11 @@ class Handler(object):
                 if isinstance(instruction.lvalue, Variable):
                     var = instruction.lvalue
                     assert instruction in var.instructions
-                    if len(var.instructions) == 1 and len(var.used_instructions) == 1:
-                        inst = var.used_instructions[0]
-                        if inst not in to_replace:
-                            to_replace[inst] = []
-                        to_replace[inst].append(instruction)
+                    if len(var.instructions) == 1 and (len(var.used_instructions) == 1) or type(instruction.rvalue) in (Variable, Immediate, Register):
+                        for inst in var.used_instructions:
+                            if inst not in to_replace:
+                                to_replace[inst] = []
+                            to_replace[inst].append(instruction)
 
                 items_to_remove = set()
                 for k, v in to_replace.iteritems():
@@ -662,8 +712,8 @@ class Handler(object):
         def set_register_value(reg, value):
             op = SetValue(state.new_register_variable(reg), value)
             op.lvalue.instructions.append(op)
-            if not isinstance(value, Immediate) and not isinstance(value, Register):
-                value = op.lvalue
+            #if not isinstance(value, Immediate) and not isinstance(value, Register):
+            value = op.lvalue
             state.set_register(reg, value)
             instructions.append(op)
 
@@ -684,94 +734,40 @@ class Handler(object):
                     else:
                         value = get_operand_value(inst.operands[1])
                     if inst.operands[0].is_reg() and state.mode.reg_native(inst.operands[0].reg) != state.mode.reg_native("sp"):
-                        if inst.opcode == "add":
-                            value = Add(lvalue, value)
-                        elif inst.opcode == "sub":
-                            value = Sub(lvalue, value)
-                        elif inst.opcode == "xor":
-                            value = Xor(lvalue, value)
-                        elif inst.opcode == "and":
-                            value = And(lvalue, value)
-                        elif inst.opcode == "or":
-                            value = Or(lvalue, value)
-                        elif inst.opcode == "shl":
-                            value = Shl(lvalue, value)
-                        elif inst.opcode == "shr":
-                            value = Shr(lvalue, value)
-                        elif inst.opcode == "rcr":
-                            value = Rcr(lvalue, value)
-                        elif inst.opcode == "rcl":
-                            value = Rcl(lvalue, value)
-                        elif inst.opcode == "rol":
-                            value = Rol(lvalue, value)
-                        elif inst.opcode == "ror":
-                            value = Ror(lvalue, value)
-                        elif inst.opcode == "imul":
-                            value = Mul(lvalue, value)
-                        elif inst.opcode == "inc":
-                            value = Inc(value)
-                        elif inst.opcode == "dec":
-                            value = Dec(value)
-                        elif inst.opcode == "not":
-                            value = Not(value)
-                        elif inst.opcode == "neg":
-                            value = Neg(value)
-                        elif inst.opcode == "mov":
-                            pass
-                        elif inst.opcode =="movzx":
-                            if inst.operands[1].is_reg():
-                                value = UnsignedConversion(value, inst.operands[1].size)
-                        elif inst.opcode == "movsx":
-                            assert inst.operands[1].is_reg()
-                            value = SignedConversion(value, inst.operands[1].size)
+                        if inst.opcode.startswith("mov"):
+                            if inst.opcode =="movzx":
+                                if inst.operands[1].is_reg():
+                                    value = UnsignedConversion(value, inst.operands[1].size)
+                            elif inst.opcode == "movsx":
+                                assert inst.operands[1].is_reg()
+                                value = SignedConversion(value, inst.operands[1].size)
+                            else:
+                                assert inst.opcode == "mov"
                         else:
-                            assert False
-                        if not inst.opcode.startswith("mov"):
-                            # TODO: line appear twice right now
-                            state.flags = FlagsOf(value)
+                            if inst.opcode in MATH_OP:
+                                op = MATH_OP[inst.opcode]
+                                # TODO: line appear twice right now
+                                # I duplicate the operation, so when optimizing it, optimizing the first line,
+                                # won't optimize the second
+                                state.flags = FlagsOf(op(lvalue, value))
+                                value = op(lvalue, value)
+                            else:
+                                op = MATH_OP_UNARY[inst.opcode]
+                                state.flags = FlagsOf(op(value))
+                                value = op(value)
                         set_register_value(inst.operands[0].reg, value)
                     else:
-                        if inst.opcode == "add":
-                            value = AddValue(lvalue, value)
-                        elif inst.opcode == "sub":
-                            value = SubValue(lvalue, value)
-                        elif inst.opcode == "xor":
-                            value = XorValue(lvalue, value)
-                        elif inst.opcode == "and":
-                            value = AndValue(lvalue, value)
-                        elif inst.opcode == "and":
-                            value = AddValue(lvalue, value)
-                        elif inst.opcode == "or":
-                            value = OrValue(lvalue, value)
-                        elif inst.opcode == "shl":
-                            value = ShlValue(lvalue, value)
-                        elif inst.opcode == "shr":
-                            value = ShrValue(lvalue, value)
-                        elif inst.opcode == "rcr":
-                            value = RcrValue(lvalue, value)
-                        elif inst.opcode == "rcl":
-                            value = RclValue(lvalue, value)
-                        elif inst.opcode == "rol":
-                            value = RolValue(lvalue, value)
-                        elif inst.opcode == "ror":
-                            value = RorValue(lvalue, value)
-                        elif inst.opcode == "imul":
-                            value = MulValue(lvalue, value)
-                        elif inst.opcode == "inc":
-                            value = IncValue(value)
-                        elif inst.opcode == "dec":
-                            value = DecValue(value)
-                        elif inst.opcode == "not":
-                            value = NotValue(value)
-                        elif inst.opcode == "neg":
-                            value = NegValue(value)
-                        elif inst.opcode == "mov":
+                        if inst.opcode == "mov":
                             value = SetValue(lvalue, value)
                         else:
-                            assert False
-                        if not inst.opcode.startswith("mov"):
-                            # TODO: line appear twice right now
-                            state.flags = FlagsOf(value)
+                            if inst.opcode in MATH_OP:
+                                op = MATH_OP_VALUE[inst.opcode]
+                                state.flags = FlagsOf(op(lvalue, value))
+                                value = op(lvalue, value)
+                            else:
+                                op = MATH_OP_UNARY_VALUE[inst.opcode]
+                                state.flags = FlagsOf(op(value))
+                                value = op(value)
                         set_value(lvalue, value)
                 elif inst.opcode == "jmp":
                     instructions.append(Jump(get_operand_value(inst.operands[0])))
@@ -892,8 +888,9 @@ class Handler(object):
                     instructions.append(nop)
                 elif inst.opcode in ("pop", state.mode.translate("popf{SB}")):
                     if len(state.stack) > 0:
-                        value = state.stack.pop()
-                        state.stack_variables.pop()
+                        # TODO: Maybe remove state.stack?
+                        state.stack.pop()
+                        value = state.stack_variables.pop()
                         state.stack_instructions.pop()
                         pop = False
                     else:
