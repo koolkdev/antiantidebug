@@ -63,8 +63,20 @@ ReadParameterDword($[X], None)
 #ReadParameterQword($[X], None)
 
 DEFINE_TEMPLATE
-$V[VAR] = *(@SIZE_WORD_B@*)(VMStructField@SIZE_WORD@(?O[HANDLERS]) + (ReadParameterWord($N[OFFSET], None) << @LOG_SIZE@))
 VMStructField@SIZE_WORD@(?O[EIP]) += $N[SIZE]
-Jump($V[VAR])
 =>
-UpdateEipAndJump(ReadParameterWord($[OFFSET], None), $[SIZE])
+UpdateEip($N[SIZE])
+
+DEFINE_TEMPLATE
+If((($V[X] & 0x80000000) != 0x0))
+    VMStructField@SIZE_WORD@(?O[EIP]) -= ($V[X] & 0x7FFFFFFF)
+Else
+    VMStructField@SIZE_WORD@(?O[EIP]) += $V[X]
+=>
+UpdateEip($V[X])
+
+
+DEFINE_TEMPLATE
+Jump(*(@SIZE_WORD_B@*)(VMStructField@SIZE_WORD@(?O[HANDLERS]) + (ReadParameterWord($N[OFFSET], None) << @LOG_SIZE@)))
+=>
+JumpToHandler(ReadParameterWord($[OFFSET], None))

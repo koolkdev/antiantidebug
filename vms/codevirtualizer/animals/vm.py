@@ -194,7 +194,7 @@ class VMHandlers(object):
             handler_address = file.read_pointer(vm_info.init_handler.handlers_address + i * arch.native_size())
             if fix_handlers:
                 handler_address = handler_address + vm_info.init_handler.base_address
-            #if handler_address == 0x426e22:
+            #if handler_address == 0x421006:
             # if handler_address in (0x426e22, 0x41c86a):
             func = handlers_decompiler.Handler(instruction.Function(file, handler_address))
             # func.make_unvisible(func.instructions[-1].instructions[-4])
@@ -235,6 +235,7 @@ class VMHandlers(object):
         print "SUCCESS"
 
         parser = handlers_parser.HandlerParser.get_parser(r"handlers\handlers_encoding.txt", self.mode)
+        parser_final = handlers_parser.HandlerParser.get_parser(r"handlers\handlers_final.txt", self.mode)
         print "Analyzing with handlers_encoding.txt..."
         if PROGRESSBAR: prog.start()
         for i in xrange(vm_info.init_handler.handlers_count):
@@ -242,6 +243,9 @@ class VMHandlers(object):
             #if addrs[i] == 0x42f9d2:
             parser.clean_handler(self.handlers[i].handler, fields, self.handlers[i].parameters, parser.default_funcs + [fish_handlers_cleaner.simple_optimization])
             fish_handlers_cleaner.fix_encoding_values(self.handlers[i], fields)
+            self.handlers[i].handler.optimize_instructions()
+            self.handlers[i].handler.clean_instructions()
+            parser_final.clean_handler(self.handlers[i].handler, fields, self.handlers[i].parameters)
         if PROGRESSBAR: prog.finish()
 
         """

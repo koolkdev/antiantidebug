@@ -9,7 +9,8 @@ HANDLERS = {
             "VMStructFieldWord($O[UNKNOWN_WORD]) = 0x0",
             "VMStructFieldByte($O[ACC_BYTE]) = 0x0",
             "VMStructFieldDword($O[KEY6]) = 0x0",
-            "UpdateEipAndJump(ReadParameterWord($P[NEXT_HANDLER], $[X1]), 0x2)"
+            "UpdateEip(0x2)",
+            "JumpToHandler(ReadParameterWord($P[NEXT_HANDLER], $[X1]))"
         ]
 }
 

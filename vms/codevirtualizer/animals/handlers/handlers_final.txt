@@ -1,0 +1,18 @@
+OPTION DONT_OPTIMIZE
+
+DEFINE_MACRO[32] SIZE_WORD Dword
+DEFINE_MACRO[64] SIZE_WORD Qword
+DEFINE_MACRO[32] SIZE_WORD_B DWORD
+DEFINE_MACRO[64] SIZE_WORD_B QWORD
+DEFINE_MACRO[32] LOG_SIZE 0x2
+DEFINE_MACRO[64] LOG_SIZE 0x3
+
+DEFINE_TEMPLATE
+Jump(*(@SIZE_WORD_B@*)(VMStructField@SIZE_WORD@(?O[HANDLERS]) + ((ReadParameterWord($N[OFFSET], DecodingInfo($[X1], None, None, None, $[X2], $[X3], None, None, None, None)) & 0xFFFF) << @LOG_SIZE@)))
+=>
+JumpToHandler(ReadParameterWord($[OFFSET], DecodingInfo($[X1], None, None, None, $[X2], $[X3], None, None, None, None)))
+
+DEFINE_TEMPLATE
+Jump(*(@SIZE_WORD_B@*)(VMStructField@SIZE_WORD@(?O[HANDLERS]) + ((ReadParameterWord($N[OFFSET], None) & 0xFFFF) << @LOG_SIZE@)))
+=>
+JumpToHandler(ReadParameterWord($[OFFSET], None))
