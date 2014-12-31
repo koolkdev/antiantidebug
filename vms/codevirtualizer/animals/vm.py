@@ -172,8 +172,7 @@ class VMInit(VMHandler):
 class VMOpcodeHandler(VMHandler):
     def __init__(self, handler):
         self.handler = handler
-        self.parameters = {}
-        self.name = None
+        self.info = None
 
 class VMHandlers(object):
     def __init__(self, file, vm_info):
@@ -219,16 +218,16 @@ class VMHandlers(object):
         if PROGRESSBAR: prog.start()
         for i in xrange(vm_info.init_handler.handlers_count):
             if PROGRESSBAR: prog.update(i)
-            parser.clean_handler(self.handlers[i].handler, fields, self.handlers[i].parameters)
+            parser.clean_handler(self.handlers[i].handler, fields)
         if PROGRESSBAR: prog.finish()
 
         parser = handlers_parser.HandlerParser.get_default_parser()
         print "Looking for VM_INIT...",
         found = False
         for handler in self.handlers.itervalues():
-            handler_info = parser.match_handlers(handler.handler, fields, self.handlers[i].parameters, [("VM_INIT", fish_handlers.HANDLERS["VM_INIT"])])
+            handler_info = fish_handlers.match_handlers(parser, handler.handler, fields, [fish_handlers.VM_INIT], arch)
             if handler_info is not None:
-                handler.name = handler_info
+                handler.info = handler_info
                 assert not found
                 found = True
         assert found
@@ -241,31 +240,28 @@ class VMHandlers(object):
         for i in xrange(vm_info.init_handler.handlers_count):
             if PROGRESSBAR: prog.update(i)
             #if addrs[i] == 0x42f9d2:
-            parser.clean_handler(self.handlers[i].handler, fields, self.handlers[i].parameters, parser.default_funcs + [fish_handlers_cleaner.simple_optimization])
+            parser.clean_handler(self.handlers[i].handler, fields, parser.default_funcs + [fish_handlers_cleaner.simple_optimization])
             fish_handlers_cleaner.fix_encoding_values(self.handlers[i], fields)
             self.handlers[i].handler.optimize_instructions()
             self.handlers[i].handler.clean_instructions()
-            parser_final.clean_handler(self.handlers[i].handler, fields, self.handlers[i].parameters)
+            parser_final.clean_handler(self.handlers[i].handler, fields)
         if PROGRESSBAR: prog.finish()
 
-        """
-        changed = True
-        while changed:
-            changed = False
-            for handler in self.handlers.itervalues():
-                if handler.name == None:
-                    #changed |= handlers_parser.parse_handler(handler.handler, fields, handler.parameters)
-                    handler_info = handlers_parser.parse_fish_handler(handler.handler, fields, handler.parameters)
-                    if handler_info != None:
-                        handler.name = handler_info
-        """
+
+        for handler in self.handlers.itervalues():
+            if handler.info is None:
+                handler_info = fish_handlers.match_handlers(parser, handler.handler, fields, fish_handlers.HANDLERS, arch)
+                if handler_info is None:
+                    handler.handler.print_instructions()
+                    raise Exception("Failed to detect handler")
+                handler.info = handler_info
+
 
         for index, handler in self.handlers.iteritems():
             print "---------------------------------------------------"
-            if handler.name:
-
-                print handler.name
-                print "@@@@@@@@@@@@@@@@@@@@@"
+            #if handler.name:
+            #    print handler.name
+            #    print "@@@@@@@@@@@@@@@@@@@@@"
             print hex(addrs[index])
             handler.handler.print_instructions()
         assert False

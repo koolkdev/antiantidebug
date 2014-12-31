@@ -48,16 +48,21 @@ class Macro(Expression):
 
 
 class Params(object):
-    def __init__(self, fields, parameters):
+    def __init__(self, fields):
         self.fields = dict(fields)
         self.real_field_name = dict()
-        self.parameters = dict(parameters)
+        self.parameters = {}
         self.vars = {}
+        self.handler_vars = {}
+        self.unique = {}
 
     def copy(self):
-        nparams = Params(self.fields, self.parameters)
+        nparams = Params(self.fields)
+        nparams.parameters = dict(self.parameters)
         nparams.real_field_name = dict(self.real_field_name)
         nparams.vars = dict(self.vars)
+        nparams.handler_vars = dict(self.handler_vars)
+        nparams.unique = dict(self.unique)
         return nparams
 
     def update(self, other):
@@ -65,10 +70,13 @@ class Params(object):
         self.real_field_name.update(other.real_field_name)
         self.parameters.update(other.parameters)
         self.vars.update(other.vars)
+        self.handler_vars.update(other.handler_vars)
+        self.unique.update(other.unique)
 
     def update_global(self, other):
         self.fields.update(other.fields)
         self.parameters.update(other.parameters)
+        self.handler_vars.update(other.handler_vars)
 
     def _set_dict_value(self, dict, key, value, comp = lambda x,y: x == y):
         if dict.has_key(key):
@@ -98,6 +106,15 @@ class Params(object):
 
     def set_var_value(self, name, value):
         return self._set_dict_value(self.vars, name, value, comp = lambda x,y: x.equals(y))
+
+    def set_handler_var_value(self, name, value):
+        return self._set_dict_value(self.vars, name, value, comp = lambda x,y: x == y)
+
+    def set_unique_value(self, name, value):
+        if value in self.unique.values():
+            return name in self.unique and self.unique[name] == value
+        else:
+            return self._set_dict_value(self.unique, name, value)
 
 
 def is_var_name(string):
@@ -297,6 +314,14 @@ class HandlerParser(object):
                     if not isinstance(expression, Immediate):
                         return False
                 return params.set_var_value(name, expression)
+            elif var_type == "H":
+                if not isinstance(expression, Immediate):
+                    return False
+                return params.set_handler_var_value(name, expression.value)
+            elif var_type == "U":
+                if not isinstance(expression, Immediate):
+                    return False
+                return params.set_unique_value(name, expression.value)
             else:
                 assert False
         elif is_constant(match):
@@ -476,6 +501,7 @@ class HandlerParser(object):
             #    optional_line = True
             #    line = line[1:-1]
             if not self.match_expression(instructions[index], line, nparams):
+                #print str(instructions[index]), line
                 if optional_line:
                     lines_index += 1
                     continue
@@ -519,7 +545,10 @@ class HandlerParser(object):
             if lines_end_index != len(lines):
                 continue
             if match:
-                nlines = [self.create_macro_result(result, nparams)]
+                if result == "None":
+                    nlines = []
+                else:
+                    nlines = [self.create_macro_result(result, nparams)]
                 instructions = self.replace_instructions(handler, instructions_container, index, real_len, nlines)
                 params.update_global(nparams)
                 changed = True
@@ -556,22 +585,9 @@ class HandlerParser(object):
             else:
                 i += 1
 
-    def clean_handler(self, handler, fields, parameters, funcs=None, reverse=True):
+    def clean_handler(self, handler, fields, funcs=None, reverse=True):
         if funcs is None:
             funcs = self.default_funcs
-        params = Params(fields, parameters)
+        params = Params(fields)
         self.clean_instructions_container(handler, handler, params, funcs, reverse)
         fields.update(params.fields)
-        parameters.update(params.parameters)
-
-    def match_handlers(self, handler, fields, parameters, handlers):
-        instructions = handler.get_instructions()
-        for name, lines in handlers:
-            params = Params(fields, parameters)
-            match, index, lines_index = self.match_instructions(instructions, 0, lines, 0, params)
-            if match and index == len(instructions) and lines_index == len(lines):
-                fields.update(params.fields)
-                parameters.update(params.parameters)
-                # TODO return more stuffs (parameters read cases etc..)
-                return name
-        return None

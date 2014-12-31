@@ -18,6 +18,12 @@ DEFINE_EXPRESSION_TEMPLATE
 =>
 $[READ_OP]($[OFFSET], DecodingInfo(Operation($[OP]), None, None, None, None, None, None, None, None, None))
 
+# BUG: There is one usage like that in binary math operations handler
+DEFINE_EXPRESSION_TEMPLATE[64]
+($G[READ_PARAMETER:READ_OP]($N[OFFSET], None) $G[SIMPLE_MATH:OP] VMStructFieldQword(?O[KEY1]))
+=>
+$[READ_OP]($[OFFSET], DecodingInfo(Operation($[OP]), None, None, None, None, None, None, None, None, None))
+
 
 # DecodingInfo[1]:
 # R + KEY2
@@ -171,6 +177,16 @@ If(((VMStructFieldDword(?O[KEY2]) & 0x1) != 0x0))
 =>
 UpdateKeyCond($[X])
 
+DEFINE_TEMPLATE
+VMStructFieldDword(?O[KEY6]) $G[UPDATE_MATH:OP]= VMStructFieldDword(?O[KEY1])
+=>
+UpdateKeySpecial(Operation($[OP]))
+
+# Not used anyway, no need to take it into account
+DEFINE_TEMPLATE
+UpdateKey(VMStructFieldDword(?O[KEY5]), $[X])
+=>
+None
 
 #### Misc ####
 DEFINE_EXPRESSION_TEMPLATE
@@ -185,6 +201,11 @@ LOW_NIBBLE($[X])
 
 
 ### Acc Byte ###
+DEFINE_EXPRESSION_TEMPLATE
+((VMStructFieldByte(?O[ACC_BYTE]) - $N[VALUE]) $G[COMPARE:COMP_OP] 0x0)
+=>
+(DecodedAccByte(None, None) $[COMP_OP] $[VALUE])
+
 DEFINE_EXPRESSION_TEMPLATE
 (((VMStructFieldByte(?O[ACC_BYTE]) $G[SIMPLE_MATH:OP] $N[NUMBER]) - $N[VALUE]) $G[COMPARE:COMP_OP] 0x0)
 =>

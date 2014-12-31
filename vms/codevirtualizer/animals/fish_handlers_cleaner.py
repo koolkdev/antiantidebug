@@ -3,7 +3,7 @@ import handlers_parser
 def clean_junk_field(handlers, fields, arch):
     blacklist = set(fields.values())
     candidates = set()
-    cparams = handlers_parser.Params({}, {})
+    cparams = handlers_parser.Params({})
     parser = handlers_parser.HandlerParser.get_default_parser()
     parser.groups["SIMPLE_MATH"] = ["+", "-", "^"]
 
@@ -20,7 +20,7 @@ def clean_junk_field(handlers, fields, arch):
     junk_offset, = junk_offset
 
     fields["JUNK"] = junk_offset
-    cparams = handlers_parser.Params(fields, {})
+    cparams = handlers_parser.Params(fields)
 
     for handler in handlers:
         for inst in handler.handler.instructions:
@@ -35,20 +35,20 @@ def fix_64_junk_bool_field(handlers, fields):
     parser = handlers_parser.HandlerParser.get_default_parser()
 
     lines = ["If(($[X] == 0x3))",
-             "    *(BYTE*)(rbp + $O[RESET_HIGH_DWORD_BOOL]) = ($[Y1] | $[Y2])"]
+             "    *(BYTE*)(rbp + $O[ZERO_HIGH_DWORD_BOOL]) = ($[Y1] | $[Y2])"]
 
     def fix_func(handler, instructions_container, index, params):
         nparams = params.copy()
         if parser.match_instructions(instructions_container.instructions, index, lines, 0, nparams)[0]:
             params.update_global(nparams)
-            parser.replace_instructions(handler, instructions_container.instructions[index], 0, 1, [parser.create_macro_result("VMStructByte($O[RESET_HIGH_DWORD_BOOL]) = 0x1", params)])
+            parser.replace_instructions(handler, instructions_container.instructions[index], 0, 1, [parser.create_macro_result("VMStructFieldByte($O[ZERO_HIGH_DWORD_BOOL]) = 0x1", params)])
             return True
         return False
 
     for handler in handlers:
-        parser.clean_handler(handler.handler, fields, handler.parameters, [fix_func])
+        parser.clean_handler(handler.handler, fields, [fix_func])
 
-    assert "RESET_HIGH_DWORD_BOOL" in fields
+    assert "ZERO_HIGH_DWORD_BOOL" in fields
 
 def clean_junk_check(handlers, fields, arch):
     parser = handlers_parser.HandlerParser.get_default_parser()
@@ -67,7 +67,7 @@ def clean_junk_check(handlers, fields, arch):
         return False
 
     for handler in handlers:
-        parser.clean_handler(handler.handler, fields, handler.parameters, [fix_func])
+        parser.clean_handler(handler.handler, fields, [fix_func])
 
     assert "ENCODED_VALUE_3" in fields
 
@@ -132,6 +132,7 @@ def fix_encoding_values(handler, fields):
             elif str(nparams.vars["OP1"]) == "^":
                 neg_op = handlers_parser.Xor
             current_expression = neg_op(current_expression, nparams.vars["VAR1"])
+            parser.replace_instructions(handler, instructions_container, index, 1, [parser.create_macro_result("$[X1] = EncodedValueByte($[X2])", nparams)])
             res = (str(current_expression), str(parser.create_macro_result("DecodedValueByte($[X1])", nparams)))
             assert res not in to_replace
             to_replace.append(res)
@@ -139,4 +140,4 @@ def fix_encoding_values(handler, fields):
             res = (str(current_expression).replace("VMStructFieldByte", "VMStructFieldQword"), str(parser.create_macro_result("DecodedValueByte($[X1])", nparams)))
             to_replace.append(res)
         return False
-    parser.clean_handler(handler.handler, fields, handler.parameters, [fix_func], reverse=False)
+    parser.clean_handler(handler.handler, fields, [fix_func], reverse=False)
