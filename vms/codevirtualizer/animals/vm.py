@@ -253,6 +253,9 @@ class VMHandlers(object):
                 handler_info = fish_handlers.match_handlers(parser, handler.handler, fields, fish_handlers.HANDLERS, arch)
                 if handler_info is None:
                     handler.handler.print_instructions()
+                    for i in xrange(100):
+                        handler_info = fish_handlers.match_handlers(parser, handler.handler, fields, fish_handlers.HANDLERS, arch)
+                    handler.handler.print_instructions()
                     raise Exception("Failed to detect handler")
                 handler.info = handler_info
 

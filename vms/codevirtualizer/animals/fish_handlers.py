@@ -292,6 +292,7 @@ LODS_MAIN = string_op(["VMStructField$G[SIZES2:SIZE2](ReadParameterWord($P[AX_OF
 MOVS = HandlerMatch(match_funcs([
     update_keys,
     MOVS_MAIN,
+    update_keys,
     match_one([match_funcs([READ_SI, READ_DI]), match_funcs([READ_DI, READ_SI])]),
     UPDATE_SI_DI,
     update_keys,
@@ -301,6 +302,7 @@ MOVS = HandlerMatch(match_funcs([
 SCAS_1 = match_funcs([
     update_keys,
     SCAS_MAIN,
+    update_keys,
     READ_DI,
     UPDATE_DI2,
     update_keys,
@@ -313,6 +315,7 @@ SCAS_2 = match_funcs([
     update_keys,
     SCAS_MAIN,
     SCAS_UPDATE_FLAGS_1,
+    update_keys,
     READ_DI,
     UPDATE_DI2,
     update_keys,
@@ -326,6 +329,7 @@ SCAS = HandlerMatch(match_one([SCAS_1, SCAS_2]), create_string_op_handler_reader
 LODS = HandlerMatch(match_funcs([
     update_keys,
     READ_SI,
+    update_keys,
     LODS_MAIN,
     update_keys,
     UPDATE_SI,
@@ -336,7 +340,9 @@ LODS = HandlerMatch(match_funcs([
 STOS = HandlerMatch(match_funcs([
     update_keys,
     READ_DI,
+    update_keys,
     STOS_MAIN,
+    update_keys,
     UPDATE_DI,
     update_keys,
     UPDATE_IP_AND_JUMP
@@ -634,15 +640,17 @@ XCHG_OPERATION = match_funcs(
 XCHG_T = [RESET_ZERO_HIGH_DWORD_BOOL, read_var_and_keep_address("DST", True), read_memvar_and_keep_address("DST"),
           read_var_and_keep_address("SRC"), read_memvar_and_keep_address("SRC")]
 
+# There isn't key updates in xchg, but we will do it with key updates because sometime afte reading two nibbles,
+# there is and UpdateKey for Key1 which we don'e handle.
 XCHG = HandlerMatch(match_funcs([
-    any_order([read_encoded_param(2), read_encoded_param(3), read_two_nibbles(4), read_two_nibbles(5)]),
+    any_order_with_key_updates([read_encoded_param(2), read_encoded_param(3), read_two_nibbles(4), read_two_nibbles(5)]),
     # Because it may confused between SRC and DST
     match_one([match_funcs([any_order(XCHG_T), XCHG_OPERATION_0]),
                match_funcs([any_order(XCHG_T[::-1]), XCHG_OPERATION_0])]),
     # Now give the names for the parameters
-    at_start(any_order([read_encoded_param(7, "SRC_VALUE"), read_encoded_param(8, "DST_VALUE"),
-                        read_two_nibbles(9, "SRC_TYPE_AND_SIZE", ("SRC_TYPE", "SRC_SIZE")),
-                        read_two_nibbles(10, "DST_TYPE_AND_SIZE", ("DST_TYPE", "DST_SIZE"))])),
+    at_start(any_order_with_key_updates([read_encoded_param(7, "SRC_VALUE"), read_encoded_param(8, "DST_VALUE"),
+                                         read_two_nibbles(9, "SRC_TYPE_AND_SIZE", ("SRC_TYPE", "SRC_SIZE")),
+                                         read_two_nibbles(10, "DST_TYPE_AND_SIZE", ("DST_TYPE", "DST_SIZE"))])),
     XCHG_OPERATION,
     UPDATE_IP_AND_JUMP
     ]), None)
