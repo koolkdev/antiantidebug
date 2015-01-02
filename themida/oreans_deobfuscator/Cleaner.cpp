@@ -571,7 +571,7 @@ int Cleaner::mergeMemorySplit(uint64_t * address, instruction_info * result) {
 			if (GET_OPCODE(next) != ADD || !IS_OPERAND_REG(next, 0) || GET_OPERAND(next, 0).reg != used_reg) return false;
 		}
 	}
-	if (GET_OPERAND_TYPE(next, 1) != OP_IMM_32) return false;
+	if (GET_OPERAND_TYPE(next, 1) != OP_IMM_32 && (this->mode != 64 || GET_OPERAND_TYPE(next, 1) != OP_IMM_64 || (get_immediate_value(&next, 1) >> 32))) return false;
 	offset = get_immediate_value(&next, 1);
 	if (this->mode == 32) offset &= 0xffffffff;
 
@@ -814,6 +814,7 @@ int Cleaner::clearMovConstant(uint64_t * address, instruction_info * result) {
 	// TODO: Maybe in some cases, if the number is small, it will be only one byte?
 	//int size = GET_OPERAND_SIZE(*result, 1);
 	uint64_t last_address = *address;
+	uint64_t last_last_address = 0;
 
 	Flags flags;
 	
@@ -821,6 +822,11 @@ int Cleaner::clearMovConstant(uint64_t * address, instruction_info * result) {
 	uint32_t v32;
 	uint16_t v16;
 	uint8_t v8;
+
+	uint64_t lv64;
+	uint32_t lv32;
+	uint16_t lv16;
+	uint8_t lv8;
 
 	switch (size) {
 	case 1: v8 = get_immediate_value(result, 1); break;
@@ -851,6 +857,20 @@ int Cleaner::clearMovConstant(uint64_t * address, instruction_info * result) {
 			case 8: v64 = operation<int64_t>(v64, GET_OPCODE(next), get_immediate_value(&next, 1), &flags); break;
 			}
 			last_address = *address;
+
+			if (GET_OPCODE(last) == ADD || GET_OPCODE(last) == SUB || GET_OPCODE(last) == XOR || (size < 4 && GET_OPCODE(last) == NEG)) {
+				// There are some cases in the vm init that there is mov ebx, 0x. shr ebx, 2
+				// So we don't want to clean the last operation
+				// So we will find the instruction that can be the last
+				last_last_address = last_address;
+				switch (size) {
+				case 1: lv8 = v8; break;
+				case 2: lv16 = v16; break;
+				case 4: lv32 = v32; break;
+				case 8: lv64 = v64; break;
+				}
+			}
+
 			next = getCleanInstructionAt(address);
 		}
 		instructions += 1;
@@ -869,7 +889,14 @@ int Cleaner::clearMovConstant(uint64_t * address, instruction_info * result) {
 			fix_size = false;
 		} else if (!IS_SAME_OPERANDS(next, 1, last, 0)) return false; // It must be the dword registry otherwise
 		check_for_mov = false; // We checked for it, no need any more
-		goto check_op;
+
+check_op:
+		// In some cases, if it ends with:
+		// NOT X
+		// SUB X, 1
+		// It will turn into neg. So accept neg if size < 4 (It is not probable that it will happen with 32 bit)
+		if ((GET_OPCODE(last) != ADD && GET_OPCODE(last) != SUB && GET_OPCODE(last) != XOR && !(size < 4 && GET_OPCODE(last) == NEG)) || (instructions == 0)) return false;
+		*address = last_address;
 	} else if (size == 8) {
 		// The completion have to happen thru another reg if our wanted result is bigger than 32bit.
 		// There are three cases:
@@ -917,12 +944,16 @@ int Cleaner::clearMovConstant(uint64_t * address, instruction_info * result) {
 		}
 
 	} else {
-check_op: // I am really really sorry for using goto
-		// In some cases, if it ends with:
-		// NOT X
-		// SUB X, 1
-		// It will turn into neg. So accept neg if size < 4 (It is not probable that it will happen with 32 bit)
-		if ((GET_OPCODE(last) != ADD && GET_OPCODE(last) != SUB && GET_OPCODE(last) != XOR && !(size < 4 && GET_OPCODE(last) == NEG)) || (instructions == 0)) return false;
+		// TODO: Same for case 1/3 in 64 bit flow?
+		if (instructions == 0 || last_last_address == 0) return false;
+		// revert to the last good instruction
+		last_address = last_last_address;
+		switch (size) {
+		case 1: v8 = lv8; break;
+		case 2: v16 = lv16; break;
+		case 4: v32 = lv32; break;
+		case 8: v64 = lv64; break;
+		}
 		*address = last_address;
 	}
 
