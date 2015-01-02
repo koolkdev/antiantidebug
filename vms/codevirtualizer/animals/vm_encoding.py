@@ -34,7 +34,7 @@ class DecodingState(object):
         self._read = read_func
 
     def read_parameter(self, offset, size):
-        return struct.unpack("<%s" % {1: "B", 2: "H", 4: "L"}[size], self._read(self.address + offset, size))
+        return struct.unpack("<%s" % {1: "B", 2: "H", 4: "L"}[size], self._read(self.address + offset, size))[0]
 
     def get_key(self, name):
         return self.keys[name]
@@ -42,6 +42,13 @@ class DecodingState(object):
     def reset(self):
         for key in self.keys.itervalues():
             key.reset()
+
+    def update_ip(self, x):
+        if x & 0x80000000:
+            self.address -= x & 0x7fffffff
+        else:
+            self.address += x
+
 
 def new_fish_state(address, read_func):
     return DecodingState({
@@ -66,11 +73,11 @@ class DecodingValueOperation(DecodingOperation):
 
 
 class Decode(object):
-    OPERATIONS = {"add": long.__add__,
-                  "sub": long.__sub__,
-                  "xor": long.__xor__,
-                  "and": long.__and__,
-                  "or": long.__or__}
+    OPERATIONS = {"+": lambda x, y: x + y,
+                  "-": lambda x, y: x - y,
+                  "^": lambda x, y: x ^ y,
+                  "&": lambda x, y: x & y,
+                  "|": lambda x, y: x | y}
 
     def decode(self, state, x):
         pass
@@ -100,16 +107,16 @@ class UpdateKey(DecodingOperation):
         self.op = op
 
     def decode(self, state):
-        state.get_key(self.key).do_operation(state, self.update_op)
+        state.get_key(self.key).do_operation(state, self.op)
 
 
 class UpdateKeyCond(DecodingOperation):
-    def __init__(self, update_op):
-        self.op = update_op
+    def __init__(self, op):
+        self.op = op
 
     def decode(self, state):
-        if state.get_key("KEY3").get_value() & 1:
-            self.op(state.get_key("KEY3"))
+        if state.get_key("KEY2").get_value() & 1:
+            state.get_key("KEY2").do_operation(state, self.op)
 
 
 class UpdateKeySpecial(UpdateKey):
@@ -123,7 +130,7 @@ class UpdateAccByte(DecodingValueOperation):
         self.op = op
 
     def decode(self, state):
-        state.get_key("ACC_BYTE").do_simple_operation(self.op, self.read.decode(state))
+        state.get_key("ACC_BYTE").do_operation(state, DecodeNumber(self.op, self.read.decode(state)))
         return state.get_key("ACC_BYTE").get_value()
 
     def get_offset(self):
@@ -144,12 +151,12 @@ class DecodeParameter(DecodingValueOperation):
         res = state.read_parameter(self.offset, self.size)
         for op in self.ops:
             if type(op) is DecodeParameter.UpdateKeyDecode:
-                UpdateKey("KEY1", Decode.DecodeNumber(op.op, res))
+                UpdateKey("KEY1", DecodeNumber(op.op, res)).decode(state)
             elif type(op) is UpdateKey:
                 op.decode(state)
             else:
-                res = op.decode(state, res)
-        return res
+                res = op.decode(state, res) & 0xffffffff
+        return res & ((1 << (self.size * 8)) - 1)
 
     def get_offset(self):
         return self.offset
@@ -293,6 +300,7 @@ def get_reading_decoding_info(handler, fields, arch):
                     len(params.vars["VAR"].instructions) == 1 and len(params.vars["VAR"].used_instructions) == 1:
                 if not simple_optimization(handler, handler, i):
                     i += 1
+                continue
             elif parser.match_expression(inst, "UpdateAccByte(SimpleOperation(Operation($[OP]), ReadParameterByte($N[OFFSET])))", params):
                 if current_decoding is None:
                     current_decoding = []

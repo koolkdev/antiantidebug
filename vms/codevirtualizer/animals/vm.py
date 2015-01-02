@@ -195,13 +195,8 @@ class VMHandlers(object):
             handler_address = file.read_pointer(vm_info.init_handler.handlers_address + i * arch.native_size())
             if fix_handlers:
                 handler_address = handler_address + vm_info.init_handler.base_address
-            #if handler_address == 0x421006:
-            # if handler_address in (0x426e22, 0x41c86a):
+            #if handler_address == 0x4219f9L:
             func = handlers_decompiler.Handler(instruction.Function(file, handler_address))
-            # func.make_unvisible(func.instructions[-1].instructions[-4])
-            # func.make_unvisible(func.instructions[57].instructions[4].instructions[0])
-            # func.optimize_instructions()
-            # func.clean_instructions()
             self.handlers[i] = VMOpcodeHandler(func)
             addrs[i] = handler_address
         if PROGRESSBAR:
@@ -224,10 +219,10 @@ class VMHandlers(object):
         if PROGRESSBAR: prog.finish()
 
         parser = handlers_parser.HandlerParser.get_default_parser()
-        print "Looking for VM_INIT...",
+        print "Looking for RESET_KEYS...",
         found = False
         for handler in self.handlers.itervalues():
-            handler_info = fish_handlers.match_handlers(parser, handler.handler, fields, [fish_handlers.VM_INIT], arch)
+            handler_info = fish_handlers.match_handlers(parser, handler.handler, fields, [fish_handlers.RESET_KEYS], arch)
             if handler_info is not None:
                 handler.info = handler_info
                 assert not found
@@ -242,7 +237,6 @@ class VMHandlers(object):
         if PROGRESSBAR: prog.start()
         for i in xrange(vm_info.init_handler.handlers_count):
             if PROGRESSBAR: prog.update(i)
-            #if addrs[i] == 0x43797aL:
             parser_pre.clean_handler(self.handlers[i].handler, fields)
             self.handlers[i].decode = vm_encoding.get_reading_decoding_info(self.handlers[i].handler, fields, arch)
             parser.clean_handler(self.handlers[i].handler, fields)
@@ -258,21 +252,18 @@ class VMHandlers(object):
                 handler_info = fish_handlers.match_handlers(parser, handler.handler, fields, fish_handlers.HANDLERS, arch)
                 if handler_info is None:
                     handler.handler.print_instructions()
-                    #for i in xrange(100):
-                    #    handler_info = fish_handlers.match_handlers(parser, handler.handler, fields, fish_handlers.HANDLERS, arch)
-                    #handler.handler.print_instructions()
                     raise Exception("Failed to detect handler")
                 handler.info = handler_info
 
 
-        for index, handler in self.handlers.iteritems():
-            print "---------------------------------------------------"
-            #if handler.name:
-            #    print handler.name
-            #    print "@@@@@@@@@@@@@@@@@@@@@"
-            print hex(addrs[index])
-            handler.handler.print_instructions()
-        assert False
+        # for index, handler in self.handlers.iteritems():
+        #     print "---------------------------------------------------"
+        #     #if handler.name:
+        #     #    print handler.name
+        #     #    print "@@@@@@@@@@@@@@@@@@@@@"
+        #     print hex(addrs[index])
+        #     handler.handler.print_instructions()
+        # assert False
 
         # Good, we have handlers now
 
@@ -342,105 +333,82 @@ class VMFunction(object):
 
         self.vm_info = VMInfo.get_vm_info(file, vm_address)
         assert self.vm_info != None
-        assert False
 
         addresses_to_explore = Queue.Queue()
         starts = []
         instructions = {}
         instructions_size = {}
 
-        # Kinda hackish, but we are looking for the start, and the code is layout like this:
-        # jmp label
-        # push adress2
-        # jmp vm
-        # ..
-        # push adressN
-        # jmp vm
-        # vmcode
-        # ..
-        # ..
-        # push address1
-        # jmp vm
-        # ...
-        # labal1:
-        # ....
-        # And we are looking for the jump to label1
-
         # Start address is the address of push address2/jmp and end address is the address of vmcode
-        real_vm_code_address = long(vm_code_address + self.vm_info.init_handler.encode)
+        real_vm_code_address = long(vm_code_address + self.vm_info.init_handler.base_address)
         self.code_address = real_vm_code_address
-        vm_code_end = push_inst.address
-        start_address = real_vm_code_address
-        i = 0
-        end_address = start_address
-        while True:
-            i += 1
-            assert i < 0x1000
-            try:
-                jmp = file.get_instruction(start_address)
-            except:
-                start_address -= 1
-                continue
-            if jmp.opcode == "jmp" and jmp.operands[0].is_immediate() and jumper.end <= jmp.operands[0].value <= jumper.end + 0x20:
-                break
-            start_address -= 1
-        start_address += jmp.length
+
+        print ("Reading VMFunction at 0x%08x..." % self.code_address),
 
         # Mark the start of the vm code as part that something is started in it
-        addresses_to_explore.put((real_vm_code_address, vm_code_address))
+        addresses_to_explore.put((real_vm_code_address, first_handler))
         starts.append(real_vm_code_address)
-        while start_address != end_address:
-            push = file.get_instruction(start_address)
-            if push.opcode != "push":
-                push = file.get_instruction(push.next)
-            assert push.opcode == "push" and push.operands[0].is_immediate()
-            jmp = file.get_instruction(push.next)
-            assert jmp.opcode == "jmp" and jmp.operands[0].is_immediate(vm_address)
-            addresses_to_explore.put((long(push.operands[0].value + self.vm_info.init_handler.encode), push.operands[0].value))
-            starts.append(long(push.operands[0].value + self.vm_info.init_handler.encode))
-            start_address = jmp.next
+
         to_print = False
         while not addresses_to_explore.empty():
-            next_labled = True
-            address, key = addresses_to_explore.get()
-            key = VMKey(key)
+            next_labeled = True
+            address, handler = addresses_to_explore.get()
+            state = vm_encoding.new_fish_state(address, file.read)
             if instructions.has_key(address):
                 instructions[address].set_info("labled", True)
                 continue
-            bytes_reader = vminstruction.BytesReader(file, address)
-            while bytes_reader.address != vm_code_end:
-                # TODO: Do a method to do this
-                address = bytes_reader.address
-                func = self.vm_info.main_handler.read.decode(bytes_reader, key)
-                assert self.vm_info.handlers.handlers.has_key(func)
-                instructions_size[address] = 1
-                if self.vm_info.handlers.handlers[func].read != None:
-                    instructions_size[address] += self.vm_info.handlers.handlers[func].read.size
-                inst = self.vm_info.handlers.handlers[func].get_vm_instruction(bytes_reader, key)
 
-                inst.address = address
-                inst.set_info("labled", next_labled)
-                next_labled = False
+            while handler is not None:
+                if instructions.has_key(state.address):
+                    if next_labeled:
+                        instructions[state.address].set_info("labled", True)
+                    break
 
-                if inst.name in ("JMP", "JMPIF"):
-                    inst.args[0] += bytes_reader.address
-                    inst.args[0] &= 0xffffffff
+                handler = self.vm_info.handlers.handlers[handler]
+                handler_reader = handler.info.reader(handler.info, handler.decode.decode(state))
 
-                if inst.name == "JMP":
-                    next_labled = True
-                    bytes_reader.address = inst.args[0]
-                    key.reset()
-                elif inst.name == "JMPIF":
-                    addresses_to_explore.put((inst.args[0], 0))
-                elif inst.name == "RESETKEY":
-                    key.reset()
+                inst = handler_reader.get_instruction()
+
+                inst.address = state.address
+                print inst
+                inst.set_info("labled", next_labeled)
+                next_labeled = False
+
+                # if inst.name in ("JMP", "JMPIF"):
+                #     inst.args[0] += bytes_reader.address
+                #     inst.args[0] &= (1 << self.mode) - 1
+                #
+                # if inst.name == "JMP":
+                #     next_labeled = True
+                #     bytes_reader.address = inst.args[0]
+                #     key.reset()
+                # elif inst.name == "JMPIF":
+                #     addresses_to_explore.put((inst.args[0], 0))
+                # elif inst.name == "RESETKEY":
+                #     key.reset()
+                #     # It isn't really an opcode, so don't store it
+                #     continue
+                # elif inst.name == "PUSH_ENCODED":
+                #     push = file.get_instruction(long(inst.args[0] + self.vm_info.init_handler.encode))
+                #     if push.opcode != "push":
+                #         push = file.get_instruction(push.next)
+                #     assert push.opcode == "push" and push.operands[0].is_immediate()
+                #     jmp = file.get_instruction(push.next)
+                #     assert jmp.opcode == "jmp" and jmp.operands[0].is_immediate(vm_address)
+                #     jmp_vm_code_address = long(push.operands[0].value + self.vm_info.init_handler.encode + self.vm_info.init_handler.encode_address_high_dword)
+                #     addresses_to_explore.put((jmp_vm_code_address, push.operands[0].value))
+                #     starts.append(jmp_vm_code_address)
+                # elif inst.name in ("ADD_DX_REALLOC", "STACK_ADD_REALLOC"): # TODO: Properly support reallocation
+                #     inst.name += "_VALUE"
+                #     inst.args = [self.vm_info.handlers.realloc_offset]
+
+                handler = handler_reader.get_next_handler()
+                #print handler
+                if handler is not None:
+                    state.update_ip(handler_reader.get_size())
 
                 instructions[inst.address] = inst
-
-                if instructions.has_key(bytes_reader.address):
-                    if next_labled:
-                        instructions[bytes_reader.address].set_info("labled", True)
-                    break
+        print "SUCCESS"
 
         last_address = 0
         last_size = 0

@@ -641,6 +641,16 @@ class Handler(object):
         # the real memory reference. II don't really care about that right now, because the only case when it happens
         # it at the end of the handler. So there isn't any reason that it will fail there.
         # But it is better to optimize it in one run because performance anyway.
+
+        # This is an hack to do that:
+        def extended_contain(x, y):
+            if x.contains(y):
+                return True
+            if isinstance(y, ValueOf) and isinstance(y.value, Variable) and len(y.value.instructions) == 1:
+                if x.contains(y.value.instructions[0].rvalue):
+                    return True
+            return False
+
         changed = False
         for instruction in instructions:
             if isinstance(instruction, NonVisible):
@@ -682,7 +692,7 @@ class Handler(object):
                 for k, v in to_replace.iteritems():
                     if k != inst:
                         for i in v:
-                            if i.rvalue.contains(instruction.lvalue):
+                            if extended_contain(i.rvalue, instruction.lvalue):
                                 items_to_remove.add(k)
                 for i in items_to_remove:
                     to_replace.pop(i)

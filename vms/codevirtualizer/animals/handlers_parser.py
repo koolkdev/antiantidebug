@@ -108,7 +108,7 @@ class Params(object):
         return self._set_dict_value(self.vars, name, value, comp = lambda x,y: x.equals(y))
 
     def set_handler_var_value(self, name, value):
-        return self._set_dict_value(self.vars, name, value, comp = lambda x,y: x == y)
+        return self._set_dict_value(self.handler_vars, name, value, comp = lambda x,y: x == y)
 
     def set_unique_value(self, name, value):
         if value in self.unique.values():

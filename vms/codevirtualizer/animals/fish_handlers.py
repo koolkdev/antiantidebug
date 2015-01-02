@@ -1,6 +1,7 @@
 from collections import namedtuple
 import vms.vminstruction as vminstruction
 import handlers_parser
+import re
 
 HandlerMatch = namedtuple("HandlerMatch", ["match_func", "reader"])
 
@@ -12,14 +13,19 @@ class HandlerInfo(object):
         self.read_info = []
         self.reader = None
 
-    def get_size(self):
-        return self.vars["OPCODE_SIZE"]
-
 
 class HandlerReader(object):
     def __init__(self, info, params):
         self.info = info
-        self.params = params
+        self.params = {}
+        for name, index in self.info.params.iteritems():
+            self.params[name] = params[index]
+        assert len(self.params) == len(params)
+        for name, value in self.params.iteritems():
+            for iname, ivalue in self.info.vars.iteritems():
+                if ivalue == value and iname.startswith(name + "_"):
+                    self.params[name] = iname[len(name) + 1:]
+                    break
 
     def get_name(self):
         pass
@@ -28,25 +34,46 @@ class HandlerReader(object):
         return []
 
     def get_instruction(self):
-        return vminstruction.VMInstruction(self.get_name(), self.get_parms())
+        return vminstruction.VMInstruction(self.get_name(), *self.get_params())
 
     def get_next_handler(self):
-        if "NEXT_HANDLER" in self.parameters:
-            return self.parameters["NEXT_HANDLER"]
+        if "NEXT_HANDLER" in self.params:
+            return self.params["NEXT_HANDLER"]
         else:
             return None
 
+    def get_size(self):
+        return self.info.vars["OPCODE_SIZE"]
 
-def create_handler_reader_class(get_name_func, get_params_func=None):
-    class GenericHandlerReader(object):
+
+def create_handler_reader_class(name, params=[]):
+    def create_handler_name_from_params(params):
+        ns = name
+        for var in re.findall("\{([\w:]+)\}", name):
+            t, n = var.split(":")
+            if t == "S": # Size
+                nvar = ["BYTE", "WORD", "DWORD", "QWORD"][(params[n]&0xf)-1]
+            elif t == "T": # Type
+                nvar = ["VAR", "MEMVAR", "IMM"][(params[n]>>4)-1]
+            elif t == "O": # Type
+                nvar = params[n]
+                try:
+                    assert type(nvar) is str
+                except:
+                    print params
+                    raise
+            else:
+                raise Exception("Invalid var: %s" % var)
+            ns = ns.replace("{%s}" % var, nvar)
+        return ns
+
+    class GenericHandlerReader(HandlerReader):
         def get_name(self):
-            return get_name_func(self)
+            return create_handler_name_from_params(self.params)
 
         def get_params(self):
-            if get_params_func is None:
-                return []
-            else:
-                return get_params_func(self)
+            return [self.params[x] for x in params]
+
     return GenericHandlerReader
 
 def create_string_op_handler_reader(op_name):
@@ -156,7 +183,7 @@ UPDATE_IP_AND_JUMP_PARAM = lines_matcher(\
         "JumpToHandler(ReadParameterWord($P[JUMP_HANDLER]))"
     ])
 
-VM_INIT = HandlerMatch(match_funcs([lines_matcher(\
+RESET_KEYS = HandlerMatch(match_funcs([lines_matcher(\
     [
         "VMStructFieldDword($O[KEY1]) = 0x0",
         "VMStructFieldDword($O[KEY2]) = 0x0",
@@ -167,13 +194,13 @@ VM_INIT = HandlerMatch(match_funcs([lines_matcher(\
         "VMStructFieldByte($O[ACC_BYTE]) = 0x0",
         "VMStructFieldDword($O[KEY6]) = 0x0"
     ]), UPDATE_IP_AND_JUMP]),
-    create_handler_reader_class(lambda x: "VM_INIT"))
+    create_handler_reader_class("RESET_KEYS"))
 
 
 COPY_STACK_RETURN = HandlerMatch(match_funcs([lines_matcher([
             "Std()" # Only line because of the decompiler unable to decompile loop
         ])]),
-        create_handler_reader_class(lambda x: "COPY_STACK_RETURN"))
+        create_handler_reader_class("COPY_STACK_RETURN"))
 
 
 def string_op(lines):
@@ -518,7 +545,7 @@ COMMON_BINARY_OP = HandlerMatch(match_funcs([
                         read_two_nibbles(10, "DST_TYPE_AND_SIZE", ("DST_TYPE", "DST_SIZE"))])),
     any_order([UPDATE_FLAGS, UPDATE_RESULT]),
     UPDATE_IP_AND_JUMP
-    ]), None) # TODO
+    ]), create_handler_reader_class("{O:OPERATION}_{S:DST_TYPE_AND_SIZE}_{T:DST_TYPE_AND_SIZE}_{T:SRC_TYPE_AND_SIZE}", ["DST_VALUE", "SRC_VALUE"])) # TODO Movzx movsx
 
 def unary_math_op(op_name, op, read_flag=False):
     return match_condition("If((DecodedAccByte() == $H[OPERATION_%s]))" % (op_name,),
@@ -547,7 +574,7 @@ COMMON_UNARY_OP = HandlerMatch(match_funcs([
                ]),
     any_order([UPDATE_FLAGS, UPDATE_RESULT]),
     UPDATE_IP_AND_JUMP
-    ]), None) # TODO
+    ]), create_handler_reader_class("{O:OPERATION}_{S:TYPE_AND_SIZE}_{T:TYPE_AND_SIZE}", ["VALUE"]))
 
 PUSH_POP_MAIN = lines_matcher(["If((DecodedAccByte() == $H[OPERATION_PUSH]))",
                                "    If(($V[SIZE_VAR] == 0x2))",
@@ -581,7 +608,7 @@ PUSH_POP = HandlerMatch(match_funcs([
     lines_matcher(["$V[SP_OFFSET] = VMStructOffset(ReadParameterWord($P[SP_OFFSET]))"]),
     PUSH_POP_UPDATE_STACK,
     UPDATE_IP_AND_JUMP
-    ]), None)
+    ]), create_handler_reader_class("{O:OPERATION}_{S:TYPE_AND_SIZE}_{T:TYPE_AND_SIZE}", ["VALUE"]))
 
 XCHG_OPERATION_0 = lines_matcher_any_order(["$V[XCHG_VAR_DST] = DecodedValue(VMStructField{SS}($U[DST_VALUE]))",
                                             "$V[XCHG_VAR_SIZE] = DecodedValueByte(VMStructFieldByte($U[DST_SIZE]))",
@@ -609,7 +636,7 @@ XCHG = HandlerMatch(match_funcs([
                         read_two_nibbles(10, "DST_TYPE_AND_SIZE", ("DST_TYPE", "DST_SIZE"))])),
     XCHG_OPERATION,
     UPDATE_IP_AND_JUMP
-    ]), None)
+    ]), create_handler_reader_class("XCHG_{S:DST_TYPE_AND_SIZE}_{T:DST_TYPE_AND_SIZE}_{T:SRC_TYPE_AND_SIZE}", ["DST_VALUE", "SRC_VALUE"]))
 
 
 POP_RET = match_funcs([
@@ -622,17 +649,17 @@ POP_RET = match_funcs([
 JMP_MEMVAR = HandlerMatch(match_funcs([
     lines_matcher(["*({SU}*)(ReadParameterWord($P[STACK_RETURN_OFFSET]) + SP) = *({SU}*)VMStructField{SS}(ReadParameterWord($P[VAR]))"]),
     POP_RET,
-]), create_handler_reader_class(lambda x: "JMP_MEMVAR", lambda x: [x.params["VAR"]]))
+]), create_handler_reader_class("JMP_MEMVAR", ["VAR"]))
 
 JMP_VAR = HandlerMatch(match_funcs([
     lines_matcher(["*({SU}*)(ReadParameterWord($P[STACK_RETURN_OFFSET]) + SP) = VMStructField{SS}(ReadParameterWord($P[VAR]))"]),
     POP_RET,
-]), create_handler_reader_class(lambda x: "JMP_VAR", lambda x: [x.params["VAR"]]))
+]), create_handler_reader_class("JMP_VAR", ["VAR"]))
 
 JMP_IMM = HandlerMatch(match_funcs([
     lines_matcher(["*({SU}*)(ReadParameterWord($P[STACK_RETURN_OFFSET]) + SP) = (ReadParameterDword($P[IMM]) + VMStructField{SS}(?O[BASE_ADDRESS]))"]),
     POP_RET,
-]), create_handler_reader_class(lambda x: "JMP_IMM", lambda x: [x.params["IMM"]]))
+]), create_handler_reader_class("JMP_IMM", ["IMM"]))
 
 CALL = HandlerMatch(match_funcs([
     lines_matcher(
@@ -648,9 +675,9 @@ CALL = HandlerMatch(match_funcs([
          "    *({SU}*)$V[VAR_STACK] = $V[VAR_VALUE]",
          "*({SU}*)($V[VAR_STACK] + 0x{N}) = (ReadParameterDword($P[RETURN_ADDRESS]) + VMStructField{SS}(?O[BASE_ADDRESS]))"]),
     POP_RET
-]), create_handler_reader_class(lambda x: "CALL_%s_NEXT" % x.params["CALL_TYPE"], lambda x: [x.params["VALUE"], x.params["RETURN_ADDRESS"]]))
+]), create_handler_reader_class("CALL_{O:CALL_TYPE}_NEXT", ["VALUE", "RETURN_ADDRESS"]))
 
-JMP = HandlerMatch(UPDATE_IP_AND_JUMP_PARAM, None)
+JMP = HandlerMatch(UPDATE_IP_AND_JUMP_PARAM, create_handler_reader_class("JMP", ["OPCODE_SIZE", "NEXT_HANDLER"]))
 
 UNK_JMP_IMM = HandlerMatch(match_funcs([
     lines_matcher([
@@ -667,17 +694,17 @@ UNK_JMP_IMM = HandlerMatch(match_funcs([
         "            *({SU}*)$V[ADDRESS_ADDRESS] += VMStructField{SS}(?O[BASE_ADDRESS])",
     ]),
     JMP_IMM.match_func
-]), None)
+]), create_handler_reader_class("{UNK_JMP_IMM:}"))
 
 MOV_VAR_UNKVAR = HandlerMatch(match_funcs([
     lines_matcher(["VMStructField{SS}(ReadParameterWord($P[VAR])) = VMStructField{SS}($O[UNK_VAR])"]),
     UPDATE_IP_AND_JUMP,
-]), None)
+]), create_handler_reader_class("{MOV_VAR_UNKVAR:}"))
 
 MOV_VAR_SP = HandlerMatch(match_funcs([
     lines_matcher(["VMStructField{SS}(ReadParameterWord($P[VAR])) = SP"]),
     UPDATE_IP_AND_JUMP,
-]), None)
+]), create_handler_reader_class("MOV_VAR_SP", ["VAR"]))
 
 UNK_CALLS = HandlerMatch(match_funcs([lines_matcher([
     "Push(VMStructField{SS}(ReadParameterWord($P[P1])))",
@@ -690,23 +717,23 @@ UNK_CALLS = HandlerMatch(match_funcs([lines_matcher([
     "Push(VMStructField{SS}(ReadParameterWord($P[P8])))",
     "Push(VMStructOffset(0x0))",
     "Push(VMStructOffset(0x0))"])
-]), None)
+]), create_handler_reader_class("{UNK_CALLS:}"))
 
 ADD_VAR_BASEADDRESS = HandlerMatch(match_funcs([
     lines_matcher(["VMStructField{SS}($N[VAR]) = EncodedValue(ReadParameterDword($P[VAR]))",
                    "VMStructField{SS}((DecodedValue(VMStructField{SS}($N[VAR])) & 0xFFFF)) += VMStructField{SS}(?O[BASE_ADDRESS])"]),
     UPDATE_IP_AND_JUMP,
-]), None)
+]), create_handler_reader_class("ADD_VAR_BASEADDRESS", ["VAR"]))
 
 ADD_VAR_IMM = HandlerMatch(match_funcs([
     lines_matcher(["VMStructField{SS}(ReadParameterWord($P[VAR])) += ReadParameterByte($P[IMM])"]),
     UPDATE_IP_AND_JUMP,
-]), None)
+]), create_handler_reader_class("ADD_VAR_IMM", ["VAR", "IMM"]))
 
 
 NOP = HandlerMatch(match_funcs([
     UPDATE_IP_AND_JUMP,
-]), None)
+]), create_handler_reader_class("NOP"))
 
 
 #("ja", "jae", "jb", "jbe", "jz", "jg", "jge", "jl", "jle", "jnz", "jno", "jnp", "jns", "jo", "jp" ,"js")
@@ -814,26 +841,26 @@ JCC_INSIDE = HandlerMatch(match_funcs([
     JCC,
     match_condition("If((VMStructFieldByte($O[TAKE_JUMP]) != 0x0))", [UPDATE_IP_AND_JUMP_PARAM]),
     UPDATE_IP_AND_JUMP,
-]), None)
+]), create_handler_reader_class("{O:CHECK_TYPE}", ["JUMP_VALUE", "JUMP_HANDLER"]))
 
 JCC_OUTSIDE = HandlerMatch(match_funcs([
     JCC,
     match_condition("If((VMStructFieldByte($O[TAKE_JUMP]) != 0x0))", [JMP_IMM.match_func]),
     lines_matcher(["VMStructField{SS}(ReadParameterWord($P[SP_OFFSET])) += $H[STACK_CLEAR_SIZE]"]),
     UPDATE_IP_AND_JUMP,
-]), None)
+]), create_handler_reader_class("{O:CHECK_TYPE}_IMM", ["IMM"]))
 
 PUSH_VAR = HandlerMatch(match_funcs([
     any_order([lines_matcher(["Push(VMStructField{SS}(ReadParameterWord($P[VAR])))"]),
                lines_matcher(["VMStructField{SS}(ReadParameterWord($P[SP_OFFSET])) -= 0x{N}"])]),
     UPDATE_IP_AND_JUMP,
-]), None)
+]), create_handler_reader_class("PUSH_VAR", ["VAR"]))
 
 POP_VAR = HandlerMatch(match_funcs([
     any_order([lines_matcher(["VMStructField{SS}(ReadParameterWord($P[VAR])) = Pop()"]),
                lines_matcher(["VMStructField{SS}(ReadParameterWord($P[SP_OFFSET])) += 0x{N}"])]),
     UPDATE_IP_AND_JUMP,
-]), None)
+]), create_handler_reader_class("POP_VAR", ["VAR"]))
 
 
 CLC = lines_matcher(["If(($V[FLAGS_OP] == $H[FLAGS_OP_CLC]))",
@@ -872,14 +899,14 @@ FLAGS_OP = HandlerMatch(match_funcs([
         "$V[FLAGS_OP] = ReadParameterByte($P[FLAGS_OP])"
     ]),
     CLC, CLD, CLI, CMC, STC, STD, STI,
-    UPDATE_IP_AND_JUMP]), None)
+    UPDATE_IP_AND_JUMP]), create_handler_reader_class("{O:FLAGS_OP}"))
 
 RESET_FLAGS = HandlerMatch(match_funcs([
     lines_matcher(["VMStructFieldDword($O[FLAGS]) = 0x0"]),
     UPDATE_IP_AND_JUMP,
-]), None)
+]), create_handler_reader_class("RESET_FLAGS"))
 
-HANDLERS = [VM_INIT,
+HANDLERS = [RESET_KEYS,
             COPY_STACK_RETURN,
             MOVS,
             LODS,
@@ -922,7 +949,6 @@ def match_handlers(parser, handler, fields, handlers, arch):
             continue
         info.params.update(params.parameters)
         info.vars.update(params.handler_vars)
-        # TODO: read_info
         info.reader = h.reader
 
         fields.update(params.fields)
