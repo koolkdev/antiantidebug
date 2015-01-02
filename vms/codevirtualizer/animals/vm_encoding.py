@@ -28,7 +28,7 @@ class AccByte(Key):
 
 
 class DecodingState(object):
-    def __self__(self, keys, address, read_func):
+    def __init__(self, keys, address, read_func):
         self.keys = keys
         self.address = address
         self._read = read_func
@@ -42,6 +42,17 @@ class DecodingState(object):
     def reset(self):
         for key in self.keys.itervalues():
             key.reset()
+
+def new_fish_state(address, read_func):
+    return DecodingState({
+        "KEY1": DwordKey(),
+        "KEY2": DwordKey(),
+        "KEY3": DwordKey(),
+        "KEY4": DwordKey(),
+        "KEY5": DwordKey(),
+        "KEY6": DwordKey(),
+        "ACC_BYTE": AccByte(),
+        }, address, read_func)
 
 
 class DecodingOperation(object):
@@ -294,6 +305,23 @@ def get_reading_decoding_info(handler, fields, arch):
                 current_decoding = None
                 decoding.append(acc_byte)
                 parser.replace_instructions(handler, handler, i, 1, [parser.create_macro_result("UpdateAccByte(ReadParameterByte($N[OFFSET]))", params)])
+                i += 1
+                continue
+            elif parser.match_expression(inst, "$V[VAR] = $G[READ_PARAMETER:READ_OP]($N[OFFSET])", params) and \
+                    len(params.vars["VAR"].instructions) == 1 and len(params.vars["VAR"].used_instructions) == 2:
+                # For UpdateKey,... UpdateKeyDecode
+                # TODO: Check for UpdateKey,.. UpdateKeyDecode, because right now this flow may do troubles
+                tsize = {"ReadParameterByte": 1, "ReadParameterWord": 2, "ReadParameterDword": 4}[params.vars["READ_OP"].value]
+                toffset = params.vars["OFFSET"].value
+                if current_decoding is None:
+                    current_decoding = []
+                    offset = toffset
+                    size = tsize
+                    assert offset not in offsets
+                    offsets[offset] = size
+                else:
+                    assert offset == toffset
+                    assert size == tsize
                 i += 1
                 continue
             else:
