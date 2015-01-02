@@ -14,6 +14,8 @@ class BytesReader(object):
         self.address += length
         return res
 
+
+# TODO: Move to cisc vm
 class VMReadInfo(object):
     def __init__(self, reader):
         self.size = 0

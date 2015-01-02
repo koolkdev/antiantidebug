@@ -1,0 +1,98 @@
+OPTION DONT_OPTIMIZE
+
+DEFINE_GROUP SIMPLE_MATH + - ^
+DEFINE_GROUP UPDATE_MATH + - ^ & |
+DEFINE_GROUP COMPARE == !=
+
+### Decode ###
+DEFINE_EXPRESSION_TEMPLATE
+($[X] $G[SIMPLE_MATH:OP] VMStructFieldDword(?O[KEY*:KEY]))
+=>
+DecodeWithKey($[X], SimpleOperation(Operation($[OP]), VMStructFieldDword(?O[KEY])))
+
+# Bug
+DEFINE_EXPRESSION_TEMPLATE[64]
+(ReadParameterDword($N[OFFSET]) $G[SIMPLE_MATH:OP] VMStructFieldQword(?O[KEY1]))
+=>
+DecodeWithKey(ReadParameterDword($N[OFFSET]), SimpleOperation(Operation($[OP]), VMStructFieldDword(?O[KEY1])))
+
+# For decoding next handler
+DEFINE_EXPRESSION_TEMPLATE
+(ReadParameterWord($N[OFFSET]) $G[SIMPLE_MATH:OP] $N[NUMBER])
+=>
+DecodeWithNumber(ReadParameterWord($N[OFFSET]), SimpleOperation(Operation($[OP]), $N[NUMBER]))
+
+DEFINE_EXPRESSION_TEMPLATE
+(DecodeWithKey(ReadParameterWord($N[OFFSET]), SimpleOperation($[OP1], VMStructFieldDword(?O[KEY1]))) $G[SIMPLE_MATH:OP2] $N[NUMBER])
+=>
+DecodeWithNumber(DecodeWithKey(ReadParameterWord($N[OFFSET]), SimpleOperation($[OP1], VMStructFieldDword(?O[KEY1]))), SimpleOperation(Operation($[OP2]), $N[NUMBER]))
+
+### Key Updates ###
+DEFINE_TEMPLATE
+VMStructFieldDword(?O[KEY*:KEY]) $G[UPDATE_MATH:OP]= $N[NUMBER]
+=>
+UpdateKey(VMStructFieldDword(?O[KEY]), SimpleOperation(Operation($[OP]), $[NUMBER]))
+
+DEFINE_TEMPLATE
+VMStructFieldDword(?O[KEY1]) $G[UPDATE_MATH:OP]= $V[VAR]
+=>
+UpdateKeyDecode(SimpleOperation(Operation($[OP]), $[VAR]))
+
+DEFINE_TEMPLATE
+If(((VMStructFieldDword(?O[KEY2]) & 0x1) != 0x0))
+=>
+None
+
+#UpdateKeyCond(None)
+
+DEFINE_TEMPLATE
+If(((VMStructFieldDword(?O[KEY2]) & 0x1) != 0x0))
+    UpdateKey(VMStructFieldDword(?O[KEY2]), $[X])
+=>
+UpdateKeyCond($[X])
+
+DEFINE_TEMPLATE
+VMStructFieldDword(?O[KEY6]) $G[UPDATE_MATH:OP]= VMStructFieldDword(?O[KEY1])
+=>
+UpdateKeySpecial(Operation($[OP]))
+
+# Not used anyway, no need to take it into account
+# Commented it out for a case that it is used
+#DEFINE_TEMPLATE
+#UpdateKey(VMStructFieldDword(?O[KEY5]), $[X])
+#=>
+#None
+
+
+#### Misc ####
+DEFINE_EXPRESSION_TEMPLATE
+(($[X] & 0xF0) >> 0x4)
+=>
+HIGH_NIBBLE($[X])
+
+DEFINE_EXPRESSION_TEMPLATE
+($[X] & 0xF)
+=>
+LOW_NIBBLE($[X])
+
+
+### Acc Byte ###
+DEFINE_EXPRESSION_TEMPLATE
+((VMStructFieldByte(?O[ACC_BYTE]) - $N[VALUE]) $G[COMPARE:COMP_OP] 0x0)
+=>
+(DecodedAccByte(None, None) $[COMP_OP] $[VALUE])
+
+DEFINE_EXPRESSION_TEMPLATE
+(((VMStructFieldByte(?O[ACC_BYTE]) $G[SIMPLE_MATH:OP] $N[NUMBER]) - $N[VALUE]) $G[COMPARE:COMP_OP] 0x0)
+=>
+(DecodedAccByte(SimpleOperation(Operation($[OP]), $[NUMBER]), None) $[COMP_OP] $[VALUE])
+
+DEFINE_EXPRESSION_TEMPLATE
+((((VMStructFieldByte(?O[ACC_BYTE]) $G[SIMPLE_MATH:OP1] $N[NUMBER1]) $G[SIMPLE_MATH:OP2] $N[NUMBER2]) - $N[VALUE]) $G[COMPARE:COMP_OP] 0x0)
+=>
+(DecodedAccByte(SimpleOperation(Operation($[OP1]), $[NUMBER1]), SimpleOperation(Operation($[OP2]), $[NUMBER2])) $[COMP_OP] $[VALUE])
+
+DEFINE_TEMPLATE
+VMStructFieldByte(?O[ACC_BYTE]) $G[SIMPLE_MATH:OP]= $[X]
+=>
+UpdateAccByte(SimpleOperation(Operation($G[OP]), $[X]))

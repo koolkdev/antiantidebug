@@ -7,6 +7,7 @@ import handlers_decompiler
 import handlers_parser
 import fish_handlers_cleaner
 import fish_handlers
+import vm_encoding
 
 import instruction
 import Queue
@@ -173,6 +174,7 @@ class VMOpcodeHandler(VMHandler):
     def __init__(self, handler):
         self.handler = handler
         self.info = None
+        self.decode = None
 
 class VMHandlers(object):
     def __init__(self, file, vm_info):
@@ -233,14 +235,17 @@ class VMHandlers(object):
         assert found
         print "SUCCESS"
 
+        parser_pre = handlers_parser.HandlerParser.get_parser(r"handlers\handlers_encoding_pre.txt", self.mode)
         parser = handlers_parser.HandlerParser.get_parser(r"handlers\handlers_encoding.txt", self.mode)
         parser_final = handlers_parser.HandlerParser.get_parser(r"handlers\handlers_final.txt", self.mode)
         print "Analyzing with handlers_encoding.txt..."
         if PROGRESSBAR: prog.start()
         for i in xrange(vm_info.init_handler.handlers_count):
             if PROGRESSBAR: prog.update(i)
-            #if addrs[i] == 0x42f9d2:
-            parser.clean_handler(self.handlers[i].handler, fields, parser.default_funcs + [fish_handlers_cleaner.simple_optimization])
+            #if addrs[i] == 0x43797aL:
+            parser_pre.clean_handler(self.handlers[i].handler, fields)
+            self.handlers[i].decode = vm_encoding.get_reading_decoding_info(self.handlers[i].handler, fields, arch)
+            parser.clean_handler(self.handlers[i].handler, fields)
             fish_handlers_cleaner.fix_encoding_values(self.handlers[i], fields)
             self.handlers[i].handler.optimize_instructions()
             self.handlers[i].handler.clean_instructions()
@@ -253,9 +258,9 @@ class VMHandlers(object):
                 handler_info = fish_handlers.match_handlers(parser, handler.handler, fields, fish_handlers.HANDLERS, arch)
                 if handler_info is None:
                     handler.handler.print_instructions()
-                    for i in xrange(100):
-                        handler_info = fish_handlers.match_handlers(parser, handler.handler, fields, fish_handlers.HANDLERS, arch)
-                    handler.handler.print_instructions()
+                    #for i in xrange(100):
+                    #    handler_info = fish_handlers.match_handlers(parser, handler.handler, fields, fish_handlers.HANDLERS, arch)
+                    #handler.handler.print_instructions()
                     raise Exception("Failed to detect handler")
                 handler.info = handler_info
 

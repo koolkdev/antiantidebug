@@ -173,6 +173,7 @@ class HandlerParser(object):
         self.templates = []
         self.expression_templates = []
         self.dont_optimize = False
+        self.run_once = False
         self.default_funcs = [self.replace_expression_templates, self.replace_templates]
 
         if data_reader is not None:
@@ -212,6 +213,8 @@ class HandlerParser(object):
                     option = tokens[1]
                     if option == "DONT_OPTIMIZE":
                         self.dont_optimize = True
+                    elif option == "RUN_ONCE":
+                        self.run_once = True
                     else:
                         raise Exception("Unrecognized option %s" % option)
             elif command == "DEFINE_GROUP":
@@ -291,12 +294,18 @@ class HandlerParser(object):
                 if var_type == "P":
                     return params.set_param_value(name, int_value)
                 elif match[0] == "?":
-                    if cond is not None and cond[-1] == "*":
-                        oname = params.get_field_name(int_value)
-                        if oname is not None and oname.startswith(cond[:-1]):
-                            params.real_field_name[name] = oname
-                            return True
-                        return False
+                    if cond is not None:
+                        if cond[-1] == "*":
+                            oname = params.get_field_name(int_value)
+                            if oname is not None and oname.startswith(cond[:-1]):
+                                params.real_field_name[name] = oname
+                                return True
+                            return False
+                        else:
+                            if params.fields.has_key(cond) and params.fields[cond] == int_value:
+                                params.real_field_name[name] = cond
+                                return True
+                            return False
                     return params.fields.has_key(name) and params.fields[name] == int_value
                 else:
                     if cond is not None and cond[-1] == "*":
@@ -557,7 +566,9 @@ class HandlerParser(object):
     def replace_templates(self, handler, instructions_container, index, params):
         return self.replace_instructions_templates(handler, self.templates, instructions_container, index, params)
 
-    def clean_instructions_container(self, handler, instructions_container, params, funcs, reverse=True):
+    def clean_instructions_container(self, handler, instructions_container, params, funcs, reverse=None):
+        if reverse is None:
+            reverse = not self.run_once
         if reverse:
             i = len(instructions_container.instructions) - 1
         else:
@@ -579,13 +590,15 @@ class HandlerParser(object):
                     # TODO: Do it proper
                     if i >= len(instructions_container.instructions):
                         i = len(instructions_container.instructions) - 1
+                if self.run_once:
+                    break
 
             if reverse:
                 i -= 1
             else:
                 i += 1
 
-    def clean_handler(self, handler, fields, funcs=None, reverse=True):
+    def clean_handler(self, handler, fields, funcs=None, reverse=None):
         if funcs is None:
             funcs = self.default_funcs
         params = Params(fields)

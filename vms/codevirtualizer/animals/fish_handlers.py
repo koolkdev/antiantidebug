@@ -68,21 +68,11 @@ def lines_matcher(lines):
         return match_lines(parser, instructions, index, params, lines, arch)
     return _match_lines
 
-def update_keys(parser, instructions, index, params, arch, info):
-    while index < len(instructions):
-        if str(instructions[index]).startswith("UpdateKey"):
-            index += 1
-        else:
-            break
-    return True, index
-
-def any_order(funcs, with_keys=False):
+def any_order(funcs):
     def _match_funcs(parser, instructions, index, params, arch, info):
         left = list(funcs)
         nparams = params.copy()
         while len(left) > 0:
-            if with_keys:
-                match, index = update_keys(parser, instructions, index, nparams, arch, info)
             for func in left:
                 match, nindex = func(parser, instructions, index, nparams, arch, info)
                 if match:
@@ -91,17 +81,12 @@ def any_order(funcs, with_keys=False):
                     break
             if not match:
                 return False, index
-        if with_keys:
-            match, index = update_keys(parser, instructions, index, nparams, arch, info)
         params.update(nparams)
         return True, index
     return _match_funcs
 
 def lines_matcher_any_order(lines):
     return any_order([lines_matcher([x]) for x in lines])
-
-def any_order_with_key_updates(funcs):
-    return any_order(funcs, True)
 
 def only_64(func):
     def _func(parser, instructions, index, params, arch, info):
@@ -162,13 +147,13 @@ def at_start(func):
 UPDATE_IP_AND_JUMP = lines_matcher(\
     [
         "UpdateEip($H[OPCODE_SIZE])",
-        "JumpToHandler(ReadParameterWord($P[NEXT_HANDLER], $[DECODE_NEXT_HANDLER]))"
+        "JumpToHandler(ReadParameterWord($P[NEXT_HANDLER]))"
     ])
 
 UPDATE_IP_AND_JUMP_PARAM = lines_matcher(\
     [
-        "UpdateEip(ReadParameterDword($P[JUMP_VALUE], None))",
-        "JumpToHandler(ReadParameterWord($P[JUMP_HANDLER], $[DECODE_JUMP_HANDLER]))"
+        "UpdateEip(ReadParameterDword($P[JUMP_VALUE]))",
+        "JumpToHandler(ReadParameterWord($P[JUMP_HANDLER]))"
     ])
 
 VM_INIT = HandlerMatch(match_funcs([lines_matcher(\
@@ -224,18 +209,18 @@ def string_op(lines):
     return _func
 
 
-READ_SI = string_op(["$V[VAR_SI_OFFSET] = VMStructOffset(ReadParameterWord($P[SI_OFFSET], None))"])
-READ_DI = string_op(["$V[VAR_DI_OFFSET] = VMStructOffset(ReadParameterWord($P[DI_OFFSET], None))"])
+READ_SI = string_op(["$V[VAR_SI_OFFSET] = VMStructOffset(ReadParameterWord($P[SI_OFFSET]))"])
+READ_DI = string_op(["$V[VAR_DI_OFFSET] = VMStructOffset(ReadParameterWord($P[DI_OFFSET]))"])
 
 UPDATE_SI_DI = match_one([string_op(
-        ["If((((VMStructField{SS}(ReadParameterWord($P[FLAGS_OFFSET], None)) & 0x400) | (VMStructFieldDword($O[FLAGS]) & 0x400)) != 0x0))",
+        ["If((((VMStructField{SS}(ReadParameterWord($P[FLAGS_OFFSET])) & 0x400) | (VMStructFieldDword($O[FLAGS]) & 0x400)) != 0x0))",
          "    *({SU}*)$V[VAR_DI_OFFSET] -= 0x$G[SIZES_NUM:SIZE_NUM]",
          "    *({SU}*)$V[VAR_SI_OFFSET] -= 0x$G[SIZES_NUM:SIZE_NUM]",
          "Else",
          "    *({SU}*)$V[VAR_DI_OFFSET] += 0x$G[SIZES_NUM:SIZE_NUM]",
          "    *({SU}*)$V[VAR_SI_OFFSET] += 0x$G[SIZES_NUM:SIZE_NUM]"]),
                           string_op(
-        ["If((((VMStructField{SS}(ReadParameterWord($P[FLAGS_OFFSET], None)) & 0x400) | (VMStructFieldDword($O[FLAGS]) & 0x400)) != 0x0))",
+        ["If((((VMStructField{SS}(ReadParameterWord($P[FLAGS_OFFSET])) & 0x400) | (VMStructFieldDword($O[FLAGS]) & 0x400)) != 0x0))",
          "    *({SU}*)$V[VAR_SI_OFFSET] -= 0x$G[SIZES_NUM:SIZE_NUM]",
          "    *({SU}*)$V[VAR_DI_OFFSET] -= 0x$G[SIZES_NUM:SIZE_NUM]",
          "Else",
@@ -243,118 +228,96 @@ UPDATE_SI_DI = match_one([string_op(
          "    *({SU}*)$V[VAR_DI_OFFSET] += 0x$G[SIZES_NUM:SIZE_NUM]"])])
 
 UPDATE_DI = string_op(
-        ["If(((VMStructField{SS}(ReadParameterWord($P[FLAGS_OFFSET], None)) & 0x400) != 0x0))",
+        ["If(((VMStructField{SS}(ReadParameterWord($P[FLAGS_OFFSET])) & 0x400) != 0x0))",
          "    *({SU}*)$V[VAR_DI_OFFSET] -= 0x$G[SIZES_NUM:SIZE_NUM]",
          "Else",
          "    *({SU}*)$V[VAR_DI_OFFSET] += 0x$G[SIZES_NUM:SIZE_NUM]"])
 
 UPDATE_DI2 = string_op(
-        ["If((((VMStructField{SS}(ReadParameterWord($P[FLAGS_OFFSET], None)) & 0x400) | (VMStructFieldDword($O[FLAGS]) & 0x400)) != 0x0))",
+        ["If((((VMStructField{SS}(ReadParameterWord($P[FLAGS_OFFSET])) & 0x400) | (VMStructFieldDword($O[FLAGS]) & 0x400)) != 0x0))",
          "    *({SU}*)$V[VAR_DI_OFFSET] -= 0x$G[SIZES_NUM:SIZE_NUM]",
          "Else",
          "    *({SU}*)$V[VAR_DI_OFFSET] += 0x$G[SIZES_NUM:SIZE_NUM]"])
 
 UPDATE_SI = string_op(
-        ["If(((VMStructField{SS}(ReadParameterWord($P[FLAGS_OFFSET], None)) & 0x400) != 0x0))",
+        ["If(((VMStructField{SS}(ReadParameterWord($P[FLAGS_OFFSET])) & 0x400) != 0x0))",
          "    *({SU}*)$V[VAR_SI_OFFSET] -= 0x$G[SIZES_NUM:SIZE_NUM]",
          "Else",
          "    *({SU}*)$V[VAR_SI_OFFSET] += 0x$G[SIZES_NUM:SIZE_NUM]"])
 
-MOVS_MAIN = string_op(["*($G[SIZES:SIZE]*)VMStructField{SS}(ReadParameterWord($P[DI_OFFSET], None)) = *($G[SIZES:SIZE]*)VMStructField{SS}(ReadParameterWord($P[SI_OFFSET], None))"])
+MOVS_MAIN = string_op(["*($G[SIZES:SIZE]*)VMStructField{SS}(ReadParameterWord($P[DI_OFFSET])) = *($G[SIZES:SIZE]*)VMStructField{SS}(ReadParameterWord($P[SI_OFFSET]))"])
 
 # BUG, it seems to be wrong..
 
-SCAS_MAIN = match_one([string_op(["$V[VAR_DI] = VMStructField{SS}(ReadParameterWord($P[DI_OFFSET], None))",
-                                  "$V[VAR_AX] = VMStructField{SS}(ReadParameterWord($P[AX_OFFSET], None))",
+SCAS_MAIN = match_one([string_op(["$V[VAR_DI] = VMStructField{SS}(ReadParameterWord($P[DI_OFFSET]))",
+                                  "$V[VAR_AX] = VMStructField{SS}(ReadParameterWord($P[AX_OFFSET]))",
                                   "*($G[SIZES:SIZE]*)$V[VAR_DI] -= $V[VAR_AX]"]),
-                       string_op(["$V[VAR_AX] = VMStructField{SS}(ReadParameterWord($P[AX_OFFSET], None))",
-                                  "$V[VAR_DI] = VMStructField{SS}(ReadParameterWord($P[DI_OFFSET], None))",
+                       string_op(["$V[VAR_AX] = VMStructField{SS}(ReadParameterWord($P[AX_OFFSET]))",
+                                  "$V[VAR_DI] = VMStructField{SS}(ReadParameterWord($P[DI_OFFSET]))",
                                   "*($G[SIZES:SIZE]*)$V[VAR_DI] -= $V[VAR_AX]"])])
 
 SCAS_UPDATE_FLAGS_1 = string_op(["var_1 = Flags(*($G[SIZES:SIZE]*)$V[VAR_DI] -= $V[VAR_AX])"])
 
-SCAS_UPDATE_FLAGS_2 = string_op(["If((ReadParameterByte($P[UPDATE_FLAGS], None) != 0x0))",
-                                 "    VMStructField{SS}(ReadParameterWord($P[SET_FLAGS_OFFSET], None)) = var_1"])
+SCAS_UPDATE_FLAGS_2 = string_op(["If((ReadParameterByte($P[UPDATE_FLAGS]) != 0x0))",
+                                 "    VMStructField{SS}(ReadParameterWord($P[SET_FLAGS_OFFSET])) = var_1"])
 
-SCAS_UPDATE_FLAGS = string_op(["If((ReadParameterByte($P[UPDATE_FLAGS], None) != 0x0))",
-                               "    VMStructField{SS}(ReadParameterWord($P[SET_FLAGS_OFFSET], None)) = Flags(*($G[SIZES:SIZE]*)$V[VAR_DI] -= $V[VAR_AX])"])
-CMPS_UPDATE_FLAGS_1 = string_op(["If((ReadParameterByte($P[UPDATE_FLAGS], None) != 0x0))",
-                                 "    VMStructField{SS}(ReadParameterWord($P[SET_FLAGS_OFFSET], None)) = Flags(Compare(*($G[SIZES:SIZE]*)VMStructField{SS}(ReadParameterWord($P[SI_OFFSET], None)), *($G[SIZES:SIZE]*)VMStructField{SS}(ReadParameterWord($P[DI_OFFSET], None))))"])
+SCAS_UPDATE_FLAGS = string_op(["If((ReadParameterByte($P[UPDATE_FLAGS]) != 0x0))",
+                               "    VMStructField{SS}(ReadParameterWord($P[SET_FLAGS_OFFSET])) = Flags(*($G[SIZES:SIZE]*)$V[VAR_DI] -= $V[VAR_AX])"])
+CMPS_UPDATE_FLAGS_1 = string_op(["If((ReadParameterByte($P[UPDATE_FLAGS]) != 0x0))",
+                                 "    VMStructField{SS}(ReadParameterWord($P[SET_FLAGS_OFFSET])) = Flags(Compare(*($G[SIZES:SIZE]*)VMStructField{SS}(ReadParameterWord($P[SI_OFFSET])), *($G[SIZES:SIZE]*)VMStructField{SS}(ReadParameterWord($P[DI_OFFSET]))))"])
 
-CMPS_UPDATE_FLAGS_2 = string_op(["If((ReadParameterByte($P[UPDATE_FLAGS], None) != 0x0))",
-                                 "    VMStructField{SS}(ReadParameterWord($P[SET_FLAGS_OFFSET], None)) = Flags(Compare(*($G[SIZES:SIZE]*)VMStructField{SS}(ReadParameterWord($P[DI_OFFSET], None)), *($G[SIZES:SIZE]*)VMStructField{SS}(ReadParameterWord($P[SI_OFFSET], None))))"])
+CMPS_UPDATE_FLAGS_2 = string_op(["If((ReadParameterByte($P[UPDATE_FLAGS]) != 0x0))",
+                                 "    VMStructField{SS}(ReadParameterWord($P[SET_FLAGS_OFFSET])) = Flags(Compare(*($G[SIZES:SIZE]*)VMStructField{SS}(ReadParameterWord($P[DI_OFFSET])), *($G[SIZES:SIZE]*)VMStructField{SS}(ReadParameterWord($P[SI_OFFSET]))))"])
 
-STOS_MAIN = string_op(["*($G[SIZES:SIZE]*)*({SU}*)$V[VAR_DI_OFFSET] = VMStructField$G[SIZES2:SIZE2](ReadParameterWord($P[AX_OFFSET], None))"])
+STOS_MAIN = string_op(["*($G[SIZES:SIZE]*)*({SU}*)$V[VAR_DI_OFFSET] = VMStructField$G[SIZES2:SIZE2](ReadParameterWord($P[AX_OFFSET]))"])
 
-LODS_MAIN = string_op(["VMStructField$G[SIZES2:SIZE2](ReadParameterWord($P[AX_OFFSET], None)) = *($G[SIZES:SIZE]*)*({SU}*)$V[VAR_SI_OFFSET]"])
+LODS_MAIN = string_op(["VMStructField$G[SIZES2:SIZE2](ReadParameterWord($P[AX_OFFSET])) = *($G[SIZES:SIZE]*)*({SU}*)$V[VAR_SI_OFFSET]"])
 
 
 MOVS = HandlerMatch(match_funcs([
-    update_keys,
     MOVS_MAIN,
-    update_keys,
     match_one([match_funcs([READ_SI, READ_DI]), match_funcs([READ_DI, READ_SI])]),
     UPDATE_SI_DI,
-    update_keys,
     UPDATE_IP_AND_JUMP
     ]), create_string_op_handler_reader("MOVS"))
 
 SCAS_1 = match_funcs([
-    update_keys,
     SCAS_MAIN,
-    update_keys,
     READ_DI,
     UPDATE_DI2,
-    update_keys,
     SCAS_UPDATE_FLAGS,
-    update_keys,
     UPDATE_IP_AND_JUMP
 ])
 
 SCAS_2 = match_funcs([
-    update_keys,
     SCAS_MAIN,
     SCAS_UPDATE_FLAGS_1,
-    update_keys,
     READ_DI,
     UPDATE_DI2,
-    update_keys,
     SCAS_UPDATE_FLAGS_2,
-    update_keys,
     UPDATE_IP_AND_JUMP
 ])
 
 SCAS = HandlerMatch(match_one([SCAS_1, SCAS_2]), create_string_op_handler_reader("SCAS"))
 
 LODS = HandlerMatch(match_funcs([
-    update_keys,
     READ_SI,
-    update_keys,
     LODS_MAIN,
-    update_keys,
     UPDATE_SI,
-    update_keys,
     UPDATE_IP_AND_JUMP
     ]), create_string_op_handler_reader("SCAS"))
 
 STOS = HandlerMatch(match_funcs([
-    update_keys,
     READ_DI,
-    update_keys,
     STOS_MAIN,
-    update_keys,
     UPDATE_DI,
-    update_keys,
     UPDATE_IP_AND_JUMP
     ]), create_string_op_handler_reader("SCAS"))
 
 CMPS = HandlerMatch(match_funcs([
-    update_keys,
     match_one([match_funcs([READ_SI, READ_DI]), match_funcs([READ_DI, READ_SI])]),
     UPDATE_SI_DI,
-    update_keys,
     match_one([CMPS_UPDATE_FLAGS_1, CMPS_UPDATE_FLAGS_2]),
-    update_keys,
     UPDATE_IP_AND_JUMP
     ]), create_string_op_handler_reader("SCAS"))
 
@@ -368,7 +331,7 @@ def read_two_nibbles(index, param_name=None, var_names=None):
     else:
         var_names = ("$U[%s]" % var_names[0], "$U[%s]" % var_names[1])
     lines = [
-        "$V[VAR_%d] = ReadParameterByte(%s, $[DECODE_%d])" % (index, param_name, index),
+        "$V[VAR_%d] = ReadParameterByte(%s)" % (index, param_name),
         "VMStructFieldByte(%s) = EncodedValueByte(HIGH_NIBBLE($V[VAR_%d]))" % (var_names[0], index),
         "VMStructFieldByte(%s) = EncodedValueByte(LOW_NIBBLE($V[VAR_%d]))" % (var_names[1], index),
     ]
@@ -387,7 +350,7 @@ def read_encoded_param(index, param_name=None, var_name=None):
     else:
         param_name = "$P[%s]" % param_name
     lines = [
-        "VMStructField{SS}(%s) = EncodedValue(ReadParameterDword(%s, $[DECODE_%d]))" % (var_name, param_name, index)
+        "VMStructField{SS}(%s) = EncodedValue(ReadParameterDword(%s))" % (var_name, param_name)
     ]
     return lines_matcher(lines)
 
@@ -397,7 +360,7 @@ def read_acc_byte(index, param_name=None):
     else:
         param_name = "$P[%s]" % param_name
     lines = [
-        "UpdateAccByte(SimpleOperation($[OP_%d], ReadParameterByte(%s, $[DECODE_%d])))" % (index, param_name, index)
+        "UpdateAccByte(ReadParameterByte(%s))" % (param_name, )
     ]
     return lines_matcher(lines)
 
@@ -439,26 +402,26 @@ def read_var(name):
 
 
 def load_high_dword(name):
-    return lines_matcher(["If((ReadParameterByte($P[%s_LOAD_HIGH_DWORD], None) != 0x0))" % (name, ),
-                          "    VMStructFieldQword($U[%s_VALUE]) = EncodedValue(((ReadParameterDword($P[%s_HIGH_DWORD], $[DECODE_%s]) << 0x20) | DecodedValue(VMStructFieldQword($U[%s_VALUE]))))" % (name, name, name, name)])
+    return lines_matcher(["If((ReadParameterByte($P[%s_LOAD_HIGH_DWORD]) != 0x0))" % (name, ),
+                          "    VMStructFieldQword($U[%s_VALUE]) = EncodedValue(((ReadParameterDword($P[%s_HIGH_DWORD]) << 0x20) | DecodedValue(VMStructFieldQword($U[%s_VALUE]))))" % (name, name, name)])
 
 
 RESET_ZERO_HIGH_DWORD_BOOL = lines_matcher(["VMStructFieldByte($O[ZERO_HIGH_DWORD_BOOL]) = 0x0"])
 
 def binary_math_op(op_name, op, read_flag=False):
-    return match_condition("If((DecodedAccByte($[DECODE_ACC_1], $[DECODE_ACC_2]) == $H[OPERATION_%s]))" % (op_name,),
+    return match_condition("If((DecodedAccByte() == $H[OPERATION_%s]))" % (op_name,),
                            [lines_matcher(["$V[%s_VAR_DST] = DecodedValue(VMStructField{SS}($U[DST_VALUE]))" % (op_name,),
                                            "$V[%s_VAR_SRC] = DecodedValue(VMStructField{SS}($U[SRC_VALUE]))" % (op_name,),
                                            "$V[%s_VAR_SIZE] = DecodedValueByte(VMStructFieldByte($U[DST_SIZE]))" % (op_name,),
                                            ])] +
-                           (read_flag and [lines_matcher(["var_1 = VMStructField{SS}(ReadParameterWord($P[FLAGS_OFFSET], None))"])] or []) +
+                           (read_flag and [lines_matcher(["var_1 = VMStructField{SS}(ReadParameterWord($P[FLAGS_OFFSET]))"])] or []) +
                             duplicate_by_size(["If(($V[%s_SIZE_VAR] == 0x@LOGSIZE@))" % (op_name, ),
                                                "    $V[%s_VAR_DST] = ($V[%s_VAR_DST] %s $V[%s_VAR_SRC])" % (op_name, op_name, op, op_name),
                                                "    var_1 = Flags(($V[%s_VAR_DST] %s $V[%s_VAR_SRC]))" % (op_name, op, op_name)]) +
                            [lines_matcher(["VMStructField{SS}($U[RESULT]) = EncodedValue($V[%s_VAR_DST])" % (op_name,)])])
 
 def binary_compare_op(op_name, op, read_flag=False):
-    return match_condition("If((DecodedAccByte($[DECODE_ACC_1], $[DECODE_ACC_2]) == $H[OPERATION_%s]))" % (op_name,),
+    return match_condition("If((DecodedAccByte() == $H[OPERATION_%s]))" % (op_name,),
                            [lines_matcher(["$V[%s_VAR_DST] = DecodedValue(VMStructField{SS}($U[DST_VALUE]))" % (op_name,),
                                            "$V[%s_VAR_SRC] = DecodedValue(VMStructField{SS}($U[SRC_VALUE]))" % (op_name,),
                                            "$V[%s_VAR_SIZE] = DecodedValueByte(VMStructFieldByte($U[DST_SIZE]))" % (op_name,),
@@ -472,7 +435,7 @@ def binary_movzx_movsx_op(op_name):
         letter = "S"
     else:
         letter = ""
-    return match_condition("If((DecodedAccByte($[DECODE_ACC_1], $[DECODE_ACC_2]) == $H[OPERATION_%s]))" % (op_name,),
+    return match_condition("If((DecodedAccByte() == $H[OPERATION_%s]))" % (op_name,),
                            [lines_matcher(["$V[%s_VAR_DST] = DecodedValue(VMStructField{SS}($U[DST_VALUE]))" % (op_name,),
                                            "$V[%s_VAR_SRC] = DecodedValue(VMStructField{SS}($U[SRC_VALUE]))" % (op_name,),
                                            "$V[%s_VAR_SIZE] = DecodedValueByte(VMStructFieldByte($U[SRC_SIZE]))" % (op_name,),
@@ -489,7 +452,7 @@ def binary_movzx_movsx_op(op_name):
 def binary_mul_op():
     op_name = "IMUL"
     op = "*"
-    return match_condition("If((DecodedAccByte($[DECODE_ACC_1], $[DECODE_ACC_2]) == $H[OPERATION_%s]))" % (op_name,),
+    return match_condition("If((DecodedAccByte() == $H[OPERATION_%s]))" % (op_name,),
                            [lines_matcher(["$V[%s_VAR_DST] = DecodedValue(VMStructField{SS}($U[DST_VALUE]))" % (op_name,),
                                            "$V[%s_VAR_SRC] = DecodedValue(VMStructField{SS}($U[SRC_VALUE]))" % (op_name,),
                                            "var_1 = Flags(($V[%s_VAR_DST] %s $V[%s_VAR_SRC]))" % (op_name, op, op_name),
@@ -497,17 +460,17 @@ def binary_mul_op():
 
 def binary_mov_op():
     op_name = "MOV"
-    return match_condition("If((DecodedAccByte($[DECODE_ACC_1], $[DECODE_ACC_2]) == $H[OPERATION_%s]))" % (op_name,),
+    return match_condition("If((DecodedAccByte() == $H[OPERATION_%s]))" % (op_name,),
                            [lines_matcher(["$V[%s_VAR_SRC] = DecodedValue(VMStructField{SS}($U[SRC_VALUE]))" % (op_name,),
                                            "var_1 = Flags(($V[%s_VAR_SRC] + $V[%s_VAR_SRC]))" % (op_name, op_name),
                                            "VMStructField{SS}($U[RESULT]) = EncodedValue($V[%s_VAR_SRC])" % (op_name,)])])
 
-UPDATE_FLAGS = lines_matcher(["If((ReadParameterByte($P[UPDATE_FLAGS], None) != 0x0))",
-                              "    VMStructField{SS}(ReadParameterWord($P[FLAGS_OFFSET], None)) = var_1"])
+UPDATE_FLAGS = lines_matcher(["If((ReadParameterByte($P[UPDATE_FLAGS]) != 0x0))",
+                              "    VMStructField{SS}(ReadParameterWord($P[FLAGS_OFFSET])) = var_1"])
 
 
-UPDATE_RESULT = match_condition("If((DecodedAccByte($[DECODE_ACC_1], $[DECODE_ACC_2]) != $H[OPERATION_CMP]))",
-    [match_condition("If((DecodedAccByte($[DECODE_ACC_1], $[DECODE_ACC_2]) != $H[OPERATION_TEST]))",
+UPDATE_RESULT = match_condition("If((DecodedAccByte() != $H[OPERATION_CMP]))",
+    [match_condition("If((DecodedAccByte() != $H[OPERATION_TEST]))",
          [
              lines_matcher_any_order(
                  ["$V[RESULT_VAR] = DecodedValue(VMStructField{SS}($U[RESULT]))",
@@ -535,34 +498,34 @@ UPDATE_RESULT = match_condition("If((DecodedAccByte($[DECODE_ACC_1], $[DECODE_AC
     ])
 
 COMMON_BINARY_OP = HandlerMatch(match_funcs([
-    any_order_with_key_updates([read_acc_byte(1, "OPERATION"), read_encoded_param(2), read_encoded_param(3), read_two_nibbles(4), read_two_nibbles(5)]),
-    any_order_with_key_updates([RESET_ZERO_HIGH_DWORD_BOOL, read_var_and_keep_address("DST", True), read_memvar_and_keep_address("DST"),
-                                only_64(load_high_dword("SRC")), read_var("SRC"), read_memvar("SRC")]),
+    any_order([read_acc_byte(1, "OPERATION"), read_encoded_param(2), read_encoded_param(3), read_two_nibbles(4), read_two_nibbles(5)]),
+    any_order([RESET_ZERO_HIGH_DWORD_BOOL, read_var_and_keep_address("DST", True), read_memvar_and_keep_address("DST"),
+               only_64(load_high_dword("SRC")), read_var("SRC"), read_memvar("SRC")]),
     # TODO as switch
-    any_order_with_key_updates([binary_math_op("ADD", "+"), binary_math_op("SUB", "-"),
-                                binary_math_op("XOR", "^"), binary_math_op("AND", "&"), binary_math_op("OR", "|"),
-                                binary_math_op("SHL", "<<", True), binary_math_op("SHR", ">>", True),
-                                binary_math_op("ROL", "rol", True), binary_math_op("ROR", "ror", True),
-                                binary_math_op("RCL", "rcl", True), binary_math_op("RCR", "rcr", True),
-                                binary_compare_op("CMP", "Compare"), binary_compare_op("TEST", "Test"),
-                                binary_movzx_movsx_op("MOVZX"), binary_movzx_movsx_op("MOVSX"),
-                                binary_mul_op(), binary_mov_op()
-                                ]),
+    any_order([binary_math_op("ADD", "+"), binary_math_op("SUB", "-"),
+               binary_math_op("XOR", "^"), binary_math_op("AND", "&"), binary_math_op("OR", "|"),
+               binary_math_op("SHL", "<<", True), binary_math_op("SHR", ">>", True),
+               binary_math_op("ROL", "rol", True), binary_math_op("ROR", "ror", True),
+               binary_math_op("RCL", "rcl", True), binary_math_op("RCR", "rcr", True),
+               binary_compare_op("CMP", "Compare"), binary_compare_op("TEST", "Test"),
+               binary_movzx_movsx_op("MOVZX"), binary_movzx_movsx_op("MOVSX"),
+               binary_mul_op(), binary_mov_op()
+               ]),
     # Now give the names for the parameters
-    at_start(any_order_with_key_updates([read_acc_byte(6, "OPERATION"),
-                                         read_encoded_param(7, "SRC_VALUE"), read_encoded_param(8, "DST_VALUE"),
-                                         read_two_nibbles(9, "SRC_TYPE_AND_SIZE", ("SRC_TYPE", "SRC_SIZE")),
-                                         read_two_nibbles(10, "DST_TYPE_AND_SIZE", ("DST_TYPE", "DST_SIZE"))])),
-    any_order_with_key_updates([UPDATE_FLAGS, UPDATE_RESULT]),
+    at_start(any_order([read_acc_byte(6, "OPERATION"),
+                        read_encoded_param(7, "SRC_VALUE"), read_encoded_param(8, "DST_VALUE"),
+                        read_two_nibbles(9, "SRC_TYPE_AND_SIZE", ("SRC_TYPE", "SRC_SIZE")),
+                        read_two_nibbles(10, "DST_TYPE_AND_SIZE", ("DST_TYPE", "DST_SIZE"))])),
+    any_order([UPDATE_FLAGS, UPDATE_RESULT]),
     UPDATE_IP_AND_JUMP
     ]), None) # TODO
 
 def unary_math_op(op_name, op, read_flag=False):
-    return match_condition("If((DecodedAccByte($[DECODE_ACC_1], $[DECODE_ACC_2]) == $H[OPERATION_%s]))" % (op_name,),
+    return match_condition("If((DecodedAccByte() == $H[OPERATION_%s]))" % (op_name,),
                            [lines_matcher(["$V[%s_VAR_VALUE] = DecodedValue(VMStructField{SS}($U[DST_VALUE]))" % (op_name,),
                                            "$V[%s_VAR_SIZE] = DecodedValueByte(VMStructFieldByte($U[DST_SIZE]))" % (op_name,),
                                            ])] +
-                           (read_flag and [lines_matcher(["var_1 = VMStructField{SS}(ReadParameterWord($P[FLAGS_OFFSET], None))"])] or []) +
+                           (read_flag and [lines_matcher(["var_1 = VMStructField{SS}(ReadParameterWord($P[FLAGS_OFFSET]))"])] or []) +
                             duplicate_by_size(["If(($V[%s_SIZE_VAR] == 0x@LOGSIZE@))" % (op_name, ),
                                                "    $V[%s_VAR_VALUE] = (%s$V[%s_VAR_VALUE])" % (op_name, op, op_name),
                                                "    var_1 = Flags((%s$V[%s_VAR_VALUE]))" % (op, op_name)]) +
@@ -570,28 +533,28 @@ def unary_math_op(op_name, op, read_flag=False):
 
 def unary_math_not():
     op_name = "NOT"
-    return match_condition("If((DecodedAccByte($[DECODE_ACC_1], $[DECODE_ACC_2]) == $H[OPERATION_%s]))" % (op_name,),
+    return match_condition("If((DecodedAccByte() == $H[OPERATION_%s]))" % (op_name,),
                            [lines_matcher(["var_1 = RandomFlags()",
                                            "VMStructField{SS}($U[RESULT]) = EncodedValue((~DecodedValue(VMStructField{SS}($U[DST_VALUE]))))"])])
 
 COMMON_UNARY_OP = HandlerMatch(match_funcs([
-    any_order_with_key_updates([read_acc_byte(1, "OPERATION"), read_encoded_param(2, "VALUE", "DST_VALUE"),
-                                read_two_nibbles(4, "TYPE_AND_SIZE", ("DST_TYPE", "DST_SIZE"))]),
-    any_order_with_key_updates([RESET_ZERO_HIGH_DWORD_BOOL, read_var_and_keep_address("DST", True), read_memvar_and_keep_address("DST")]),
+    any_order([read_acc_byte(1, "OPERATION"), read_encoded_param(2, "VALUE", "DST_VALUE"),
+               read_two_nibbles(4, "TYPE_AND_SIZE", ("DST_TYPE", "DST_SIZE"))]),
+    any_order([RESET_ZERO_HIGH_DWORD_BOOL, read_var_and_keep_address("DST", True), read_memvar_and_keep_address("DST")]),
     # TODO as switch
-    any_order_with_key_updates([unary_math_op("INC", "++", True), unary_math_op("DEC", "--", True),
-                                unary_math_op("NEG", "-"), unary_math_not(),
-                                ]),
-    any_order_with_key_updates([UPDATE_FLAGS, UPDATE_RESULT]),
+    any_order([unary_math_op("INC", "++", True), unary_math_op("DEC", "--", True),
+               unary_math_op("NEG", "-"), unary_math_not(),
+               ]),
+    any_order([UPDATE_FLAGS, UPDATE_RESULT]),
     UPDATE_IP_AND_JUMP
     ]), None) # TODO
 
-PUSH_POP_MAIN = lines_matcher(["If((DecodedAccByte($[DECODE_ACC_1], $[DECODE_ACC_2]) == $H[OPERATION_PUSH]))",
+PUSH_POP_MAIN = lines_matcher(["If((DecodedAccByte() == $H[OPERATION_PUSH]))",
                                "    If(($V[SIZE_VAR] == 0x2))",
                                "        PushWord($V[VALUE])",
                                "    Else",
                                "        Push($V[VALUE])",
-                               "If((DecodedAccByte($[DECODE_ACC_1], $[DECODE_ACC_2]) == $H[OPERATION_POP]))",
+                               "If((DecodedAccByte() == $H[OPERATION_POP]))",
                                "    $V[VALUE] = DecodedValue(VMStructField{SS}($U[VALUE_ADDRESS]))",
                                "    If(($V[SIZE_VAR] == 0x2))",
                                "        *(WORD*)$V[VALUE] = PopWord()",
@@ -599,29 +562,24 @@ PUSH_POP_MAIN = lines_matcher(["If((DecodedAccByte($[DECODE_ACC_1], $[DECODE_ACC
                                "        *({SU}*)$V[VALUE] = Pop()"])
 
 # BUG: Pop word doesn't seem to work...
-PUSH_POP_UPDATE_STACK = lines_matcher(["If((DecodedAccByte($[DECODE_ACC_1], $[DECODE_ACC_2]) == $H[OPERATION_PUSH]))",
+PUSH_POP_UPDATE_STACK = lines_matcher(["If((DecodedAccByte() == $H[OPERATION_PUSH]))",
                                        "    If((LOW_NIBBLE(DecodedValueByte(VMStructFieldByte($U[VALUE_SIZE]))) == 0x2))",
                                        "        *({SU}*)$V[SP_OFFSET] -= 0x2",
                                        "    Else",
                                        "        *({SU}*)$V[SP_OFFSET] -= 0x{N}",
-                                       "If((DecodedAccByte($[DECODE_ACC_1], $[DECODE_ACC_2]) == $H[OPERATION_POP]))",
+                                       "If((DecodedAccByte() == $H[OPERATION_POP]))",
                                        "    If((DecodedValue(VMStructField{SS}($U[VALUE_ADDRESS])) != $V[SP_OFFSET]))",
                                        "        *({SU}*)$V[SP_OFFSET] += 0x{N}"])
 
 PUSH_POP = HandlerMatch(match_funcs([
-    any_order_with_key_updates([read_acc_byte(1, "OPERATION"), read_encoded_param(2, "VALUE", "VALUE_VALUE"),
+    any_order([read_acc_byte(1, "OPERATION"), read_encoded_param(2, "VALUE", "VALUE_VALUE"),
                                 read_two_nibbles(3, "TYPE_AND_SIZE", ("VALUE_TYPE", "VALUE_SIZE"))]),
-    any_order_with_key_updates([RESET_ZERO_HIGH_DWORD_BOOL, read_var_and_keep_address("VALUE", True), read_memvar_and_keep_address("VALUE")]),
+    any_order([RESET_ZERO_HIGH_DWORD_BOOL, read_var_and_keep_address("VALUE", True), read_memvar_and_keep_address("VALUE")]),
     lines_matcher(["$V[VALUE] = DecodedValue(VMStructField{SS}($U[VALUE_VALUE]))"]),
-    update_keys,
     lines_matcher(["$V[SIZE_VAR] = LOW_NIBBLE(DecodedValueByte(VMStructFieldByte($U[VALUE_SIZE])))"]),
-    update_keys,
     PUSH_POP_MAIN,
-    update_keys,
-    lines_matcher(["$V[SP_OFFSET] = VMStructOffset(ReadParameterWord($P[SP_OFFSET], None))"]),
-    update_keys,
+    lines_matcher(["$V[SP_OFFSET] = VMStructOffset(ReadParameterWord($P[SP_OFFSET]))"]),
     PUSH_POP_UPDATE_STACK,
-    update_keys,
     UPDATE_IP_AND_JUMP
     ]), None)
 
@@ -640,17 +598,15 @@ XCHG_OPERATION = match_funcs(
 XCHG_T = [RESET_ZERO_HIGH_DWORD_BOOL, read_var_and_keep_address("DST", True), read_memvar_and_keep_address("DST"),
           read_var_and_keep_address("SRC"), read_memvar_and_keep_address("SRC")]
 
-# There isn't key updates in xchg, but we will do it with key updates because sometime afte reading two nibbles,
-# there is and UpdateKey for Key1 which we don'e handle.
 XCHG = HandlerMatch(match_funcs([
-    any_order_with_key_updates([read_encoded_param(2), read_encoded_param(3), read_two_nibbles(4), read_two_nibbles(5)]),
+    any_order([read_encoded_param(2), read_encoded_param(3), read_two_nibbles(4), read_two_nibbles(5)]),
     # Because it may confused between SRC and DST
     match_one([match_funcs([any_order(XCHG_T), XCHG_OPERATION_0]),
                match_funcs([any_order(XCHG_T[::-1]), XCHG_OPERATION_0])]),
     # Now give the names for the parameters
-    at_start(any_order_with_key_updates([read_encoded_param(7, "SRC_VALUE"), read_encoded_param(8, "DST_VALUE"),
-                                         read_two_nibbles(9, "SRC_TYPE_AND_SIZE", ("SRC_TYPE", "SRC_SIZE")),
-                                         read_two_nibbles(10, "DST_TYPE_AND_SIZE", ("DST_TYPE", "DST_SIZE"))])),
+    at_start(any_order([read_encoded_param(7, "SRC_VALUE"), read_encoded_param(8, "DST_VALUE"),
+                        read_two_nibbles(9, "SRC_TYPE_AND_SIZE", ("SRC_TYPE", "SRC_SIZE")),
+                        read_two_nibbles(10, "DST_TYPE_AND_SIZE", ("DST_TYPE", "DST_SIZE"))])),
     XCHG_OPERATION,
     UPDATE_IP_AND_JUMP
     ]), None)
@@ -664,33 +620,33 @@ POP_RET = match_funcs([
 ])
 
 JMP_MEMVAR = HandlerMatch(match_funcs([
-    lines_matcher(["*({SU}*)(ReadParameterWord($P[STACK_RETURN_OFFSET], None) + SP) = *({SU}*)VMStructField{SS}(ReadParameterWord($P[VAR], None))"]),
+    lines_matcher(["*({SU}*)(ReadParameterWord($P[STACK_RETURN_OFFSET]) + SP) = *({SU}*)VMStructField{SS}(ReadParameterWord($P[VAR]))"]),
     POP_RET,
 ]), create_handler_reader_class(lambda x: "JMP_MEMVAR", lambda x: [x.params["VAR"]]))
 
 JMP_VAR = HandlerMatch(match_funcs([
-    lines_matcher(["*({SU}*)(ReadParameterWord($P[STACK_RETURN_OFFSET], None) + SP) = VMStructField{SS}(ReadParameterWord($P[VAR], None))"]),
+    lines_matcher(["*({SU}*)(ReadParameterWord($P[STACK_RETURN_OFFSET]) + SP) = VMStructField{SS}(ReadParameterWord($P[VAR]))"]),
     POP_RET,
 ]), create_handler_reader_class(lambda x: "JMP_VAR", lambda x: [x.params["VAR"]]))
 
 JMP_IMM = HandlerMatch(match_funcs([
-    lines_matcher(["*({SU}*)(ReadParameterWord($P[STACK_RETURN_OFFSET], None) + SP) = (ReadParameterDword($P[IMM], None) + VMStructField{SS}(?O[BASE_ADDRESS]))"]),
+    lines_matcher(["*({SU}*)(ReadParameterWord($P[STACK_RETURN_OFFSET]) + SP) = (ReadParameterDword($P[IMM]) + VMStructField{SS}(?O[BASE_ADDRESS]))"]),
     POP_RET,
 ]), create_handler_reader_class(lambda x: "JMP_IMM", lambda x: [x.params["IMM"]]))
 
 CALL = HandlerMatch(match_funcs([
     lines_matcher(
-        ["$V[VAR_CALL_TYPE] = ReadParameterByte($P[CALL_TYPE], None)",
+        ["$V[VAR_CALL_TYPE] = ReadParameterByte($P[CALL_TYPE])",
          "If(($V[VAR_CALL_TYPE] == $H[CALL_TYPE_IMM]))",
-         "    $V[VAR_STACK] = (ReadParameterWord($P[STACK_RETURN_OFFSET], None) + SP)",
-         "    *({SU}*)$V[VAR_STACK] = (ReadParameterDword($P[VALUE], None) + VMStructField{SS}(?O[BASE_ADDRESS]))",
+         "    $V[VAR_STACK] = (ReadParameterWord($P[STACK_RETURN_OFFSET]) + SP)",
+         "    *({SU}*)$V[VAR_STACK] = (ReadParameterDword($P[VALUE]) + VMStructField{SS}(?O[BASE_ADDRESS]))",
          "If((($V[VAR_CALL_TYPE] == $H[CALL_TYPE_VAL]) || ($V[VAR_CALL_TYPE] == $H[CALL_TYPE_MEMVAL])))",
-         "    $V[VAR_VALUE] = VMStructField{SS}(ReadParameterWord($P[VALUE], None))",
+         "    $V[VAR_VALUE] = VMStructField{SS}(ReadParameterWord($P[VALUE]))",
          "    If(($V[VAR_CALL_TYPE] == $H[CALL_TYPE_MEMVAL]))",
          "        $V[VAR_VALUE] = *({SU}*)$V[VAR_VALUE]",
-         "    $V[VAR_STACK] = (ReadParameterWord($P[STACK_RETURN_OFFSET], None) + SP)",
+         "    $V[VAR_STACK] = (ReadParameterWord($P[STACK_RETURN_OFFSET]) + SP)",
          "    *({SU}*)$V[VAR_STACK] = $V[VAR_VALUE]",
-         "*({SU}*)($V[VAR_STACK] + 0x{N}) = (ReadParameterDword($P[RETURN_ADDRESS], None) + VMStructField{SS}(?O[BASE_ADDRESS]))"]),
+         "*({SU}*)($V[VAR_STACK] + 0x{N}) = (ReadParameterDword($P[RETURN_ADDRESS]) + VMStructField{SS}(?O[BASE_ADDRESS]))"]),
     POP_RET
 ]), create_handler_reader_class(lambda x: "CALL_%s_NEXT" % x.params["CALL_TYPE"], lambda x: [x.params["VALUE"], x.params["RETURN_ADDRESS"]]))
 
@@ -698,15 +654,15 @@ JMP = HandlerMatch(UPDATE_IP_AND_JUMP_PARAM, None)
 
 UNK_JMP_IMM = HandlerMatch(match_funcs([
     lines_matcher([
-        "$V[ADDRS_COUNT] = ReadParameterByte($P[ADDRS_COUNT], None)",
+        "$V[ADDRS_COUNT] = ReadParameterByte($P[ADDRS_COUNT])",
         "If((($V[ADDRS_COUNT] == 0x1) || ($V[ADDRS_COUNT] == 0x2)))",
-        "    If((*({SU}*)(ReadParameterByte($P[ADDRESS_OFFSET_1], None) + (ReadParameterDword($P[IMM], None) + VMStructField{SS}(?O[BASE_ADDRESS]))) != (ReadParameterDword($P[TARGET_ADDRESS], None) + VMStructField{SS}(?O[BASE_ADDRESS]))))",
+        "    If((*({SU}*)(ReadParameterByte($P[ADDRESS_OFFSET_1]) + (ReadParameterDword($P[IMM]) + VMStructField{SS}(?O[BASE_ADDRESS]))) != (ReadParameterDword($P[TARGET_ADDRESS]) + VMStructField{SS}(?O[BASE_ADDRESS]))))",
         "        $V[BASE_ADDRESS] = VMStructField{SS}(?O[BASE_ADDRESS])",
-        "        $V[ADDRESS_ADDRESS] = ((ReadParameterByte($P[ADDRESS_OFFSET_1], None) + ReadParameterDword($P[IMM], None)) + $V[BASE_ADDRESS])",
+        "        $V[ADDRESS_ADDRESS] = ((ReadParameterByte($P[ADDRESS_OFFSET_1]) + ReadParameterDword($P[IMM])) + $V[BASE_ADDRESS])",
         "        *({SU}*)$V[ADDRESS_ADDRESS] -= VMStructField{SS}($[UNK_ADDRESS_OFFSET])",
         "        *({SU}*)$V[ADDRESS_ADDRESS] += VMStructField{SS}(?O[BASE_ADDRESS])",
-        "        If((ReadParameterByte($P[ADDRS_COUNT], None) == 0x2))",
-        "            $V[ADDRESS_ADDRESS] = ((ReadParameterByte($P[ADDRESS_OFFSET_2], None) + ReadParameterDword($P[IMM], None)) + $V[BASE_ADDRESS])",
+        "        If((ReadParameterByte($P[ADDRS_COUNT]) == 0x2))",
+        "            $V[ADDRESS_ADDRESS] = ((ReadParameterByte($P[ADDRESS_OFFSET_2]) + ReadParameterDword($P[IMM])) + $V[BASE_ADDRESS])",
         "            *({SU}*)$V[ADDRESS_ADDRESS] -= VMStructField{SS}($[UNK_ADDRESS_OFFSET])",
         "            *({SU}*)$V[ADDRESS_ADDRESS] += VMStructField{SS}(?O[BASE_ADDRESS])",
     ]),
@@ -714,37 +670,36 @@ UNK_JMP_IMM = HandlerMatch(match_funcs([
 ]), None)
 
 MOV_VAR_UNKVAR = HandlerMatch(match_funcs([
-    lines_matcher(["VMStructField{SS}(ReadParameterWord($P[VAR], None)) = VMStructField{SS}($O[UNK_VAR])"]),
+    lines_matcher(["VMStructField{SS}(ReadParameterWord($P[VAR])) = VMStructField{SS}($O[UNK_VAR])"]),
     UPDATE_IP_AND_JUMP,
 ]), None)
 
 MOV_VAR_SP = HandlerMatch(match_funcs([
-    lines_matcher(["VMStructField{SS}(ReadParameterWord($P[VAR], None)) = SP"]),
+    lines_matcher(["VMStructField{SS}(ReadParameterWord($P[VAR])) = SP"]),
     UPDATE_IP_AND_JUMP,
 ]), None)
 
 UNK_CALLS = HandlerMatch(match_funcs([lines_matcher([
-    "Push(VMStructField{SS}(ReadParameterWord($P[P1], None)))",
-    "Push(VMStructField{SS}(ReadParameterWord($P[P2], None)))",
-    "Push(VMStructField{SS}(ReadParameterWord($P[P3], None)))",
-    "Push(VMStructField{SS}(ReadParameterWord($P[P4], None)))",
-    "Push(VMStructField{SS}(ReadParameterWord($P[P5], None)))",
-    "Push(VMStructField{SS}(ReadParameterWord($P[P6], None)))",
-    "Push(VMStructField{SS}(ReadParameterWord($P[P7], None)))",
-    "Push(VMStructField{SS}(ReadParameterWord($P[P8], None)))",
+    "Push(VMStructField{SS}(ReadParameterWord($P[P1])))",
+    "Push(VMStructField{SS}(ReadParameterWord($P[P2])))",
+    "Push(VMStructField{SS}(ReadParameterWord($P[P3])))",
+    "Push(VMStructField{SS}(ReadParameterWord($P[P4])))",
+    "Push(VMStructField{SS}(ReadParameterWord($P[P5])))",
+    "Push(VMStructField{SS}(ReadParameterWord($P[P6])))",
+    "Push(VMStructField{SS}(ReadParameterWord($P[P7])))",
+    "Push(VMStructField{SS}(ReadParameterWord($P[P8])))",
     "Push(VMStructOffset(0x0))",
     "Push(VMStructOffset(0x0))"])
 ]), None)
 
 ADD_VAR_BASEADDRESS = HandlerMatch(match_funcs([
-    update_keys,
-    lines_matcher(["VMStructField{SS}($N[VAR]) = EncodedValue(ReadParameterDword($P[VAR], $[DECODE_VAR]))",
+    lines_matcher(["VMStructField{SS}($N[VAR]) = EncodedValue(ReadParameterDword($P[VAR]))",
                    "VMStructField{SS}((DecodedValue(VMStructField{SS}($N[VAR])) & 0xFFFF)) += VMStructField{SS}(?O[BASE_ADDRESS])"]),
     UPDATE_IP_AND_JUMP,
 ]), None)
 
 ADD_VAR_IMM = HandlerMatch(match_funcs([
-    lines_matcher(["VMStructField{SS}(ReadParameterWord($P[VAR], None)) += ReadParameterByte($P[IMM], None)"]),
+    lines_matcher(["VMStructField{SS}(ReadParameterWord($P[VAR])) += ReadParameterByte($P[IMM])"]),
     UPDATE_IP_AND_JUMP,
 ]), None)
 
@@ -850,8 +805,8 @@ JS = lines_matcher(["If(($V[CHECK_TYPE] == $H[CHECK_TYPE_JS]))",
 JCC = match_funcs([
     lines_matcher([
         "VMStructFieldByte($O[TAKE_JUMP]) = 0x0",
-        "$V[FLAGS] = VMStructFieldDword(ReadParameterWord($P[FLAGS_OFFSET], None))",
-        "$V[CHECK_TYPE] = ReadParameterByte($P[CHECK_TYPE], None)"
+        "$V[FLAGS] = VMStructFieldDword(ReadParameterWord($P[FLAGS_OFFSET]))",
+        "$V[CHECK_TYPE] = ReadParameterByte($P[CHECK_TYPE])"
     ]),
     JZ, JNZ, JA, JAE, JB, JBE, JG, JGE, JL, JLE, JNO, JNP, JNS, JO, JP, JS])
 
@@ -864,19 +819,19 @@ JCC_INSIDE = HandlerMatch(match_funcs([
 JCC_OUTSIDE = HandlerMatch(match_funcs([
     JCC,
     match_condition("If((VMStructFieldByte($O[TAKE_JUMP]) != 0x0))", [JMP_IMM.match_func]),
-    lines_matcher(["VMStructField{SS}(ReadParameterWord($P[SP_OFFSET], None)) += $H[STACK_CLEAR_SIZE]"]),
+    lines_matcher(["VMStructField{SS}(ReadParameterWord($P[SP_OFFSET])) += $H[STACK_CLEAR_SIZE]"]),
     UPDATE_IP_AND_JUMP,
 ]), None)
 
 PUSH_VAR = HandlerMatch(match_funcs([
-    any_order_with_key_updates([lines_matcher(["Push(VMStructField{SS}(ReadParameterWord($P[VAR], None)))"]),
-                   lines_matcher(["VMStructField{SS}(ReadParameterWord($P[SP_OFFSET], None)) -= 0x{N}"])]),
+    any_order([lines_matcher(["Push(VMStructField{SS}(ReadParameterWord($P[VAR])))"]),
+               lines_matcher(["VMStructField{SS}(ReadParameterWord($P[SP_OFFSET])) -= 0x{N}"])]),
     UPDATE_IP_AND_JUMP,
 ]), None)
 
 POP_VAR = HandlerMatch(match_funcs([
-    any_order_with_key_updates([lines_matcher(["VMStructField{SS}(ReadParameterWord($P[VAR], None)) = Pop()"]),
-                   lines_matcher(["VMStructField{SS}(ReadParameterWord($P[SP_OFFSET], None)) += 0x{N}"])]),
+    any_order([lines_matcher(["VMStructField{SS}(ReadParameterWord($P[VAR])) = Pop()"]),
+               lines_matcher(["VMStructField{SS}(ReadParameterWord($P[SP_OFFSET])) += 0x{N}"])]),
     UPDATE_IP_AND_JUMP,
 ]), None)
 
@@ -913,8 +868,8 @@ STI = lines_matcher(["If(($V[FLAGS_OP] == $H[FLAGS_OP_STI]))",
 
 FLAGS_OP = HandlerMatch(match_funcs([
     lines_matcher([
-        "$V[FLAGS_OFFSET] = VMStructOffset(ReadParameterWord($P[FLAGS_OFFSET], None))",
-        "$V[FLAGS_OP] = ReadParameterByte($P[FLAGS_OP], None)"
+        "$V[FLAGS_OFFSET] = VMStructOffset(ReadParameterWord($P[FLAGS_OFFSET]))",
+        "$V[FLAGS_OP] = ReadParameterByte($P[FLAGS_OP])"
     ]),
     CLC, CLD, CLI, CMC, STC, STD, STI,
     UPDATE_IP_AND_JUMP]), None)

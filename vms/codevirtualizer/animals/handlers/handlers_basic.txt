@@ -45,22 +45,22 @@ VMStructFieldQword($[X])
 DEFINE_EXPRESSION_TEMPLATE
 *(BYTE*)(VMStructField@SIZE_WORD@(?O[EIP]) + $[X])
 =>
-ReadParameterByte($[X], None)
+ReadParameterByte($[X])
 
 DEFINE_EXPRESSION_TEMPLATE
 *(WORD*)(VMStructField@SIZE_WORD@(?O[EIP]) + $[X])
 =>
-ReadParameterWord($[X], None)
+ReadParameterWord($[X])
 
 DEFINE_EXPRESSION_TEMPLATE
 *(DWORD*)(VMStructField@SIZE_WORD@(?O[EIP]) + $[X])
 =>
-ReadParameterDword($[X], None)
+ReadParameterDword($[X])
 
 #DEFINE_EXPRESSION_TEMPLATE[64]
 #*(QWORD*)(VMStructField@SIZE_WORD@(?O[EIP]) + $[X])
 #=>
-#ReadParameterQword($[X], None)
+#ReadParameterQword($[X])
 
 DEFINE_TEMPLATE
 VMStructField@SIZE_WORD@(?O[EIP]) += $N[SIZE]
@@ -77,6 +77,6 @@ UpdateEip($V[X])
 
 
 DEFINE_TEMPLATE
-Jump(*(@SIZE_WORD_B@*)(VMStructField@SIZE_WORD@(?O[HANDLERS]) + (ReadParameterWord($N[OFFSET], None) << @LOG_SIZE@)))
+Jump(*(@SIZE_WORD_B@*)(VMStructField@SIZE_WORD@(?O[HANDLERS]) + (ReadParameterWord($N[OFFSET]) << @LOG_SIZE@)))
 =>
-JumpToHandler(ReadParameterWord($[OFFSET], None))
+JumpToHandler(ReadParameterWord($[OFFSET]))
