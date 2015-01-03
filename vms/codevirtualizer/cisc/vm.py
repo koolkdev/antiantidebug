@@ -375,26 +375,32 @@ class VMKey(vminstruction.VMKey):
 
     def reset(self):
         self.key = utils.uint32(0)
-        
+
+class VMFunctionJumper(object):
+    def __init__(self, file, address):
+        push_inst = file.get_instruction(address)
+        jmp_inst = file.get_instruction(push_inst.next)
+        assert push_inst.opcode == "push" and push_inst.operands[0].is_immediate()
+        assert jmp_inst.opcode == "jmp" and jmp_inst.operands[0].is_immediate()
+        self.vm_code_address = push_inst.operands[0].value
+        self.vm_address = jmp_inst.operands[0].value
+
 class VMFunction(object):
-    def __init__(self, file, vm_code_address, vm_address):
+    def __init__(self, file, jumper):
         self.mode = file.mode
         self.file = file
-        #assert push_inst.opcode == "push" and push_inst.operands[0].is_immediate()
-        #assert jmp_inst.opcode == "jmp" and jmp_inst.operands[0].is_immediate()
-        #vm_address = jmp_inst.operands[0].value
-        #vm_code_address = push_inst.operands[0].value
-        #print "` %08X %08X" % (vm_address, vm_code_address)
+        vm_address = jumper.vm_address
+        vm_code_address = jumper.vm_code_address
 
         self.vm_info = VMInfo.get_vm_info(file, vm_address)
-        assert self.vm_info != None
+        assert self.vm_info is not None
         
         addresses_to_explore = Queue.Queue()
         starts = []
         instructions = {}
         instructions_size = {}
         
-        # Kinda hackish, but we are looking for the start, and the code is layout like this:
+        # The code is layout like this:
         # jmp label
         # push adress2
         # jmp vm
@@ -409,7 +415,6 @@ class VMFunction(object):
         # ...
         # labal1:
         # ....
-        # And we are looking for the jump to label1
 
         # Start address is the address of push address2/jmp and end address is the address of vmcode
         real_vm_code_address = long(vm_code_address + self.vm_info.init_handler.encode + self.vm_info.init_handler.encode_address_high_dword)
@@ -471,14 +476,13 @@ class VMFunction(object):
                     # It isn't really an opcode, so don't store it
                     continue
                 elif inst.name == "PUSH_ENCODED":
-                    push = file.get_instruction(long(inst.args[0] + self.vm_info.init_handler.encode))
-                    if push.opcode != "push":
-                        push = file.get_instruction(push.next)
-                    assert push.opcode == "push" and push.operands[0].is_immediate()
-                    jmp = file.get_instruction(push.next)
-                    assert jmp.opcode == "jmp" and jmp.operands[0].is_immediate(vm_address)
-                    jmp_vm_code_address = long(push.operands[0].value + self.vm_info.init_handler.encode + self.vm_info.init_handler.encode_address_high_dword)
-                    addresses_to_explore.put((jmp_vm_code_address, push.operands[0].value))
+                    try:
+                        jumper = VMFunctionJumper(file, long(inst.args[0] + self.vm_info.init_handler.encode))
+                    except:
+                        tinst = file.get_instruction(long(inst.args[0] + self.vm_info.init_handler.encode))
+                        jumper = VMFunctionJumper(file, tinst.next)
+                    jmp_vm_code_address = long(jumper.vm_code_address + self.vm_info.init_handler.encode + self.vm_info.init_handler.encode_address_high_dword)
+                    addresses_to_explore.put((jmp_vm_code_address, jumper.vm_code_address))
                     starts.append(jmp_vm_code_address)
                 elif inst.name in ("ADD_DX_REALLOC", "STACK_ADD_REALLOC"): # TODO: Properly support reallocation
                     inst.name += "_VALUE"
@@ -718,6 +722,7 @@ class VMFunction(object):
         self.code = code[:-1]
         return self.code
 
+    # TODO: Make this base class function
     def compile_code(self, address = None, relocs = False):
         code = self.get_code()
         if address == None:
@@ -734,98 +739,3 @@ class VMFunction(object):
     def printfunc(self):
         for inst in self.instructions:
             print inst
-
-
-def get_vm(file, address):
-    push_inst = file.get_instruction(address)
-    jmp_inst = file.get_instruction(push_inst.next)
-    assert push_inst.opcode == "push" and push_inst.operands[0].is_immediate()
-    assert jmp_inst.opcode == "jmp" and jmp_inst.operands[0].is_immediate()
-    return VMFunction(file, push_inst.operands[0].value, jmp_inst.operands[0].value)
-
-
-def get_vm_code(file, push_inst, jmp_inst):
-    assert push_inst.opcode == "push" and push_inst.operands[0].is_immediate()
-    assert jmp_inst.opcode == "jmp" and jmp_inst.operands[0].is_immediate()
-    vm = VMFunction(file, push_inst.operands[0].value, jmp_inst.operands[0].value)
-    #print "Cleaning vm.."
-    #vm.clean()
-    #vm.printfunc()
-    #print "Converting to asm..."
-    return vm.get_code()
-
-
-def get_compiled_vm_code(file, push_inst, jmp_inst, address = None):
-    assert push_inst.opcode == "push" and push_inst.operands[0].is_immediate()
-    assert jmp_inst.opcode == "jmp" and jmp_inst.operands[0].is_immediate()
-    return VMFunction(file, push_inst.operands[0].value, jmp_inst.operands[0].value).compile_code()
-
-
-def fix_vms(pe, code_section=0, vms_section=3, macro_size=0x12):
-    vms = []
-    code_section_start = pe.sections[code_section].VirtualAddress + pe.OPTIONAL_HEADER.ImageBase
-    code_section_end = code_section_start + pe.sections[code_section].SizeOfRawData
-    vms_section_start = pe.sections[vms_section].VirtualAddress + pe.OPTIONAL_HEADER.ImageBase
-    vms_section_end = vms_section_start + pe.sections[vms_section].SizeOfRawData
-    file = mappedfile.PEMappedFile(pe)
-    decompile_all_vms(file, (code_section_start, code_section_end), (vms_section_start, vms_section_end))
-
-
-def decompile_all_vms(file, code_section, vm_section, macro_size=0x12):
-    address = code_section[0]
-    if PROGRESSBAR:
-        class Address(progressbar.Widget):
-            def update(self, pbar):
-                return '0x%x' % (pbar.currval + code_section[0])
-        widgets = ['Searching: ', Address(), ' ', progressbar.Percentage(), ' ', progressbar.Bar(),
-           ' ', progressbar.ETA()]
-        prog = progressbar.ProgressBar(maxval=code_section[1] - code_section[0], widgets=widgets, fd=sys.stdout).start()
-    while address < code_section[1]:
-        if file.read_byte(address) in (0xe9, 0xeb): # Jump
-            if file.read_byte(address) == 0xe9:
-                jmp_address = file.read_dword(address + 1) + address + 5
-            else:
-                jmp_address = file.read_byte(address + 1) + address + 2
-            if vm_section[0] <= jmp_address <= vm_section[1]:
-                try:
-                    push_inst = file.get_instruction(jmp_address)
-                    jmp_inst = file.get_instruction(push_inst.next)
-                except:
-                    address += 1
-                    continue
-                if not (push_inst.opcode == "push" and push_inst.operands[0].is_immediate()):
-                    address += 1
-                    continue
-                if not (jmp_inst.opcode == "jmp" and jmp_inst.operands[0].is_immediate()):
-                    address += 1
-                    continue
-                # Now it must be a vm
-                print "Found VM: 0x%08x" % address
-                decompile_vm(file, address, macro_size)
-        address += 1
-        if PROGRESSBAR:
-            prog.update(address - code_section[0])
-    if PROGRESSBAR:
-        prog.finish()
-
-
-def decompile_vm(file, address, macro_size=0x12):
-    if file.read_byte(address) == 0xe9:
-        jmp_address = file.read_dword(address + 1) + address + 5
-    elif file.read_byte(address) == 0xe8:
-        jmp_address = file.read_byte(address + 1) + address + 2
-    else:
-        assert False
-    vm = get_vm(file, jmp_address)
-    code = vm.get_code()
-    print code
-    last_line = code.splitlines()[-1]
-    assert last_line.startswith("jmp ")
-    end_address = int(last_line.split()[1].replace("?", ""), 16)
-    code_address, compiled_code, relocations_info = vm.compile_code(address + macro_size, relocs=True)
-
-    assert end_address - code_address > len(compiled_code)
-    if end_address - code_address - macro_size != len(compiled_code) - 2:
-        print "Warning: Code size is different %d" % (end_address - code_address - macro_size - (len(compiled_code) - 2))
-    file.write(address, "\xeb" + chr(macro_size - 2))
-    file.write(code_address, compiled_code)

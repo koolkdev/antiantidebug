@@ -182,7 +182,7 @@ class VMHandlers(object):
         self.handlers = {}
         addrs = {}
         # Let's find all the handlers now
-        print "Decompiling handlers..."
+        print "Decompiling handlers... (%d handlers)" % vm_info.init_handler.handlers_count
         if PROGRESSBAR:
             prog = progressbar.ProgressBar(maxval=vm_info.init_handler.handlers_count, fd=sys.stdout).start()
         for i in xrange(vm_info.init_handler.handlers_count):
@@ -207,7 +207,7 @@ class VMHandlers(object):
             fish_handlers_cleaner.fix_64_junk_bool_field(self.handlers.values(), fields)
 
         parser = handlers_parser.HandlerParser.get_parser(r"handlers\handlers_basic.txt", self.mode)
-        print "Analyzing with handlers_basic.txt..."
+        print "Analyzing handlers... PASS 1/2"
         if PROGRESSBAR: prog.start()
         for i in xrange(vm_info.init_handler.handlers_count):
             if PROGRESSBAR: prog.update(i)
@@ -229,7 +229,7 @@ class VMHandlers(object):
         parser_pre = handlers_parser.HandlerParser.get_parser(r"handlers\handlers_encoding_pre.txt", self.mode)
         parser = handlers_parser.HandlerParser.get_parser(r"handlers\handlers_encoding.txt", self.mode)
         parser_final = handlers_parser.HandlerParser.get_parser(r"handlers\handlers_final.txt", self.mode)
-        print "Analyzing with handlers_encoding.txt..."
+        print "Analyzing handlers... PASS 2/2"
         if PROGRESSBAR: prog.start()
         for i in xrange(vm_info.init_handler.handlers_count):
             if PROGRESSBAR: prog.update(i)
@@ -243,6 +243,7 @@ class VMHandlers(object):
         if PROGRESSBAR: prog.finish()
 
 
+        print "Detecting handlers...",
         for handler in self.handlers.itervalues():
             if handler.info is None:
                 handler_info = fish_handlers.match_handlers(parser, handler.handler, fields, fish_handlers.HANDLERS, arch)
@@ -250,6 +251,7 @@ class VMHandlers(object):
                     handler.handler.print_instructions()
                     raise Exception("Failed to detect handler")
                 handler.info = handler_info
+        print "SUCCESS"
 
 
         # for index, handler in self.handlers.iteritems():
@@ -264,6 +266,7 @@ class VMHandlers(object):
 class VMInfo(object):
     cache = {}
     def __init__(self, file, vm_address):
+        print "Parsing FISH%d VM at 0x%08x" % (file.mode, vm_address)
         self.struct_fields = {}
         self.regs_fields = {}
         self.init_handler = VMInit(self, file, vm_address)
@@ -314,7 +317,6 @@ class VMFunctionJumper(object):
         reader.get_cond(lambda x: str(x) == mode.translate("pop {R:bx}"))
         reader.get_cond(lambda x: str(x) == mode.translate("pop {R:ax}"))
         self.vm_address = reader.get_cond(lambda x: x.opcode == "jmp" and x.operands[0].is_immediate()).operands[0].value
-        self.end = reader.address
 
 class VMFunction(object):
     def __init__(self, file, jumper):
@@ -325,7 +327,6 @@ class VMFunction(object):
         vm_address = jumper.vm_address
         vm_code_address = jumper.vm_code_address
         first_handler = jumper.first_handler
-        print "Getting VM %08X %08X" % (vm_address, vm_code_address)
 
         self.vm_info = VMInfo.get_vm_info(file, vm_address)
         assert self.vm_info != None
@@ -345,7 +346,6 @@ class VMFunction(object):
         addresses_to_explore.put((real_vm_code_address, first_handler))
         starts.append(real_vm_code_address)
 
-        to_print = False
         while not addresses_to_explore.empty():
             next_labeled = True
             address, handler = addresses_to_explore.get()
@@ -438,7 +438,6 @@ class VMFunction(object):
                         reg = reg[1:]
                     self.vm_info.regs_fields[reg] = reader.get_cond(lambda x: x.name == arch.translate("POP_{SU}_VAR")).args[0]
             reader.get_cond(lambda x: x.name == "ADD_SP_IMM" and x.args[0] == arch.native_size() * 2)
-            print self.vm_info.regs_fields
 
         self.instructions = []
         for address in sorted(instructions.keys()):
@@ -582,7 +581,6 @@ class VMFunction(object):
         if relocs:
             return address, compiled_code[0], compiled_code[1]
         return address, compiled_code
-
 
 
     def printfunc(self):
