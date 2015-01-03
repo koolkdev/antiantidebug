@@ -77,7 +77,7 @@ def create_handler_reader_class(name, params=[]):
     return GenericHandlerReader
 
 def create_string_op_handler_reader(op_name):
-    class StringOpHandlerReader(object):
+    class StringOpHandlerReader(HandlerReader):
         def get_name(self):
             return op_name + {1: "B", 2: "W", 4: "D", 8: "Q"}[self.info.vars["SIZE"]]
     return StringOpHandlerReader
@@ -667,9 +667,9 @@ CALL = HandlerMatch(match_funcs([
          "If(($V[VAR_CALL_TYPE] == $H[CALL_TYPE_IMM]))",
          "    $V[VAR_STACK] = (ReadParameterWord($P[STACK_RETURN_OFFSET]) + SP)",
          "    *({SU}*)$V[VAR_STACK] = (ReadParameterDword($P[VALUE]) + VMStructField{SS}(?O[BASE_ADDRESS]))",
-         "If((($V[VAR_CALL_TYPE] == $H[CALL_TYPE_VAL]) || ($V[VAR_CALL_TYPE] == $H[CALL_TYPE_MEMVAL])))",
+         "If((($V[VAR_CALL_TYPE] == $H[CALL_TYPE_VAR]) || ($V[VAR_CALL_TYPE] == $H[CALL_TYPE_MEMVAR])))",
          "    $V[VAR_VALUE] = VMStructField{SS}(ReadParameterWord($P[VALUE]))",
-         "    If(($V[VAR_CALL_TYPE] == $H[CALL_TYPE_MEMVAL]))",
+         "    If(($V[VAR_CALL_TYPE] == $H[CALL_TYPE_MEMVAR]))",
          "        $V[VAR_VALUE] = *({SU}*)$V[VAR_VALUE]",
          "    $V[VAR_STACK] = (ReadParameterWord($P[STACK_RETURN_OFFSET]) + SP)",
          "    *({SU}*)$V[VAR_STACK] = $V[VAR_VALUE]",
@@ -677,7 +677,7 @@ CALL = HandlerMatch(match_funcs([
     POP_RET
 ]), create_handler_reader_class("CALL_{O:CALL_TYPE}_NEXT", ["VALUE", "RETURN_ADDRESS"]))
 
-JMP = HandlerMatch(UPDATE_IP_AND_JUMP_PARAM, create_handler_reader_class("JMP", ["OPCODE_SIZE", "NEXT_HANDLER"]))
+JMP = HandlerMatch(UPDATE_IP_AND_JUMP_PARAM, create_handler_reader_class("JMP", ["JUMP_VALUE", "JUMP_HANDLER"]))
 
 UNK_JMP_IMM = HandlerMatch(match_funcs([
     lines_matcher([
@@ -694,7 +694,7 @@ UNK_JMP_IMM = HandlerMatch(match_funcs([
         "            *({SU}*)$V[ADDRESS_ADDRESS] += VMStructField{SS}(?O[BASE_ADDRESS])",
     ]),
     JMP_IMM.match_func
-]), create_handler_reader_class("{UNK_JMP_IMM:}"))
+]), create_handler_reader_class("JMP_UNKNOWN", ["IMM"])) # TODO: When addrs count is 1 or 2
 
 MOV_VAR_UNKVAR = HandlerMatch(match_funcs([
     lines_matcher(["VMStructField{SS}(ReadParameterWord($P[VAR])) = VMStructField{SS}($O[UNK_VAR])"]),
@@ -869,12 +869,12 @@ CLC = lines_matcher(["If(($V[FLAGS_OP] == $H[FLAGS_OP_CLC]))",
 CLD = lines_matcher(["If(($V[FLAGS_OP] == $H[FLAGS_OP_CLD]))",
                      "    $V[FLAGS2] = (~0x400)",
                      "    *(DWORD*)$V[FLAGS_OFFSET] &= $V[FLAGS2]",
-                     "    VMStructFieldDword(?O[FLAGS]) &= $V[FLAGS2]"])
+                     "    VMStructFieldDword($O[FLAGS]) &= $V[FLAGS2]"])
 
 CLI = lines_matcher(["If(($V[FLAGS_OP] == $H[FLAGS_OP_CLI]))",
                      "    $V[FLAGS2] = (~0x200)",
                      "    *(DWORD*)$V[FLAGS_OFFSET] &= $V[FLAGS2]",
-                     "    VMStructFieldDword(?O[FLAGS]) &= $V[FLAGS2]"])
+                     "    VMStructFieldDword($O[FLAGS]) &= $V[FLAGS2]"])
 
 CMC = lines_matcher(["If(($V[FLAGS_OP] == $H[FLAGS_OP_CMC]))",
                      "    If(((*(DWORD*)$V[FLAGS_OFFSET] & 0x1) != 0x0))",
@@ -887,11 +887,11 @@ STC = lines_matcher(["If(($V[FLAGS_OP] == $H[FLAGS_OP_STC]))",
 
 STD = lines_matcher(["If(($V[FLAGS_OP] == $H[FLAGS_OP_STD]))",
                      "    *(DWORD*)$V[FLAGS_OFFSET] |= 0x400",
-                     "    VMStructFieldDword(?O[FLAGS]) |= 0x400"])
+                     "    VMStructFieldDword($O[FLAGS]) |= 0x400"])
 
 STI = lines_matcher(["If(($V[FLAGS_OP] == $H[FLAGS_OP_STI]))",
                      "    *(DWORD*)$V[FLAGS_OFFSET] |= 0x200",
-                     "    VMStructFieldDword(?O[FLAGS]) |= 0x200"])
+                     "    VMStructFieldDword($O[FLAGS]) |= 0x200"])
 
 FLAGS_OP = HandlerMatch(match_funcs([
     lines_matcher([

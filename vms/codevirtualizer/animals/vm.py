@@ -340,7 +340,7 @@ class VMFunction(object):
         instructions_size = {}
 
         # Start address is the address of push address2/jmp and end address is the address of vmcode
-        real_vm_code_address = long(vm_code_address + self.vm_info.init_handler.base_address)
+        real_vm_code_address = vm_code_address + self.vm_info.init_handler.base_address
         self.code_address = real_vm_code_address
 
         print ("Reading VMFunction at 0x%08x..." % self.code_address),
@@ -364,15 +364,48 @@ class VMFunction(object):
                         instructions[state.address].set_info("labled", True)
                     break
 
-                handler = self.vm_info.handlers.handlers[handler]
-                handler_reader = handler.info.reader(handler.info, handler.decode.decode(state))
+                h = self.vm_info.handlers.handlers[handler]
+                handler_reader = h.info.reader(h.info, h.decode.decode(state))
 
                 inst = handler_reader.get_instruction()
 
                 inst.address = state.address
-                print inst
                 inst.set_info("labled", next_labeled)
                 next_labeled = False
+
+                if inst.name == "JMP_UNKNOWN":
+                    # Jump to an unknown instruction
+                    assert handler_reader.params["ADDRS_COUNT"] not in (1,2) # TODO
+                    address = inst.args[0] + self.vm_info.init_handler.base_address
+                    i = file.get_instruction(address)
+                    jumper = VMFunctionJumper(file, i.next)
+                    addresses_to_explore.put((jumper.vm_code_address + self.vm_info.init_handler.base_address, jumper.first_handler))
+                elif inst.name == "JMP":
+                    state.update_ip(inst.args[0])
+                    inst.args[0] = state.address
+                    handler = inst.args[1]
+                    inst.args = inst.args[:1]
+                    instructions[inst.address] = inst
+                    #print inst
+                    continue
+                elif inst.name in ("JZ", "JNZ", "JA", "JAE", "JB", "JBE", "JG", "JGE", "JL", "JLE", "JNO", "JNP", "JNS", "JO", "JP", "JS"):
+                    state.update_ip(inst.args[0])
+                    inst.args[0] = state.address
+                    addresses_to_explore.put((inst.args[0], inst.args[1]))
+                    inst.args = inst.args[:1]
+                    state.address = inst.address
+                elif inst.name in ("CALL_IMM_NEXT", "CALL_VAR_NEXT", "CALL_MEMVAR_NEXT"):
+                    if inst.name == "CALL_IMM_NEXT":
+                        inst.args[0] += self.vm_info.init_handler.base_address
+                    jumper = VMFunctionJumper(file, inst.args[1] + self.vm_info.init_handler.base_address)
+                    addresses_to_explore.put((jumper.vm_code_address + self.vm_info.init_handler.base_address, jumper.first_handler))
+                    inst.args = inst.args[:-1]
+                    inst.name = inst.name[:-len("_NEXT")]
+                elif inst.name == "RESET_KEYS":
+                    state.reset()
+
+
+
 
                 # if inst.name in ("JMP", "JMPIF"):
                 #     inst.args[0] += bytes_reader.address
@@ -408,10 +441,9 @@ class VMFunction(object):
                     state.update_ip(handler_reader.get_size())
 
                 instructions[inst.address] = inst
+                #print inst
         print "SUCCESS"
 
-        last_address = 0
-        last_size = 0
         self.instructions = []
         for address in sorted(instructions.keys()):
             if instructions[address].info["labled"]:
@@ -421,10 +453,6 @@ class VMFunction(object):
                     label = vminstruction.VMInstruction("LABEL", address)
                 label.address = address
                 self.instructions.append(label)
-            #if last_address and address - last_address != last_size:
-            #    print "Gap: %d" % (address - last_address - last_size)
-            last_address = address
-            last_size = instructions_size[address]
             self.instructions.append(instructions[address])
         self.code = None
 
