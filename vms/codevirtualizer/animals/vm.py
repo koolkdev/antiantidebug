@@ -175,7 +175,7 @@ class VMOpcodeHandler(VMHandler):
 class VMHandlers(object):
     def __init__(self, file, vm_info):
         #clean = cleaner.Cleaner(executable)
-        fix_handlers = file.read_dword(vm_info.init_handler.vm_struct + vm_info.struct_fields["HANDLERS"]) != vm_info.init_handler.handlers_address
+        fix_handlers = file.read_pointer(vm_info.init_handler.vm_struct + vm_info.struct_fields["HANDLERS"]) != vm_info.init_handler.handlers_address
         self.mode = file.mode
         arch = file.get_arch()
 
@@ -525,7 +525,8 @@ class VMFunction(object):
                 if section_counter == 0:
                     reader.get_cond(lambda x: x.name == "RESET_FLAGS")
 
-                # if section_counter == 1:
+                if section_counter == 1:
+                    code = cleaner.clean_animals_vm_code(code, self.file.get_arch())
                 #     index = max(max(code.rfind("add esp, 0x"), code.rfind("pop esp")), code.rfind("mov esp, dword [esp]"))
                 #     # Deal with anti-debugging
                 #     if index != -1:
@@ -562,7 +563,8 @@ class VMFunction(object):
                 inst = reader.get()
             code += sectioncode
 
-        # if section_counter == 1:
+        if section_counter == 1:
+            code = cleaner.clean_animals_vm_code(code, self.file.get_arch())
         #     index = max(max(code.rfind("add esp, 0x"), code.rfind("pop esp")), code.rfind("mov esp, dword [esp]"))
         #     # Deal with anti-debugging
         #     if index != -1:

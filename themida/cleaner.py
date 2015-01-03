@@ -103,3 +103,50 @@ class JunkSkipper(object):
                     return self.get_next_real_instruction(next4.next)
             return inst
         return inst
+
+
+def _get_opcode(line):
+    return line.split(" ")[0]
+
+
+def _get_operand(line, i):
+    return line[line.find(" ")+1:].split(", ")[i]
+
+
+def clean_animals_vm_code(code, arch):
+    lines = code.splitlines()
+    while _get_opcode(lines[0]) == "push" and _get_operand(lines[0], 0) in arch.get_registers():
+        stack = [_get_operand(lines[0], 0)]
+        i = 1
+        while stack:
+            opcode = _get_opcode(lines[i])
+            if opcode in ("test", "mov", "add", "sub", "and", "xor", "or", "shr", "shl"):
+                op1 = _get_operand(lines[i], 0)
+                op2 = _get_operand(lines[i], 1)
+                if arch.reg_native(op1) is None:
+                    return code
+                if opcode != "test" and arch.reg_native(op1) not in stack:
+                    return code
+                if arch.reg_native(op2) is None and not op2.startswith("0x"):
+                    return code
+            elif opcode == "push":
+                op1 = _get_operand(lines[i], 0)
+                if op1 not in arch.get_registers():
+                    return code
+                stack.append(op1)
+            elif opcode == "pop":
+                op1 = _get_operand(lines[i], 0)
+                if op1 != stack.pop() and op1 not in stack:
+                    return code
+            elif opcode == "pushf":
+                stack.append("flags")
+            elif opcode == "popf":
+                if stack.pop() != "flags":
+                    return code
+            else:
+                return code
+            i += 1
+        code = "\n".join(lines[i:]) + "\n"
+        lines = code.splitlines()
+    return code
+
