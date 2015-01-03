@@ -706,6 +706,11 @@ MOV_VAR_SP = HandlerMatch(match_funcs([
     UPDATE_IP_AND_JUMP,
 ]), create_handler_reader_class("MOV_VAR_SP", ["VAR"]))
 
+MOV_SP_VAR = HandlerMatch(match_funcs([
+    lines_matcher(["SP = VMStructField{SS}(ReadParameterWord($P[VAR]))"]),
+    UPDATE_IP_AND_JUMP,
+]), create_handler_reader_class("MOV_SP_VAR", ["VAR"]))
+
 UNK_CALLS = HandlerMatch(match_funcs([lines_matcher([
     "Push(VMStructField{SS}(ReadParameterWord($P[P1])))",
     "Push(VMStructField{SS}(ReadParameterWord($P[P2])))",
@@ -725,15 +730,12 @@ ADD_VAR_BASEADDRESS = HandlerMatch(match_funcs([
     UPDATE_IP_AND_JUMP,
 ]), create_handler_reader_class("ADD_VAR_BASEADDRESS", ["VAR"]))
 
-ADD_VAR_IMM = HandlerMatch(match_funcs([
-    lines_matcher(["VMStructField{SS}(ReadParameterWord($P[VAR])) += ReadParameterByte($P[IMM])"]),
+ADD_SP_IMM = HandlerMatch(match_funcs([
+    lines_matcher(["$V[VAR] = ReadParameterByte($P[IMM])",
+                   "SP += $V[VAR]",
+                   "VMStructField{SS}(ReadParameterWord($P[VAR])) += $V[VAR]"]),
     UPDATE_IP_AND_JUMP,
-]), create_handler_reader_class("ADD_VAR_IMM", ["VAR", "IMM"]))
-
-
-NOP = HandlerMatch(match_funcs([
-    UPDATE_IP_AND_JUMP,
-]), create_handler_reader_class("NOP"))
+]), create_handler_reader_class("ADD_SP_IMM", ["IMM"]))
 
 
 #("ja", "jae", "jb", "jbe", "jz", "jg", "jge", "jl", "jle", "jnz", "jno", "jnp", "jns", "jo", "jp" ,"js")
@@ -846,7 +848,8 @@ JCC_INSIDE = HandlerMatch(match_funcs([
 JCC_OUTSIDE = HandlerMatch(match_funcs([
     JCC,
     match_condition("If((VMStructFieldByte($O[TAKE_JUMP]) != 0x0))", [JMP_IMM.match_func]),
-    lines_matcher(["VMStructField{SS}(ReadParameterWord($P[SP_OFFSET])) += $H[STACK_CLEAR_SIZE]"]),
+    lines_matcher(["SP += $H[STACK_CLEAR_SIZE]",
+                   "VMStructField{SS}(ReadParameterWord($P[SP_OFFSET])) += $H[STACK_CLEAR_SIZE]"]),
     UPDATE_IP_AND_JUMP,
 ]), create_handler_reader_class("{O:CHECK_TYPE}_IMM", ["IMM"]))
 
@@ -923,12 +926,12 @@ HANDLERS = [RESET_KEYS,
             CALL,
             MOV_VAR_UNKVAR,
             MOV_VAR_SP,
+            MOV_SP_VAR,
             ADD_VAR_BASEADDRESS,
-            ADD_VAR_IMM,
+            ADD_SP_IMM,
             PUSH_VAR,
             POP_VAR,
             PUSH_POP,
-            NOP,
             UNK_CALLS,
             FLAGS_OP,
             RESET_FLAGS,

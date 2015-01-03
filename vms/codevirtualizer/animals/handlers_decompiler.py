@@ -728,7 +728,7 @@ class Handler(object):
             instructions.append(op)
 
         def set_value(lvalue, value):
-            if isinstance(lvalue, ValueOf):
+            if isinstance(lvalue, ValueOf) or type(lvalue) is SP:
                 instructions.append(value)
                 self.make_visible(value)
 

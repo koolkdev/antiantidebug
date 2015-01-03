@@ -316,9 +316,11 @@ def get_reading_decoding_info(handler, fields, arch):
                 i += 1
                 continue
             elif parser.match_expression(inst, "$V[VAR] = $G[READ_PARAMETER:READ_OP]($N[OFFSET])", params) and \
-                    len(params.vars["VAR"].instructions) == 1 and len(params.vars["VAR"].used_instructions) == 2:
+                    len(params.vars["VAR"].instructions) == 1 and len(params.vars["VAR"].used_instructions) == 2 and \
+                    type(handler.instructions[i+1]) is handlers_parser.Macro and handler.instructions[i+1].name == "UpdateKey":
                 # For UpdateKey,... UpdateKeyDecode
                 # TODO: Check for UpdateKey,.. UpdateKeyDecode, because right now this flow may do troubles
+                # Checking only for UpdateKey isn't enough
                 tsize = {"ReadParameterByte": 1, "ReadParameterWord": 2, "ReadParameterDword": 4}[params.vars["READ_OP"].value]
                 toffset = params.vars["OFFSET"].value
                 if current_decoding is None:
