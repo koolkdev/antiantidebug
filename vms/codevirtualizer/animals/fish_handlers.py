@@ -15,9 +15,10 @@ class HandlerInfo(object):
 
 
 class HandlerReader(object):
-    def __init__(self, info, params):
+    def __init__(self, info, params, arch):
         self.info = info
         self.params = {}
+        self.arch = arch
         for name, index in self.info.params.iteritems():
             self.params[name] = params[index]
         assert len(self.params) == len(params)
@@ -47,15 +48,24 @@ class HandlerReader(object):
 
 
 def create_handler_reader_class(name, params=[]):
-    def create_handler_name_from_params(params):
+    def create_handler_name_from_params(reader):
         ns = name
+        params = reader.params
         for var in re.findall("\{([\w:]+)\}", name):
             t, n = var.split(":")
             if t == "S": # Size
                 nvar = ["BYTE", "WORD", "DWORD", "QWORD"][(params[n]&0xf)-1]
+                # Hack for movzx/movsx
+                if ns.startswith("MOVZX_") or ns.startswith("MOVSX_"):
+                    nvar += "_" + ["BYTE", "WORD", "DWORD", "QWORD"][(params[n.replace("DST", "SRC")]&0xf)-1]
+            elif t == "SS": # Size stack
+                if (params[n]&0xf) == 0x2:
+                    nvar = "WORD"
+                else:
+                    nvar = reader.arch.translate("{SU}")
             elif t == "T": # Type
                 nvar = ["VAR", "MEMVAR", "IMM"][(params[n]>>4)-1]
-            elif t == "O": # Type
+            elif t == "O": # Operation
                 nvar = params[n]
                 try:
                     assert type(nvar) is str
@@ -69,10 +79,17 @@ def create_handler_reader_class(name, params=[]):
 
     class GenericHandlerReader(HandlerReader):
         def get_name(self):
-            return create_handler_name_from_params(self.params)
+            return create_handler_name_from_params(self)
 
         def get_params(self):
-            return [self.params[x] for x in params]
+            ret = []
+            for x in params:
+                ret.append(self.params[x])
+                # Hack for 64bit numbers
+                if self.arch.native_size() == 8 and \
+                        x == "SRC_VALUE" and "SRC_LOAD_HIGH_DWORD" in self.params and self.params["SRC_LOAD_HIGH_DWORD"]:
+                    ret[-1] |= self.params["SRC_HIGH_DWORD"] << 0x20
+            return ret
 
     return GenericHandlerReader
 
@@ -195,13 +212,6 @@ RESET_KEYS = HandlerMatch(match_funcs([lines_matcher(\
         "VMStructFieldDword($O[KEY6]) = 0x0"
     ]), UPDATE_IP_AND_JUMP]),
     create_handler_reader_class("RESET_KEYS"))
-
-
-COPY_STACK_RETURN = HandlerMatch(match_funcs([lines_matcher([
-            "Std()" # Only line because of the decompiler unable to decompile loop
-        ])]),
-        create_handler_reader_class("COPY_STACK_RETURN"))
-
 
 def string_op(lines):
     def _func(parser, instructions, index, params, arch, info):
@@ -332,21 +342,21 @@ LODS = HandlerMatch(match_funcs([
     LODS_MAIN,
     UPDATE_SI,
     UPDATE_IP_AND_JUMP
-    ]), create_string_op_handler_reader("SCAS"))
+    ]), create_string_op_handler_reader("LODS"))
 
 STOS = HandlerMatch(match_funcs([
     READ_DI,
     STOS_MAIN,
     UPDATE_DI,
     UPDATE_IP_AND_JUMP
-    ]), create_string_op_handler_reader("SCAS"))
+    ]), create_string_op_handler_reader("STOS"))
 
 CMPS = HandlerMatch(match_funcs([
     match_one([match_funcs([READ_SI, READ_DI]), match_funcs([READ_DI, READ_SI])]),
     UPDATE_SI_DI,
     match_one([CMPS_UPDATE_FLAGS_1, CMPS_UPDATE_FLAGS_2]),
     UPDATE_IP_AND_JUMP
-    ]), create_string_op_handler_reader("SCAS"))
+    ]), create_string_op_handler_reader("CMPS"))
 
 def read_two_nibbles(index, param_name=None, var_names=None):
     if param_name is None:
@@ -608,7 +618,7 @@ PUSH_POP = HandlerMatch(match_funcs([
     lines_matcher(["$V[SP_OFFSET] = VMStructOffset(ReadParameterWord($P[SP_OFFSET]))"]),
     PUSH_POP_UPDATE_STACK,
     UPDATE_IP_AND_JUMP
-    ]), create_handler_reader_class("{O:OPERATION}_{S:TYPE_AND_SIZE}_{T:TYPE_AND_SIZE}", ["VALUE"]))
+    ]), create_handler_reader_class("{O:OPERATION}_{SS:TYPE_AND_SIZE}_{T:TYPE_AND_SIZE}", ["VALUE"]))
 
 XCHG_OPERATION_0 = lines_matcher_any_order(["$V[XCHG_VAR_DST] = DecodedValue(VMStructField{SS}($U[DST_VALUE]))",
                                             "$V[XCHG_VAR_SIZE] = DecodedValueByte(VMStructFieldByte($U[DST_SIZE]))",
@@ -645,6 +655,23 @@ POP_RET = match_funcs([
     lines_matcher(["{R:%s} = Pop()" % reg for reg in ["di", "si", "bp", "bx", "dx", "cx" ,"ax"]]),
     lines_matcher(["Return(0)"]),
 ])
+
+# TODO: Decompilation wrong (var_edi should'nt be optimized)
+RETURN = HandlerMatch(match_funcs([lines_matcher([
+        "$V[STACK_MOVE_OFFSET] = ReadParameterDword($P[STACK_MOVE_OFFSET])",
+        "$V[STACK_TO_MOVE] = (SP + $H[STACK_SIZE])",
+        "Std()",
+        "$V[STACK_COPY_SIZE] = $V[STACK_MOVE_OFFSET]",
+        "If(($V[STACK_COPY_SIZE] != 0x0))",
+        "    $V[STACK_COPY_SIZE] = $H[STACK_COPY_SIZE]",
+        "MemCopy(($V[STACK_TO_MOVE] + $V[STACK_COPY_SIZE]), $V[STACK_TO_MOVE], $V[STACK_COPY_SIZE])",
+        "SP += ReadParameterDword($P[STACK_MOVE_OFFSET])",
+        "$V[VAR] = (SP + $H[STACK_RETURN_OFFSET])",
+        "*({SU}*)($V[VAR] + 0x{N}) = *({SU}*)$V[VAR]",
+    ]),
+    POP_RET
+    ]),
+    create_handler_reader_class("RETURN", ["STACK_MOVE_OFFSET"]))
 
 JMP_MEMVAR = HandlerMatch(match_funcs([
     lines_matcher(["*({SU}*)(ReadParameterWord($P[STACK_RETURN_OFFSET]) + SP) = *({SU}*)VMStructField{SS}(ReadParameterWord($P[VAR]))"]),
@@ -910,7 +937,6 @@ RESET_FLAGS = HandlerMatch(match_funcs([
 ]), create_handler_reader_class("RESET_FLAGS"))
 
 HANDLERS = [RESET_KEYS,
-            COPY_STACK_RETURN,
             MOVS,
             LODS,
             STOS,
@@ -938,6 +964,7 @@ HANDLERS = [RESET_KEYS,
             UNK_JMP_IMM,
             XCHG,
             COMMON_UNARY_OP,
+            RETURN,
             ]
 
 

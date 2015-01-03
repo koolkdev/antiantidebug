@@ -22051,6 +22051,7 @@ CLI cli
 STI sti
 PUSHF pushf
 POPF popf
+LEAVE leave
 RET ret
 NOP nop
 LODSB lodsb

@@ -23141,8 +23141,11 @@ CLI cli
 STI sti
 PUSHF pushf
 POPF popf
+LEAVE leave
 RET ret
 NOP nop
+PUSHA pusha
+POPA popa
 LODSB lodsb
 MOVSB movsb
 REP_MOVSB rep movsb

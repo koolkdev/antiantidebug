@@ -1,4 +1,3 @@
-import utils
 from themida import cleaner
 from vms import vminstruction
 from vms import templates
@@ -12,10 +11,7 @@ import vm_encoding
 import instruction
 import Queue
 
-import os
 import sys
-import tempfile
-import subprocess
 
 try:
     import progressbar
@@ -258,9 +254,7 @@ class VMHandlers(object):
 
         # for index, handler in self.handlers.iteritems():
         #     print "---------------------------------------------------"
-        #     #if handler.name:
-        #     #    print handler.name
-        #     #    print "@@@@@@@@@@@@@@@@@@@@@"
+        #     print hex(index)
         #     print hex(addrs[index])
         #     handler.handler.print_instructions()
         # assert False
@@ -271,26 +265,26 @@ class VMInfo(object):
     cache = {}
     def __init__(self, file, vm_address):
         self.struct_fields = {}
+        self.regs_fields = {}
         self.init_handler = VMInit(self, file, vm_address)
         self.handlers = VMHandlers(file, self)
 
     @classmethod
     def get_vm_info(cls, file, address):
-        if cls.cache.has_key(address):
-            return cls.cache[address]
+        if cls.cache.has_key((file, address)):
+            return cls.cache[(file, address)]
         #try:
         res = cls(file, address)
         #except cleaner.CleanerException, e:
         #    res = None
 
-        cls.cache[address] = res
+        cls.cache[(file, address)] = res
         return res
 
 class VMFunctionSection(object):
     def __init__(self, address):
         self.address = address
         self.start = False
-        self.end = False
         self.instructions = []
 
 
@@ -325,6 +319,8 @@ class VMFunctionJumper(object):
 class VMFunction(object):
     def __init__(self, file, jumper):
         self.file = file
+        arch = self.file.get_arch()
+        self.mode = file.mode
 
         vm_address = jumper.vm_address
         vm_code_address = jumper.vm_code_address
@@ -337,7 +333,7 @@ class VMFunction(object):
         addresses_to_explore = Queue.Queue()
         starts = []
         instructions = {}
-        instructions_size = {}
+        instructions_list = []
 
         # Start address is the address of push address2/jmp and end address is the address of vmcode
         real_vm_code_address = vm_code_address + self.vm_info.init_handler.base_address
@@ -365,7 +361,7 @@ class VMFunction(object):
                     break
 
                 h = self.vm_info.handlers.handlers[handler]
-                handler_reader = h.info.reader(h.info, h.decode.decode(state))
+                handler_reader = h.info.reader(h.info, h.decode.decode(state), arch)
 
                 inst = handler_reader.get_instruction()
 
@@ -376,17 +372,19 @@ class VMFunction(object):
                 if inst.name == "JMP_UNKNOWN":
                     # Jump to an unknown instruction
                     assert handler_reader.params["ADDRS_COUNT"] not in (1,2) # TODO
-                    address = inst.args[0] + self.vm_info.init_handler.base_address
-                    i = file.get_instruction(address)
+                    inst.args[0] += self.vm_info.init_handler.base_address
+                    i = file.get_instruction(inst.args[0])
                     jumper = VMFunctionJumper(file, i.next)
                     addresses_to_explore.put((jumper.vm_code_address + self.vm_info.init_handler.base_address, jumper.first_handler))
+                    starts.append(jumper.vm_code_address + self.vm_info.init_handler.base_address)
                 elif inst.name == "JMP":
                     state.update_ip(inst.args[0])
                     inst.args[0] = state.address
                     handler = inst.args[1]
                     inst.args = inst.args[:1]
                     instructions[inst.address] = inst
-                    #print inst
+                    instructions_list.append(inst)
+                    next_labeled = True
                     continue
                 elif inst.name in ("JZ", "JNZ", "JA", "JAE", "JB", "JBE", "JG", "JGE", "JL", "JLE", "JNO", "JNP", "JNS", "JO", "JP", "JS"):
                     state.update_ip(inst.args[0])
@@ -394,55 +392,53 @@ class VMFunction(object):
                     addresses_to_explore.put((inst.args[0], inst.args[1]))
                     inst.args = inst.args[:1]
                     state.address = inst.address
+                elif inst.name.endswith("_IMM") and inst.name[:-len("_IMM")] in ("JMP", "JZ", "JNZ", "JA", "JAE", "JB", "JBE", "JG", "JGE", "JL", "JLE", "JNO", "JNP", "JNS", "JO", "JP", "JS"):
+                    inst.args[0] += self.vm_info.init_handler.base_address
+                    inst.name = inst.name[:-len("IMM")] + "RELIMM"
                 elif inst.name in ("CALL_IMM_NEXT", "CALL_VAR_NEXT", "CALL_MEMVAR_NEXT"):
                     if inst.name == "CALL_IMM_NEXT":
                         inst.args[0] += self.vm_info.init_handler.base_address
+                        inst.name == "CALL_RELIMM"
                     jumper = VMFunctionJumper(file, inst.args[1] + self.vm_info.init_handler.base_address)
                     addresses_to_explore.put((jumper.vm_code_address + self.vm_info.init_handler.base_address, jumper.first_handler))
+                    starts.append(jumper.vm_code_address + self.vm_info.init_handler.base_address)
                     inst.args = inst.args[:-1]
                     inst.name = inst.name[:-len("_NEXT")]
+                elif inst.name == "ADD_VAR_BASEADDRESS":
+                    inst.args.append(self.vm_info.init_handler.base_address)
                 elif inst.name == "RESET_KEYS":
                     state.reset()
 
 
-
-
-                # if inst.name in ("JMP", "JMPIF"):
-                #     inst.args[0] += bytes_reader.address
-                #     inst.args[0] &= (1 << self.mode) - 1
-                #
-                # if inst.name == "JMP":
-                #     next_labeled = True
-                #     bytes_reader.address = inst.args[0]
-                #     key.reset()
-                # elif inst.name == "JMPIF":
-                #     addresses_to_explore.put((inst.args[0], 0))
-                # elif inst.name == "RESETKEY":
-                #     key.reset()
-                #     # It isn't really an opcode, so don't store it
-                #     continue
-                # elif inst.name == "PUSH_ENCODED":
-                #     push = file.get_instruction(long(inst.args[0] + self.vm_info.init_handler.encode))
-                #     if push.opcode != "push":
-                #         push = file.get_instruction(push.next)
-                #     assert push.opcode == "push" and push.operands[0].is_immediate()
-                #     jmp = file.get_instruction(push.next)
-                #     assert jmp.opcode == "jmp" and jmp.operands[0].is_immediate(vm_address)
-                #     jmp_vm_code_address = long(push.operands[0].value + self.vm_info.init_handler.encode + self.vm_info.init_handler.encode_address_high_dword)
-                #     addresses_to_explore.put((jmp_vm_code_address, push.operands[0].value))
-                #     starts.append(jmp_vm_code_address)
-                # elif inst.name in ("ADD_DX_REALLOC", "STACK_ADD_REALLOC"): # TODO: Properly support reallocation
-                #     inst.name += "_VALUE"
-                #     inst.args = [self.vm_info.handlers.realloc_offset]
-
                 handler = handler_reader.get_next_handler()
-                #print handler
                 if handler is not None:
                     state.update_ip(handler_reader.get_size())
 
                 instructions[inst.address] = inst
-                #print inst
+                instructions_list.append(inst)
         print "SUCCESS"
+
+        if not self.vm_info.regs_fields:
+            reader = vminstruction.VMInstructionsReader(instructions_list)
+            reader.get_cond(lambda x: x.name == "RESET_FLAGS")
+            try:
+                reader.get_cond(lambda x: x.name == "RESET_KEYS")
+            except vminstruction.ReaderException:
+                self.vm_info.regs_fields["SP"] = reader.get_cond(lambda x: x.name == "MOV_VAR_SP").args[0]
+                reader.get_cond(lambda x: x.name == "RESET_KEYS")
+            else:
+                self.vm_info.regs_fields["SP"] = reader.get_cond(lambda x: x.name == "MOV_VAR_SP").args[0]
+            regs = list(self.vm_info.init_handler.regs[::-1])
+            for reg in regs:
+                if reg == "flags":
+                    self.vm_info.regs_fields["FLAGS"] = reader.get_cond(lambda x: x.name == "POP_VAR").args[0]
+                else:
+                    reg = reg.upper()
+                    if not reg[1].isdigit():
+                        reg = reg[1:]
+                    self.vm_info.regs_fields[reg] = reader.get_cond(lambda x: x.name == arch.translate("POP_{SU}_VAR")).args[0]
+            reader.get_cond(lambda x: x.name == "ADD_SP_IMM" and x.args[0] == arch.native_size() * 2)
+            print self.vm_info.regs_fields
 
         self.instructions = []
         for address in sorted(instructions.keys()):
@@ -456,18 +452,31 @@ class VMFunction(object):
             self.instructions.append(instructions[address])
         self.code = None
 
-    def clean(self):
-        TEMPLATES = [r"codevirtualizer\cisc_pre.txt", r"codevirtualizer\cisc.txt", r"ag_templates.txt", r"codevirtualizer\cisc.txt", r"ag_templates.txt"]
+        self._clean()
 
-        # Clean nops
-        i = 0
-        while i < len(self.instructions):
-            if self.instructions[i].name == "NOP":
-                self.instructions[i:i+1] = []
-            i += 1
+        print "Converting VMCode to Assembly...",
+        try:
+            self.get_code()
+        except:
+            print ""
+            self.printfunc()
+            raise
+        print "SUCCESS"
+
+
+    def _clean(self):
+        TEMPLATES = ["fish_00_regs.txt", "fish_01_vm.txt", "fish_02_misc.txt", "fish_03_vars.txt", "fish_04_memvars.txt", "fish_05_fix_pop.txt", "fish_06_rep.txt"]
+        print "Processing VMFunction (%d instructions)..." % len(self.instructions)
+
+        vars = dict(self.vm_info.regs_fields)
+        vars["IS_REG"] = lambda x: x in self.vm_info.regs_fields.values()
 
         for template in TEMPLATES:
-            templates.Templates.get_template(template).clean(self.instructions)
+            print ("Applying %s," % template),
+            templates.Templates.get_template(r"codevirtualizer\animals\%s" % template, self.mode).clean(self.instructions, vars)
+            print "OK."
+
+        print "After processing: %d instructions" % len(self.instructions)
 
         # Clean labels
         refs = []
@@ -485,7 +494,7 @@ class VMFunction(object):
             i += 1
 
     def get_code(self):
-        if self.code != None:
+        if self.code is not None:
             return self.code
         sections = {}
         for inst in self.instructions:
@@ -499,15 +508,11 @@ class VMFunction(object):
                 section.instructions.append(inst)
             else:
                 section.instructions.append(inst)
-        section.end = True
 
-        code = ""#"use32 org 0x%08X\n" % base_address
-        code_base = code
+        code = ""
         section_counter = 0
         next_section = 0
-        jb_count = 0
-        last_jump = 0
-        registers = None
+        registers = {v: k.lower() for k, v in self.vm_info.regs_fields.iteritems()}
 
         for address in sorted(sections.keys()):
             if next_section:
@@ -518,122 +523,64 @@ class VMFunction(object):
             reader = vminstruction.VMInstructionsReader(section.instructions)
 
             if section.start:
-                registers = {}
-                if section_counter == 1:
-                    index = max(max(code.rfind("add esp, 0x"), code.rfind("pop esp")), code.rfind("mov esp, dword [esp]"))
-                    # Deal with anti-debugging
-                    if index != -1:
-                        code = code_base + code[code.find("\n", index+1)+1:]
+                if section_counter == 0:
+                    reader.get_cond(lambda x: x.name == "RESET_FLAGS")
+
+                # if section_counter == 1:
+                #     index = max(max(code.rfind("add esp, 0x"), code.rfind("pop esp")), code.rfind("mov esp, dword [esp]"))
+                #     # Deal with anti-debugging
+                #     if index != -1:
+                #         code = code_base + code[code.find("\n", index+1)+1:]
                 section_counter += 1
 
-                regs = list(self.vm_info.init_handler.regs)
-
-                # For older version
-                #reader.get_cond(lambda x: x.name == "POPF") # flags
-                #assert regs.pop() == "flags"
-
-                # Check reg
-                for i in xrange(4):
-                    registers[reader.get_cond(lambda x: x.name == "POPDWORDREG").args[0]] = regs.pop()
-                reader.get_cond(lambda x: x.name == "SETUNKNOWN")
-                for i in xrange(4):
-                    registers[reader.get_cond(lambda x: x.name == "POPDWORDREG").args[0]] = regs.pop()
-
-                reader.get_cond(lambda x: x.name == "POPF") # flags
-                assert regs.pop() == "flags"
-
-                reader.get_cond(lambda x: x.name == "ADDDWORDESP" and x.args[0] == 4)
-            elif section.end:
-                continue
+                reader.get_cond(lambda x: x.name == "START_VM")
 
             inst = reader.get()
-            while inst:
-                is_call = False
-                if inst.name.startswith("PUSHDWORD"):
-                    reader.push()
-                    try:
-                        next = reader.get_cond(lambda x: x.name == "JMP" and sections[x.args[0]].end)
-                        sectioncode += inst.to_asm(registers).replace("push ", "jmp ") + "\n"
-                        last_jump = inst.args[0]
-                        break
-                    except vminstruction.ReaderException:
-                        pass
-                    finally:
-                        reader.pop()
-                elif inst.name == "PUSHWITHENCODE":
-                    next = reader.get()
-                    if next.name == "JMP":
-                        assert sections[next.args[0]].end
-                        asminst = self.file.get_instruction(long(inst.args[0] + self.vm_info.init_handler.encode))
-                        asminst_after = self.file.get_instruction(asminst.next)
-                        assert asminst_after.opcode == "push"
-                        assert asminst_after.operands[0].is_immediate()
-                        sectioncode += "\n".join(["db 0x%x" % ord(x) for x in asminst.bytes]) + "\n"
-                        next_section = long(asminst_after.operands[0].value + self.vm_info.init_handler.encode)
-                        break
-                    elif next.name.startswith("PUSHDWORD"):
-                        nextnext = reader.get_cond(lambda x: x.name == "JMP" and sections[x.args[0]].end)
-                        sectioncode += next.to_asm(registers).replace("push ", "call ") + "\n"
-                        break
-                    else:
-                        assert False
+            stop = False
 
-                if inst.name == "MOVENCODEREG":
-                    inst = vminstruction.VMInstruction("MOVDWORDREG", inst.args[0], long(self.vm_info.init_handler.encode))
-                elif inst.name == "JMP" and not sections[inst.args[0]].end:
-                    inst = vminstruction.VMInstruction("JMPLABEL", inst.args[0])
-                elif inst.name in vminstruction.CONDITIONAL_JUMPS:
-                    inst = vminstruction.VMInstruction(inst.name + "LABEL", inst.args[0])
-                elif inst.name.endswith("ADDRESS") and inst.name[:-len("ADDRESS")] in vminstruction.CONDITIONAL_JUMPS:
-                    assert sections[inst.args[1]].end
-                    inst = vminstruction.VMInstruction(inst.name[:-len("ADDRESS")], inst.args[0])
-                if inst.name == "SETRETN":
-                    next = reader.get_cond(lambda x: x.name == "JMP" and sections[x.args[0]].end)
-                    sectioncode += "ret %d\n" % inst.args[0]
+            while inst:
+                if inst.name == "END_VM":
+                    inst = reader.get()
+                    if inst.name == "JMP_UNKNOWN":
+                        sectioncode += str(self.file.get_instruction(inst.args[0])) + "\n"
+                        # Stop
+                        assert reader.get() is None
+                        break
+                    elif inst.name.split("_")[0] in ("JMP", "CALL", "RET"):
+                        stop = True
+                    else:
+                        assert inst.name.split("_")[0] in vminstruction.CONDITIONAL_JUMPS
+                elif inst.name == "_NOP":
+                    inst.name = "NOP"
+                elif inst.name == "JMP" or inst.name in vminstruction.CONDITIONAL_JUMPS:
+                    inst.name += "_LABEL"
+
+                sectioncode += inst.to_asm(registers, self.mode) + "\n"
+                if stop:
+                    assert reader.get() is None
                     break
-                elif inst.name == "JMP": # jmp to end
-                    sectioncode += "ret\n"
-                    break
-                else:
-                    sectioncode += inst.to_asm(registers) + "\n"
+
                 inst = reader.get()
             code += sectioncode
 
-        if section_counter == 1:
-            index = max(max(code.rfind("add esp, 0x"), code.rfind("pop esp")), code.rfind("mov esp, dword [esp]"))
-            # Deal with anti-debugging
-            if index != -1:
-                code = code_base + code[code.find("\n", index+1)+1:]
-        code = code.replace("push eax\npush ecx\npush edx\npush ebx\npush ebx\npush ebp\npush esi\npush edi", "pusha")
-        code = code.replace("pop edi\npop esi\npop ebp\npop ebx\npop ebx\npop edx\npop ecx\npop eax", "popa")
-        #print code
+        # if section_counter == 1:
+        #     index = max(max(code.rfind("add esp, 0x"), code.rfind("pop esp")), code.rfind("mov esp, dword [esp]"))
+        #     # Deal with anti-debugging
+        #     if index != -1:
+        #         code = code_base + code[code.find("\n", index+1)+1:]
+
         self.code = code[:-1]
         return self.code
 
-    def compile_code(self, address = None):
+    def compile_code(self, address = None, relocs = False):
         code = self.get_code()
-        if address == None:
+        if address is None:
             address = self.code_address
-        #print code
-        code = ("use32 org 0x%08X\n" % address) + code
-        source = tempfile.NamedTemporaryFile("wb", delete = False)
-        source.write(code)
-        source.close()
-
-        # Ugly hack to get temporary file name
-        output = tempfile.NamedTemporaryFile("wb", delete = False)
-        output.close()
-        os.unlink(output.name)
-        startupinfo = subprocess.STARTUPINFO()
-        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-        fasm = subprocess.Popen([r"vms\fasm.exe", source.name, output.name], stdout = subprocess.PIPE, stderr = subprocess.STDOUT, startupinfo=startupinfo)
-        if fasm.wait() != 0:
-            raise Exception(fasm.stdout.read())
-        #print fasm.stdout.read()
-        compiled_code = open(output.name, "rb").read()
-        os.unlink(output.name)
-        os.unlink(source.name)
-
+        compiled_code = instruction.Assembler(self.mode).assemble(code, address, relocs)
+        if not compiled_code:
+            raise Exception("Failed to compile code")
+        if relocs:
+            return address, compiled_code[0], compiled_code[1]
         return address, compiled_code
 
 
@@ -641,82 +588,3 @@ class VMFunction(object):
     def printfunc(self):
         for inst in self.instructions:
             print inst
-
-def get_vm(file, address):
-    vm = VMFunction(file, VMFunctionJumper(file, address))
-    #vm.clean()
-    return vm
-
-def get_vm_code(file, push_inst, jmp_inst):
-    vm = VMFunction(file, push_inst, jmp_inst)
-    #print "Cleaning vm.."
-    vm.clean()
-    #vm.printfunc()
-    #print "Converting to asm..."
-    try:
-        return vm.get_code()
-    except:
-        vm.printfunc()
-        raise
-
-def get_compiled_vm_code(file, push_inst, jmp_inst, address = None):
-    vm = VMFunction(file, push_inst, jmp_inst)
-    vm.clean()
-    code = vm.get_code()
-    if address == None:
-        address = vm.code_address
-    #print code
-    code = ("use32 org 0x%08X\n" % address) + code
-    source = tempfile.NamedTemporaryFile("wb", delete = False)
-    source.write(code)
-    source.close()
-
-    # Ugly hack to get temporary file name
-    output = tempfile.NamedTemporaryFile("wb", delete = False)
-    output.close()
-    os.unlink(output.name)
-    startupinfo = subprocess.STARTUPINFO()
-    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-    fasm = subprocess.Popen([r"vms\fasm.exe", source.name, output.name], stdout = subprocess.PIPE, stderr = subprocess.STDOUT, startupinfo=startupinfo)
-    if fasm.wait() != 0:
-        raise Exception(fasm.stdout.read())
-    print fasm.stdout.read()
-    compiled_code = open(output.name, "rb").read()
-    os.unlink(output.name)
-    os.unlink(source.name)
-
-    return address, compiled_code
-
-"""
-def fix_vms(pe, code_section = 0, vms_section = 3):
-    vms = []
-    code_section_start = pe.sections[code_section].VirtualAddress + pe.OPTIONAL_HEADER.ImageBase
-    code_section_end = code_section_start + pe.sections[code_section].Misc_VirtualSize
-    vms_section_start = pe.sections[vms_section].VirtualAddress + pe.OPTIONAL_HEADER.ImageBase
-    vms_section_end = vms_section_start + pe.sections[vms_section].Misc_VirtualSize
-    exe = MappeFile..ToExecutable(pe)
-    for address in xrange(code_section_start, code_section_end):
-        if exe.read_byte(address) in (0xe9, 0xeb): # Jump
-            if exe.read_byte(address) == 0xe9:
-                jmp_address = exe.read_dword(address + 1) + address + 5
-            else:
-                jmp_address = exe.read_byte(address + 1) + address + 2
-            if vms_section_start <= jmp_address <= vms_section_end:
-                push_inst = exe.get_instruction(jmp_address)
-                jmp_inst = exe.get_instruction(push_inst.next)
-                if not (push_inst.opcode == "push" and push_inst.operands[0].is_immediate()): continue
-                if not (jmp_inst.opcode == "jmp" and jmp_inst.operands[0].is_immediate()): continue
-                print hex(address)
-                vm = get_vm(exe, jmp_address)
-                code = vm.get_code()
-                last_line = code.splitlines()[-1]
-                assert last_line.startswith("jmp ")
-                end_address = int(last_line.split()[1], 16)
-                code_address, compiled_code = vm.compile_code(address + 0x12)
-                assert end_address - code_address > len(compiled_code)
-                if end_address - code_address - 0x12 != len(compiled_code) - 2:
-                    print "Warning: Code size is different %d" % (end_address - code_address - 0x12 - (len(compiled_code) - 2))
-                exe.write(address, "\xeb\x10")
-                exe.write(code_address, compiled_code)
-                #addressd, compil vm.compile_code(address + 0x12)
-"""

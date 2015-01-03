@@ -139,6 +139,9 @@ def check_one_operand_size_byte(mode, size1, size2, size3):
 def check_none_operands(mode, size1, size2, size3):
     return size1 is None
     
+def check_none_operands_and_32(mode, size1, size2, size3):
+    return size1 is None and mode == 32
+
 def check_none_operands_and_64(mode, size1, size2, size3):
     return size1 is None and mode == 64
     
@@ -290,8 +293,9 @@ OPCODES.extend([Opcode("label", "LABEL", check_jmps_sizes, check_label_type)])
 CC_JMPS = ["ja", "jae", "jb", "jbe", "jz", "jg", "jge", "jl", "jle", "jnz", "jno", "jnp", "jns", "jo", "jp" ,"js", "jcxz", "loop", "loope", "loopne"]
 OPCODES.extend([Opcode(x, "%s_{TYPE1}" % x.upper(), check_jmps_sizes, check_jcc_types) for x in CC_JMPS])
 # NONE OPERANDS
-SIMPLE_OPS = ["clc", "cmc", "std", "cld", "stc", "std", "cli", "sti", "pushf", "popf", "ret", "nop"]
+SIMPLE_OPS = ["clc", "cmc", "std", "cld", "stc", "std", "cli", "sti", "pushf", "popf", "leave", "ret", "nop"]
 OPCODES.extend([Opcode(x, "%s" % x.upper(), check_none_operands, None) for x in SIMPLE_OPS])
+OPCODES.extend([Opcode(x, "%s" % x.upper(), check_none_operands_and_32, None) for x in ["pusha", "popa"]])
 # RET ..
 OPCODES.extend([Opcode("ret", "RET_{TYPE1}", check_one_operand_size_byte, check_one_operand_type_imm)])
 # NONE OPERANDS

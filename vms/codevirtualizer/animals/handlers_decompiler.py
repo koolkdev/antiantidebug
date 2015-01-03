@@ -450,6 +450,27 @@ class Std(Expression):
     def get_format(self):
         return "Std()"
 
+class MemCopy(Expression):
+    def __init__(self, dst, src, size):
+        self.dst = dst
+        self.src = src
+        self.size = size
+
+    def get_children(self):
+        return [self.dst, self.src, self.size]
+
+    def replace_child(self, child, new_child):
+        if self.dst == child:
+            self.dst = new_child
+        if self.src == child:
+            self.src = new_child
+        if self.size == child:
+            self.size = new_child
+
+    def get_format(self):
+        return "MemCopy({0}, {1}, {2})"
+
+
 MATH_OP = {
     "add": Add,
     "sub": Sub,
@@ -644,11 +665,23 @@ class Handler(object):
 
         # This is an hack to do that:
         def extended_contain(x, y):
+            # Check if x contains y or and address reference by x is included in y
             if x.contains(y):
                 return True
             if isinstance(y, ValueOf) and isinstance(y.value, Variable) and len(y.value.instructions) == 1:
                 if x.contains(y.value.instructions[0].rvalue):
                     return True
+
+            if isinstance(y, ValueOf):
+                for c in [x] + x.get_all_children():
+                    if isinstance(c, ValueOf) and isinstance(c.value, Variable) and len(c.value.instructions) == 1:
+                        c = c.value.instructions[0].rvalue
+                        if isinstance(y.value, Variable) and len(y.value.instructions) == 1:
+                            if c.contains(y.value.instructions[0].rvalue):
+                                return True
+                        elif c.contains(y.value):
+                            return True
+
             return False
 
         changed = False
@@ -795,10 +828,23 @@ class Handler(object):
                     # If both have common block, than it is a. If one of the next blocks is the common block (or after an empty one), than it is a If.
                     # Else it is a If/Else
                     # Most of the time the condition link skip on the condition
-                    try:
-                        next_block = instruction.get_common_block(block.next, block.next_cond)
-                    except:
-                        return state, instructions # TODO: loop
+
+                    next_block = instruction.get_common_block(block.next, block.next_cond)
+
+                    if next_block is None:
+                        # Hack for memcpy
+                        if str(state.flags) == state.mode.translate("Flags(Compare(var_{R:cx}, 0x0))"):
+                            if len(block.next.instructions) == 2 and \
+                                            str(block.next.instructions[0]) == state.mode.translate("movs{SB}") and \
+                                            str(block.next.instructions[1]) == state.mode.translate("dec ecx"):
+                                instructions.append(MemCopy(state.get_register("di"),
+                                                            state.get_register("si"),
+                                                            state.get_register("cx")))
+                                self.make_visible(instructions[-1])
+                                block = block.next_cond
+                                new_block = True
+                                break
+
                     assert next_block != block.next
                     cond = None
                     if isinstance(state.flags.value, Cmp):

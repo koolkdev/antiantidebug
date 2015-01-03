@@ -28,6 +28,7 @@ class Templates(object):
         self.templates = []
         self.mode = mode
         self.run_once = False
+        self.match_one = False
 
         # Parse the file first
         self._parse_file(data_reader)
@@ -118,6 +119,8 @@ class Templates(object):
                     option = tokens[1]
                     if option == "RUN_ONCE":
                         self.run_once = True
+                    elif option == "MATCH_ONE":
+                        self.match_one = True
                     else:
                         raise Exception("Unrecognized option %s" % option)
             elif command == "DEFINE_GROUP":
@@ -201,10 +204,10 @@ class Templates(object):
 
     @classmethod
     def get_template(cls, name, mode):
-        if cls.cache.has_key(name):
-            return cls.cache[name]
+        if cls.cache.has_key((name, mode)):
+            return cls.cache[(name, mode)]
         res = cls(open(r"%s\files\%s" % (os.path.dirname(os.path.abspath(__file__)), name), "r"), mode)
-        cls.cache[name] = res
+        cls.cache[(name, mode)] = res
         return res
 
 
@@ -242,7 +245,7 @@ class Templates(object):
         variables.update(nvariables)
         return True
 
-    def clean(self, insts):
+    def clean(self, insts, vars={}):
         # TODO clean insts as i should clean (get_clean_instruction), so I won't need the outer loop
         value_mask = (1 << self.mode) - 1
         if self.run_once:
@@ -269,7 +272,7 @@ class Templates(object):
             match = False
             for template in matched_templates:
                 releated = []
-                values = {}
+                values = dict(vars)
                 variables = {}
                 saved_args = {}
                 j = i
@@ -290,37 +293,44 @@ class Templates(object):
                     elif not self.match_instruction(tinst, inst, variables):
                         match = False
                         break
-                    if len(template[0][ti].args) == 1 and template[0][ti].args[0].startswith("*"):
-                        var_name = template[0][ti].args[0][1:]
-                        if var_name in saved_args:
-                            if len(saved_args[var_name]) != len(insts[j].args):
-                                match = False
-                                break
-                            for ai in xrange(len(insts[j].args)):
-                                if insts[j].args[ai] != saved_args[var_name][ai]:
+                    if len([arg for arg in template[0][ti].args if not arg.startswith("*")]) > len(insts[j].args):
+                        match = False
+                        break
+                    for ai in xrange(len(template[0][ti].args)):
+                        # Check if a number
+                        arg = template[0][ti].args[ai]
+                        # TODO Check that hexdigits
+                        if arg.startswith("*") and ai == len(template[0][ti].args) - 1:
+                            var_name = arg[1:]
+                            if var_name in saved_args:
+                                if len(saved_args[var_name]) != len(insts[j].args[ai:]):
                                     match = False
                                     break
-                        else:
-                            saved_args[var_name] = insts[j].args
-                    else:
-                        if len(template[0][ti].args) > len(insts[j].args):
-                            match = False
+                                for aj in xrange(len(insts[j].args)):
+                                    if insts[j].args[ai+aj] != saved_args[var_name][aj]:
+                                        match = False
+                                        break
+                            else:
+                                saved_args[var_name] = insts[j].args[ai:]
                             break
-                        for ai in xrange(len(template[0][ti].args)):
-                            # Check if a number
-                            arg = template[0][ti].args[ai]
-                            # TODO Check that hexdigits
-                            if arg.isdigit() or ((arg.startswith("0x") or arg.startswith("0X"))):
-                                if insts[j].args[ai] != eval(arg):
+                        elif arg.isdigit() or ((arg.startswith("0x") or arg.startswith("0X"))):
+                            if insts[j].args[ai] != eval(arg):
+                                match = False
+                                break
+                        else:
+                            test = None
+                            if ":" in arg:
+                                arg, test = arg.split(":")
+                            if values.has_key(arg):
+                                if values[arg] != insts[j].args[ai]:
                                     match = False
                                     break
                             else:
-                                if values.has_key(arg):
-                                    if values[arg] != insts[j].args[ai]:
-                                        match = False
-                                        break
-                                else:
-                                    values[arg] = insts[j].args[ai]
+                                values[arg] = insts[j].args[ai]
+                            if test is not None:
+                                if not eval(test, values):
+                                    match = False
+                                    break
                     if not match:
                         break
                     releated.append(j)
@@ -358,7 +368,7 @@ class Templates(object):
                         # Go to the last new instruction and pass again
                         i = ni
                     break
-            if not match:
+            if not match or self.match_one:
                 if self.run_once:
                     i += 1
                 else:

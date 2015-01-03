@@ -161,10 +161,10 @@ class HandlerParser(object):
 
     @classmethod
     def get_parser(cls, name, mode):
-        if cls.cache.has_key(name):
-            return cls.cache[name]
+        if cls.cache.has_key((name, mode)):
+            return cls.cache[(name, mode)]
         res = cls(open(r"%s\%s" % (os.path.dirname(os.path.abspath(__file__)), name), "r"), mode)
-        cls.cache[name] = res
+        cls.cache[(name, mode)] = res
         return res
 
     def __init__(self, data_reader, mode):

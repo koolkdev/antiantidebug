@@ -199,6 +199,7 @@ def get_common_block(block1, block2, blocks=None, loop_p=[]):
         blocks = block1.blocks_cache
     loop_p_1 = list(loop_p)
     loop_p_2 = list(loop_p)
+    #loop = False
     while block1 is not None or block2 is not None:
         if block1 is not None:
             if blocks_visited2.count(block1) > 0:
@@ -208,7 +209,9 @@ def get_common_block(block1, block2, blocks=None, loop_p=[]):
             blocks_visited.append(block1)
             add = block1.address
             if loop_p_1.count(add):
-                raise Exception("loop")  # TODO: support loops
+                block1 = None
+                #loop = True
+                continue
             loop_p_1.append(add)
             if blocks.has_key(add):
                 block1 = blocks[add]
@@ -226,7 +229,9 @@ def get_common_block(block1, block2, blocks=None, loop_p=[]):
             blocks_visited2.append(block2)
             add = block2.address
             if loop_p_2.count(add):
-                raise Exception("loop") # TODO: support loops
+                block2 = None
+                #loop = True
+                continue
             loop_p_2.append(add)
             if blocks.has_key(add):
                 block2 = blocks[add]
@@ -236,6 +241,8 @@ def get_common_block(block1, block2, blocks=None, loop_p=[]):
                 else:
                     block2 = block2.next
                 blocks[add] = block2
+    #if loop:
+    #    raise Exception("loop") # TODO: support loops
     return None
         
 CONDITIONAL_JUMPS = "jz jnz".split(" ")  # TODO more
