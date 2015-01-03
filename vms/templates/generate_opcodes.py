@@ -265,9 +265,9 @@ OPCODES.extend([Opcode(x, "%s_{SIZE1}_{TYPE1}" % x.upper(), check_one_operand_si
 # ONE OPERAND REG NOT BYTE
 OPCODES.extend([Opcode("bswap", "BSWAP_{SIZE1}_{TYPE1}", check_one_operand_size_not_byte, check_one_operand_reg_type)])
 # NOT BYTE, FIRST REGISTER, SECOND NOT IMMEDIATE
-OPCODES.extend([Opcode("imul", "IMULTWO_{SIZE1}_{TYPE1}_{TYPE2}", check_two_operands_not_byte, check_multwo_types)])
+OPCODES.extend([Opcode("imul", "IMUL_{SIZE1}_{TYPE1}_{TYPE2}", check_two_operands_not_byte, check_multwo_types)])
 # NOT BYTE, FIRST REGISTER, SECOND NOT IMMEDIATE, THIRD IMMEDIATE
-OPCODES.extend([Opcode("imul", "IMULTHREE_{SIZE1}_{TYPE1}_{TYPE2}_{TYPE3}", check_three_operands_not_byte, check_multhree_types)])
+OPCODES.extend([Opcode("imul", "IMUL_{SIZE1}_{TYPE1}_{TYPE2}_{TYPE3}", check_three_operands_not_byte, check_multhree_types)])
 # SECOND CL/IMM
 TWO_OPERANDS_SHL_SHR = ["shl", "shr", "sar", "rol", "ror", "rcr", "rcl"]
 OPCODES.extend([Opcode(x, "%s_{SIZE1}_{TYPE1}_{TYPE2}" % x.upper(), check_shlshr_sizes, check_shlshr_types) for x in TWO_OPERANDS_SHL_SHR])

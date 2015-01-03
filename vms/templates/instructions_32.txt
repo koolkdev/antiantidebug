@@ -7047,150 +7047,150 @@ MOVSX_WORD_BYTE_MEMGSSPREGMULIMM_IMM movsx word gs:[esp+#0*$1+0x$2], 0x$3
 MOVSX_WORD_BYTE_MEMGSSPREGMULRELIMM_REG movsx word gs:[esp+#0*$1+?0x$2], ~3
 MOVSX_WORD_BYTE_MEMGSSPREGMULRELIMM_REGHIGH movsx word gs:[esp+#0*$1+?0x$2], !3
 MOVSX_WORD_BYTE_MEMGSSPREGMULRELIMM_IMM movsx word gs:[esp+#0*$1+?0x$2], 0x$3
-IMULTHREE_WORD_REG_REG_IMM imul @0, @1, 0x$2
-IMULTHREE_WORD_REG_SP_IMM imul @0, sp, 0x$1
-IMULTHREE_WORD_REG_MEMIMM_IMM imul @0, word [0x$1], 0x$2
-IMULTHREE_WORD_REG_MEMRELIMM_IMM imul @0, word [?0x$1], 0x$2
-IMULTHREE_WORD_REG_MEMREG_IMM imul @0, word [#1], 0x$2
-IMULTHREE_WORD_REG_MEMREGIMM_IMM imul @0, word [#1+0x$2], 0x$3
-IMULTHREE_WORD_REG_MEMREGRELIMM_IMM imul @0, word [#1+?0x$2], 0x$3
-IMULTHREE_WORD_REG_MEMREGREG_IMM imul @0, word [#1+#2], 0x$3
-IMULTHREE_WORD_REG_MEMREGREGIMM_IMM imul @0, word [#1+#2+0x$3], 0x$4
-IMULTHREE_WORD_REG_MEMREGREGRELIMM_IMM imul @0, word [#1+#2+?0x$3], 0x$4
-IMULTHREE_WORD_REG_MEMREGMUL_IMM imul @0, word [#1*$2], 0x$3
-IMULTHREE_WORD_REG_MEMREGMULIMM_IMM imul @0, word [#1*$2+0x$3], 0x$4
-IMULTHREE_WORD_REG_MEMREGMULRELIMM_IMM imul @0, word [#1*$2+?0x$3], 0x$4
-IMULTHREE_WORD_REG_MEMREGREGMUL_IMM imul @0, word [#1+#2*$3], 0x$4
-IMULTHREE_WORD_REG_MEMREGREGMULIMM_IMM imul @0, word [#1+#2*$3+0x$4], 0x$5
-IMULTHREE_WORD_REG_MEMREGREGMULRELIMM_IMM imul @0, word [#1+#2*$3+?0x$4], 0x$5
-IMULTHREE_WORD_REG_MEMSP_IMM imul @0, word [esp], 0x$1
-IMULTHREE_WORD_REG_MEMSPIMM_IMM imul @0, word [esp+0x$1], 0x$2
-IMULTHREE_WORD_REG_MEMSPRELIMM_IMM imul @0, word [esp+?0x$1], 0x$2
-IMULTHREE_WORD_REG_MEMSPREG_IMM imul @0, word [esp+#1], 0x$2
-IMULTHREE_WORD_REG_MEMSPREGIMM_IMM imul @0, word [esp+#1+0x$2], 0x$3
-IMULTHREE_WORD_REG_MEMSPREGRELIMM_IMM imul @0, word [esp+#1+?0x$2], 0x$3
-IMULTHREE_WORD_REG_MEMSPREGMUL_IMM imul @0, word [esp+#1*$2], 0x$3
-IMULTHREE_WORD_REG_MEMSPREGMULIMM_IMM imul @0, word [esp+#1*$2+0x$3], 0x$4
-IMULTHREE_WORD_REG_MEMSPREGMULRELIMM_IMM imul @0, word [esp+#1*$2+?0x$3], 0x$4
-IMULTHREE_WORD_REG_MEMFSIMM_IMM imul @0, word fs:[0x$1], 0x$2
-IMULTHREE_WORD_REG_MEMFSRELIMM_IMM imul @0, word fs:[?0x$1], 0x$2
-IMULTHREE_WORD_REG_MEMFSREG_IMM imul @0, word fs:[#1], 0x$2
-IMULTHREE_WORD_REG_MEMFSREGIMM_IMM imul @0, word fs:[#1+0x$2], 0x$3
-IMULTHREE_WORD_REG_MEMFSREGRELIMM_IMM imul @0, word fs:[#1+?0x$2], 0x$3
-IMULTHREE_WORD_REG_MEMFSREGREG_IMM imul @0, word fs:[#1+#2], 0x$3
-IMULTHREE_WORD_REG_MEMFSREGREGIMM_IMM imul @0, word fs:[#1+#2+0x$3], 0x$4
-IMULTHREE_WORD_REG_MEMFSREGREGRELIMM_IMM imul @0, word fs:[#1+#2+?0x$3], 0x$4
-IMULTHREE_WORD_REG_MEMFSREGMUL_IMM imul @0, word fs:[#1*$2], 0x$3
-IMULTHREE_WORD_REG_MEMFSREGMULIMM_IMM imul @0, word fs:[#1*$2+0x$3], 0x$4
-IMULTHREE_WORD_REG_MEMFSREGMULRELIMM_IMM imul @0, word fs:[#1*$2+?0x$3], 0x$4
-IMULTHREE_WORD_REG_MEMFSREGREGMUL_IMM imul @0, word fs:[#1+#2*$3], 0x$4
-IMULTHREE_WORD_REG_MEMFSREGREGMULIMM_IMM imul @0, word fs:[#1+#2*$3+0x$4], 0x$5
-IMULTHREE_WORD_REG_MEMFSREGREGMULRELIMM_IMM imul @0, word fs:[#1+#2*$3+?0x$4], 0x$5
-IMULTHREE_WORD_REG_MEMFSSP_IMM imul @0, word fs:[esp], 0x$1
-IMULTHREE_WORD_REG_MEMFSSPIMM_IMM imul @0, word fs:[esp+0x$1], 0x$2
-IMULTHREE_WORD_REG_MEMFSSPRELIMM_IMM imul @0, word fs:[esp+?0x$1], 0x$2
-IMULTHREE_WORD_REG_MEMFSSPREG_IMM imul @0, word fs:[esp+#1], 0x$2
-IMULTHREE_WORD_REG_MEMFSSPREGIMM_IMM imul @0, word fs:[esp+#1+0x$2], 0x$3
-IMULTHREE_WORD_REG_MEMFSSPREGRELIMM_IMM imul @0, word fs:[esp+#1+?0x$2], 0x$3
-IMULTHREE_WORD_REG_MEMFSSPREGMUL_IMM imul @0, word fs:[esp+#1*$2], 0x$3
-IMULTHREE_WORD_REG_MEMFSSPREGMULIMM_IMM imul @0, word fs:[esp+#1*$2+0x$3], 0x$4
-IMULTHREE_WORD_REG_MEMFSSPREGMULRELIMM_IMM imul @0, word fs:[esp+#1*$2+?0x$3], 0x$4
-IMULTHREE_WORD_REG_MEMGSIMM_IMM imul @0, word gs:[0x$1], 0x$2
-IMULTHREE_WORD_REG_MEMGSRELIMM_IMM imul @0, word gs:[?0x$1], 0x$2
-IMULTHREE_WORD_REG_MEMGSREG_IMM imul @0, word gs:[#1], 0x$2
-IMULTHREE_WORD_REG_MEMGSREGIMM_IMM imul @0, word gs:[#1+0x$2], 0x$3
-IMULTHREE_WORD_REG_MEMGSREGRELIMM_IMM imul @0, word gs:[#1+?0x$2], 0x$3
-IMULTHREE_WORD_REG_MEMGSREGREG_IMM imul @0, word gs:[#1+#2], 0x$3
-IMULTHREE_WORD_REG_MEMGSREGREGIMM_IMM imul @0, word gs:[#1+#2+0x$3], 0x$4
-IMULTHREE_WORD_REG_MEMGSREGREGRELIMM_IMM imul @0, word gs:[#1+#2+?0x$3], 0x$4
-IMULTHREE_WORD_REG_MEMGSREGMUL_IMM imul @0, word gs:[#1*$2], 0x$3
-IMULTHREE_WORD_REG_MEMGSREGMULIMM_IMM imul @0, word gs:[#1*$2+0x$3], 0x$4
-IMULTHREE_WORD_REG_MEMGSREGMULRELIMM_IMM imul @0, word gs:[#1*$2+?0x$3], 0x$4
-IMULTHREE_WORD_REG_MEMGSREGREGMUL_IMM imul @0, word gs:[#1+#2*$3], 0x$4
-IMULTHREE_WORD_REG_MEMGSREGREGMULIMM_IMM imul @0, word gs:[#1+#2*$3+0x$4], 0x$5
-IMULTHREE_WORD_REG_MEMGSREGREGMULRELIMM_IMM imul @0, word gs:[#1+#2*$3+?0x$4], 0x$5
-IMULTHREE_WORD_REG_MEMGSSP_IMM imul @0, word gs:[esp], 0x$1
-IMULTHREE_WORD_REG_MEMGSSPIMM_IMM imul @0, word gs:[esp+0x$1], 0x$2
-IMULTHREE_WORD_REG_MEMGSSPRELIMM_IMM imul @0, word gs:[esp+?0x$1], 0x$2
-IMULTHREE_WORD_REG_MEMGSSPREG_IMM imul @0, word gs:[esp+#1], 0x$2
-IMULTHREE_WORD_REG_MEMGSSPREGIMM_IMM imul @0, word gs:[esp+#1+0x$2], 0x$3
-IMULTHREE_WORD_REG_MEMGSSPREGRELIMM_IMM imul @0, word gs:[esp+#1+?0x$2], 0x$3
-IMULTHREE_WORD_REG_MEMGSSPREGMUL_IMM imul @0, word gs:[esp+#1*$2], 0x$3
-IMULTHREE_WORD_REG_MEMGSSPREGMULIMM_IMM imul @0, word gs:[esp+#1*$2+0x$3], 0x$4
-IMULTHREE_WORD_REG_MEMGSSPREGMULRELIMM_IMM imul @0, word gs:[esp+#1*$2+?0x$3], 0x$4
-IMULTHREE_WORD_REG_IMM_IMM imul @0, 0x$1, 0x$2
-IMULTHREE_WORD_SP_REG_IMM imul sp, @0, 0x$1
-IMULTHREE_WORD_SP_SP_IMM imul sp, sp, 0x$0
-IMULTHREE_WORD_SP_MEMIMM_IMM imul sp, word [0x$0], 0x$1
-IMULTHREE_WORD_SP_MEMRELIMM_IMM imul sp, word [?0x$0], 0x$1
-IMULTHREE_WORD_SP_MEMREG_IMM imul sp, word [#0], 0x$1
-IMULTHREE_WORD_SP_MEMREGIMM_IMM imul sp, word [#0+0x$1], 0x$2
-IMULTHREE_WORD_SP_MEMREGRELIMM_IMM imul sp, word [#0+?0x$1], 0x$2
-IMULTHREE_WORD_SP_MEMREGREG_IMM imul sp, word [#0+#1], 0x$2
-IMULTHREE_WORD_SP_MEMREGREGIMM_IMM imul sp, word [#0+#1+0x$2], 0x$3
-IMULTHREE_WORD_SP_MEMREGREGRELIMM_IMM imul sp, word [#0+#1+?0x$2], 0x$3
-IMULTHREE_WORD_SP_MEMREGMUL_IMM imul sp, word [#0*$1], 0x$2
-IMULTHREE_WORD_SP_MEMREGMULIMM_IMM imul sp, word [#0*$1+0x$2], 0x$3
-IMULTHREE_WORD_SP_MEMREGMULRELIMM_IMM imul sp, word [#0*$1+?0x$2], 0x$3
-IMULTHREE_WORD_SP_MEMREGREGMUL_IMM imul sp, word [#0+#1*$2], 0x$3
-IMULTHREE_WORD_SP_MEMREGREGMULIMM_IMM imul sp, word [#0+#1*$2+0x$3], 0x$4
-IMULTHREE_WORD_SP_MEMREGREGMULRELIMM_IMM imul sp, word [#0+#1*$2+?0x$3], 0x$4
-IMULTHREE_WORD_SP_MEMSP_IMM imul sp, word [esp], 0x$0
-IMULTHREE_WORD_SP_MEMSPIMM_IMM imul sp, word [esp+0x$0], 0x$1
-IMULTHREE_WORD_SP_MEMSPRELIMM_IMM imul sp, word [esp+?0x$0], 0x$1
-IMULTHREE_WORD_SP_MEMSPREG_IMM imul sp, word [esp+#0], 0x$1
-IMULTHREE_WORD_SP_MEMSPREGIMM_IMM imul sp, word [esp+#0+0x$1], 0x$2
-IMULTHREE_WORD_SP_MEMSPREGRELIMM_IMM imul sp, word [esp+#0+?0x$1], 0x$2
-IMULTHREE_WORD_SP_MEMSPREGMUL_IMM imul sp, word [esp+#0*$1], 0x$2
-IMULTHREE_WORD_SP_MEMSPREGMULIMM_IMM imul sp, word [esp+#0*$1+0x$2], 0x$3
-IMULTHREE_WORD_SP_MEMSPREGMULRELIMM_IMM imul sp, word [esp+#0*$1+?0x$2], 0x$3
-IMULTHREE_WORD_SP_MEMFSIMM_IMM imul sp, word fs:[0x$0], 0x$1
-IMULTHREE_WORD_SP_MEMFSRELIMM_IMM imul sp, word fs:[?0x$0], 0x$1
-IMULTHREE_WORD_SP_MEMFSREG_IMM imul sp, word fs:[#0], 0x$1
-IMULTHREE_WORD_SP_MEMFSREGIMM_IMM imul sp, word fs:[#0+0x$1], 0x$2
-IMULTHREE_WORD_SP_MEMFSREGRELIMM_IMM imul sp, word fs:[#0+?0x$1], 0x$2
-IMULTHREE_WORD_SP_MEMFSREGREG_IMM imul sp, word fs:[#0+#1], 0x$2
-IMULTHREE_WORD_SP_MEMFSREGREGIMM_IMM imul sp, word fs:[#0+#1+0x$2], 0x$3
-IMULTHREE_WORD_SP_MEMFSREGREGRELIMM_IMM imul sp, word fs:[#0+#1+?0x$2], 0x$3
-IMULTHREE_WORD_SP_MEMFSREGMUL_IMM imul sp, word fs:[#0*$1], 0x$2
-IMULTHREE_WORD_SP_MEMFSREGMULIMM_IMM imul sp, word fs:[#0*$1+0x$2], 0x$3
-IMULTHREE_WORD_SP_MEMFSREGMULRELIMM_IMM imul sp, word fs:[#0*$1+?0x$2], 0x$3
-IMULTHREE_WORD_SP_MEMFSREGREGMUL_IMM imul sp, word fs:[#0+#1*$2], 0x$3
-IMULTHREE_WORD_SP_MEMFSREGREGMULIMM_IMM imul sp, word fs:[#0+#1*$2+0x$3], 0x$4
-IMULTHREE_WORD_SP_MEMFSREGREGMULRELIMM_IMM imul sp, word fs:[#0+#1*$2+?0x$3], 0x$4
-IMULTHREE_WORD_SP_MEMFSSP_IMM imul sp, word fs:[esp], 0x$0
-IMULTHREE_WORD_SP_MEMFSSPIMM_IMM imul sp, word fs:[esp+0x$0], 0x$1
-IMULTHREE_WORD_SP_MEMFSSPRELIMM_IMM imul sp, word fs:[esp+?0x$0], 0x$1
-IMULTHREE_WORD_SP_MEMFSSPREG_IMM imul sp, word fs:[esp+#0], 0x$1
-IMULTHREE_WORD_SP_MEMFSSPREGIMM_IMM imul sp, word fs:[esp+#0+0x$1], 0x$2
-IMULTHREE_WORD_SP_MEMFSSPREGRELIMM_IMM imul sp, word fs:[esp+#0+?0x$1], 0x$2
-IMULTHREE_WORD_SP_MEMFSSPREGMUL_IMM imul sp, word fs:[esp+#0*$1], 0x$2
-IMULTHREE_WORD_SP_MEMFSSPREGMULIMM_IMM imul sp, word fs:[esp+#0*$1+0x$2], 0x$3
-IMULTHREE_WORD_SP_MEMFSSPREGMULRELIMM_IMM imul sp, word fs:[esp+#0*$1+?0x$2], 0x$3
-IMULTHREE_WORD_SP_MEMGSIMM_IMM imul sp, word gs:[0x$0], 0x$1
-IMULTHREE_WORD_SP_MEMGSRELIMM_IMM imul sp, word gs:[?0x$0], 0x$1
-IMULTHREE_WORD_SP_MEMGSREG_IMM imul sp, word gs:[#0], 0x$1
-IMULTHREE_WORD_SP_MEMGSREGIMM_IMM imul sp, word gs:[#0+0x$1], 0x$2
-IMULTHREE_WORD_SP_MEMGSREGRELIMM_IMM imul sp, word gs:[#0+?0x$1], 0x$2
-IMULTHREE_WORD_SP_MEMGSREGREG_IMM imul sp, word gs:[#0+#1], 0x$2
-IMULTHREE_WORD_SP_MEMGSREGREGIMM_IMM imul sp, word gs:[#0+#1+0x$2], 0x$3
-IMULTHREE_WORD_SP_MEMGSREGREGRELIMM_IMM imul sp, word gs:[#0+#1+?0x$2], 0x$3
-IMULTHREE_WORD_SP_MEMGSREGMUL_IMM imul sp, word gs:[#0*$1], 0x$2
-IMULTHREE_WORD_SP_MEMGSREGMULIMM_IMM imul sp, word gs:[#0*$1+0x$2], 0x$3
-IMULTHREE_WORD_SP_MEMGSREGMULRELIMM_IMM imul sp, word gs:[#0*$1+?0x$2], 0x$3
-IMULTHREE_WORD_SP_MEMGSREGREGMUL_IMM imul sp, word gs:[#0+#1*$2], 0x$3
-IMULTHREE_WORD_SP_MEMGSREGREGMULIMM_IMM imul sp, word gs:[#0+#1*$2+0x$3], 0x$4
-IMULTHREE_WORD_SP_MEMGSREGREGMULRELIMM_IMM imul sp, word gs:[#0+#1*$2+?0x$3], 0x$4
-IMULTHREE_WORD_SP_MEMGSSP_IMM imul sp, word gs:[esp], 0x$0
-IMULTHREE_WORD_SP_MEMGSSPIMM_IMM imul sp, word gs:[esp+0x$0], 0x$1
-IMULTHREE_WORD_SP_MEMGSSPRELIMM_IMM imul sp, word gs:[esp+?0x$0], 0x$1
-IMULTHREE_WORD_SP_MEMGSSPREG_IMM imul sp, word gs:[esp+#0], 0x$1
-IMULTHREE_WORD_SP_MEMGSSPREGIMM_IMM imul sp, word gs:[esp+#0+0x$1], 0x$2
-IMULTHREE_WORD_SP_MEMGSSPREGRELIMM_IMM imul sp, word gs:[esp+#0+?0x$1], 0x$2
-IMULTHREE_WORD_SP_MEMGSSPREGMUL_IMM imul sp, word gs:[esp+#0*$1], 0x$2
-IMULTHREE_WORD_SP_MEMGSSPREGMULIMM_IMM imul sp, word gs:[esp+#0*$1+0x$2], 0x$3
-IMULTHREE_WORD_SP_MEMGSSPREGMULRELIMM_IMM imul sp, word gs:[esp+#0*$1+?0x$2], 0x$3
-IMULTHREE_WORD_SP_IMM_IMM imul sp, 0x$0, 0x$1
+IMUL_WORD_REG_REG_IMM imul @0, @1, 0x$2
+IMUL_WORD_REG_SP_IMM imul @0, sp, 0x$1
+IMUL_WORD_REG_MEMIMM_IMM imul @0, word [0x$1], 0x$2
+IMUL_WORD_REG_MEMRELIMM_IMM imul @0, word [?0x$1], 0x$2
+IMUL_WORD_REG_MEMREG_IMM imul @0, word [#1], 0x$2
+IMUL_WORD_REG_MEMREGIMM_IMM imul @0, word [#1+0x$2], 0x$3
+IMUL_WORD_REG_MEMREGRELIMM_IMM imul @0, word [#1+?0x$2], 0x$3
+IMUL_WORD_REG_MEMREGREG_IMM imul @0, word [#1+#2], 0x$3
+IMUL_WORD_REG_MEMREGREGIMM_IMM imul @0, word [#1+#2+0x$3], 0x$4
+IMUL_WORD_REG_MEMREGREGRELIMM_IMM imul @0, word [#1+#2+?0x$3], 0x$4
+IMUL_WORD_REG_MEMREGMUL_IMM imul @0, word [#1*$2], 0x$3
+IMUL_WORD_REG_MEMREGMULIMM_IMM imul @0, word [#1*$2+0x$3], 0x$4
+IMUL_WORD_REG_MEMREGMULRELIMM_IMM imul @0, word [#1*$2+?0x$3], 0x$4
+IMUL_WORD_REG_MEMREGREGMUL_IMM imul @0, word [#1+#2*$3], 0x$4
+IMUL_WORD_REG_MEMREGREGMULIMM_IMM imul @0, word [#1+#2*$3+0x$4], 0x$5
+IMUL_WORD_REG_MEMREGREGMULRELIMM_IMM imul @0, word [#1+#2*$3+?0x$4], 0x$5
+IMUL_WORD_REG_MEMSP_IMM imul @0, word [esp], 0x$1
+IMUL_WORD_REG_MEMSPIMM_IMM imul @0, word [esp+0x$1], 0x$2
+IMUL_WORD_REG_MEMSPRELIMM_IMM imul @0, word [esp+?0x$1], 0x$2
+IMUL_WORD_REG_MEMSPREG_IMM imul @0, word [esp+#1], 0x$2
+IMUL_WORD_REG_MEMSPREGIMM_IMM imul @0, word [esp+#1+0x$2], 0x$3
+IMUL_WORD_REG_MEMSPREGRELIMM_IMM imul @0, word [esp+#1+?0x$2], 0x$3
+IMUL_WORD_REG_MEMSPREGMUL_IMM imul @0, word [esp+#1*$2], 0x$3
+IMUL_WORD_REG_MEMSPREGMULIMM_IMM imul @0, word [esp+#1*$2+0x$3], 0x$4
+IMUL_WORD_REG_MEMSPREGMULRELIMM_IMM imul @0, word [esp+#1*$2+?0x$3], 0x$4
+IMUL_WORD_REG_MEMFSIMM_IMM imul @0, word fs:[0x$1], 0x$2
+IMUL_WORD_REG_MEMFSRELIMM_IMM imul @0, word fs:[?0x$1], 0x$2
+IMUL_WORD_REG_MEMFSREG_IMM imul @0, word fs:[#1], 0x$2
+IMUL_WORD_REG_MEMFSREGIMM_IMM imul @0, word fs:[#1+0x$2], 0x$3
+IMUL_WORD_REG_MEMFSREGRELIMM_IMM imul @0, word fs:[#1+?0x$2], 0x$3
+IMUL_WORD_REG_MEMFSREGREG_IMM imul @0, word fs:[#1+#2], 0x$3
+IMUL_WORD_REG_MEMFSREGREGIMM_IMM imul @0, word fs:[#1+#2+0x$3], 0x$4
+IMUL_WORD_REG_MEMFSREGREGRELIMM_IMM imul @0, word fs:[#1+#2+?0x$3], 0x$4
+IMUL_WORD_REG_MEMFSREGMUL_IMM imul @0, word fs:[#1*$2], 0x$3
+IMUL_WORD_REG_MEMFSREGMULIMM_IMM imul @0, word fs:[#1*$2+0x$3], 0x$4
+IMUL_WORD_REG_MEMFSREGMULRELIMM_IMM imul @0, word fs:[#1*$2+?0x$3], 0x$4
+IMUL_WORD_REG_MEMFSREGREGMUL_IMM imul @0, word fs:[#1+#2*$3], 0x$4
+IMUL_WORD_REG_MEMFSREGREGMULIMM_IMM imul @0, word fs:[#1+#2*$3+0x$4], 0x$5
+IMUL_WORD_REG_MEMFSREGREGMULRELIMM_IMM imul @0, word fs:[#1+#2*$3+?0x$4], 0x$5
+IMUL_WORD_REG_MEMFSSP_IMM imul @0, word fs:[esp], 0x$1
+IMUL_WORD_REG_MEMFSSPIMM_IMM imul @0, word fs:[esp+0x$1], 0x$2
+IMUL_WORD_REG_MEMFSSPRELIMM_IMM imul @0, word fs:[esp+?0x$1], 0x$2
+IMUL_WORD_REG_MEMFSSPREG_IMM imul @0, word fs:[esp+#1], 0x$2
+IMUL_WORD_REG_MEMFSSPREGIMM_IMM imul @0, word fs:[esp+#1+0x$2], 0x$3
+IMUL_WORD_REG_MEMFSSPREGRELIMM_IMM imul @0, word fs:[esp+#1+?0x$2], 0x$3
+IMUL_WORD_REG_MEMFSSPREGMUL_IMM imul @0, word fs:[esp+#1*$2], 0x$3
+IMUL_WORD_REG_MEMFSSPREGMULIMM_IMM imul @0, word fs:[esp+#1*$2+0x$3], 0x$4
+IMUL_WORD_REG_MEMFSSPREGMULRELIMM_IMM imul @0, word fs:[esp+#1*$2+?0x$3], 0x$4
+IMUL_WORD_REG_MEMGSIMM_IMM imul @0, word gs:[0x$1], 0x$2
+IMUL_WORD_REG_MEMGSRELIMM_IMM imul @0, word gs:[?0x$1], 0x$2
+IMUL_WORD_REG_MEMGSREG_IMM imul @0, word gs:[#1], 0x$2
+IMUL_WORD_REG_MEMGSREGIMM_IMM imul @0, word gs:[#1+0x$2], 0x$3
+IMUL_WORD_REG_MEMGSREGRELIMM_IMM imul @0, word gs:[#1+?0x$2], 0x$3
+IMUL_WORD_REG_MEMGSREGREG_IMM imul @0, word gs:[#1+#2], 0x$3
+IMUL_WORD_REG_MEMGSREGREGIMM_IMM imul @0, word gs:[#1+#2+0x$3], 0x$4
+IMUL_WORD_REG_MEMGSREGREGRELIMM_IMM imul @0, word gs:[#1+#2+?0x$3], 0x$4
+IMUL_WORD_REG_MEMGSREGMUL_IMM imul @0, word gs:[#1*$2], 0x$3
+IMUL_WORD_REG_MEMGSREGMULIMM_IMM imul @0, word gs:[#1*$2+0x$3], 0x$4
+IMUL_WORD_REG_MEMGSREGMULRELIMM_IMM imul @0, word gs:[#1*$2+?0x$3], 0x$4
+IMUL_WORD_REG_MEMGSREGREGMUL_IMM imul @0, word gs:[#1+#2*$3], 0x$4
+IMUL_WORD_REG_MEMGSREGREGMULIMM_IMM imul @0, word gs:[#1+#2*$3+0x$4], 0x$5
+IMUL_WORD_REG_MEMGSREGREGMULRELIMM_IMM imul @0, word gs:[#1+#2*$3+?0x$4], 0x$5
+IMUL_WORD_REG_MEMGSSP_IMM imul @0, word gs:[esp], 0x$1
+IMUL_WORD_REG_MEMGSSPIMM_IMM imul @0, word gs:[esp+0x$1], 0x$2
+IMUL_WORD_REG_MEMGSSPRELIMM_IMM imul @0, word gs:[esp+?0x$1], 0x$2
+IMUL_WORD_REG_MEMGSSPREG_IMM imul @0, word gs:[esp+#1], 0x$2
+IMUL_WORD_REG_MEMGSSPREGIMM_IMM imul @0, word gs:[esp+#1+0x$2], 0x$3
+IMUL_WORD_REG_MEMGSSPREGRELIMM_IMM imul @0, word gs:[esp+#1+?0x$2], 0x$3
+IMUL_WORD_REG_MEMGSSPREGMUL_IMM imul @0, word gs:[esp+#1*$2], 0x$3
+IMUL_WORD_REG_MEMGSSPREGMULIMM_IMM imul @0, word gs:[esp+#1*$2+0x$3], 0x$4
+IMUL_WORD_REG_MEMGSSPREGMULRELIMM_IMM imul @0, word gs:[esp+#1*$2+?0x$3], 0x$4
+IMUL_WORD_REG_IMM_IMM imul @0, 0x$1, 0x$2
+IMUL_WORD_SP_REG_IMM imul sp, @0, 0x$1
+IMUL_WORD_SP_SP_IMM imul sp, sp, 0x$0
+IMUL_WORD_SP_MEMIMM_IMM imul sp, word [0x$0], 0x$1
+IMUL_WORD_SP_MEMRELIMM_IMM imul sp, word [?0x$0], 0x$1
+IMUL_WORD_SP_MEMREG_IMM imul sp, word [#0], 0x$1
+IMUL_WORD_SP_MEMREGIMM_IMM imul sp, word [#0+0x$1], 0x$2
+IMUL_WORD_SP_MEMREGRELIMM_IMM imul sp, word [#0+?0x$1], 0x$2
+IMUL_WORD_SP_MEMREGREG_IMM imul sp, word [#0+#1], 0x$2
+IMUL_WORD_SP_MEMREGREGIMM_IMM imul sp, word [#0+#1+0x$2], 0x$3
+IMUL_WORD_SP_MEMREGREGRELIMM_IMM imul sp, word [#0+#1+?0x$2], 0x$3
+IMUL_WORD_SP_MEMREGMUL_IMM imul sp, word [#0*$1], 0x$2
+IMUL_WORD_SP_MEMREGMULIMM_IMM imul sp, word [#0*$1+0x$2], 0x$3
+IMUL_WORD_SP_MEMREGMULRELIMM_IMM imul sp, word [#0*$1+?0x$2], 0x$3
+IMUL_WORD_SP_MEMREGREGMUL_IMM imul sp, word [#0+#1*$2], 0x$3
+IMUL_WORD_SP_MEMREGREGMULIMM_IMM imul sp, word [#0+#1*$2+0x$3], 0x$4
+IMUL_WORD_SP_MEMREGREGMULRELIMM_IMM imul sp, word [#0+#1*$2+?0x$3], 0x$4
+IMUL_WORD_SP_MEMSP_IMM imul sp, word [esp], 0x$0
+IMUL_WORD_SP_MEMSPIMM_IMM imul sp, word [esp+0x$0], 0x$1
+IMUL_WORD_SP_MEMSPRELIMM_IMM imul sp, word [esp+?0x$0], 0x$1
+IMUL_WORD_SP_MEMSPREG_IMM imul sp, word [esp+#0], 0x$1
+IMUL_WORD_SP_MEMSPREGIMM_IMM imul sp, word [esp+#0+0x$1], 0x$2
+IMUL_WORD_SP_MEMSPREGRELIMM_IMM imul sp, word [esp+#0+?0x$1], 0x$2
+IMUL_WORD_SP_MEMSPREGMUL_IMM imul sp, word [esp+#0*$1], 0x$2
+IMUL_WORD_SP_MEMSPREGMULIMM_IMM imul sp, word [esp+#0*$1+0x$2], 0x$3
+IMUL_WORD_SP_MEMSPREGMULRELIMM_IMM imul sp, word [esp+#0*$1+?0x$2], 0x$3
+IMUL_WORD_SP_MEMFSIMM_IMM imul sp, word fs:[0x$0], 0x$1
+IMUL_WORD_SP_MEMFSRELIMM_IMM imul sp, word fs:[?0x$0], 0x$1
+IMUL_WORD_SP_MEMFSREG_IMM imul sp, word fs:[#0], 0x$1
+IMUL_WORD_SP_MEMFSREGIMM_IMM imul sp, word fs:[#0+0x$1], 0x$2
+IMUL_WORD_SP_MEMFSREGRELIMM_IMM imul sp, word fs:[#0+?0x$1], 0x$2
+IMUL_WORD_SP_MEMFSREGREG_IMM imul sp, word fs:[#0+#1], 0x$2
+IMUL_WORD_SP_MEMFSREGREGIMM_IMM imul sp, word fs:[#0+#1+0x$2], 0x$3
+IMUL_WORD_SP_MEMFSREGREGRELIMM_IMM imul sp, word fs:[#0+#1+?0x$2], 0x$3
+IMUL_WORD_SP_MEMFSREGMUL_IMM imul sp, word fs:[#0*$1], 0x$2
+IMUL_WORD_SP_MEMFSREGMULIMM_IMM imul sp, word fs:[#0*$1+0x$2], 0x$3
+IMUL_WORD_SP_MEMFSREGMULRELIMM_IMM imul sp, word fs:[#0*$1+?0x$2], 0x$3
+IMUL_WORD_SP_MEMFSREGREGMUL_IMM imul sp, word fs:[#0+#1*$2], 0x$3
+IMUL_WORD_SP_MEMFSREGREGMULIMM_IMM imul sp, word fs:[#0+#1*$2+0x$3], 0x$4
+IMUL_WORD_SP_MEMFSREGREGMULRELIMM_IMM imul sp, word fs:[#0+#1*$2+?0x$3], 0x$4
+IMUL_WORD_SP_MEMFSSP_IMM imul sp, word fs:[esp], 0x$0
+IMUL_WORD_SP_MEMFSSPIMM_IMM imul sp, word fs:[esp+0x$0], 0x$1
+IMUL_WORD_SP_MEMFSSPRELIMM_IMM imul sp, word fs:[esp+?0x$0], 0x$1
+IMUL_WORD_SP_MEMFSSPREG_IMM imul sp, word fs:[esp+#0], 0x$1
+IMUL_WORD_SP_MEMFSSPREGIMM_IMM imul sp, word fs:[esp+#0+0x$1], 0x$2
+IMUL_WORD_SP_MEMFSSPREGRELIMM_IMM imul sp, word fs:[esp+#0+?0x$1], 0x$2
+IMUL_WORD_SP_MEMFSSPREGMUL_IMM imul sp, word fs:[esp+#0*$1], 0x$2
+IMUL_WORD_SP_MEMFSSPREGMULIMM_IMM imul sp, word fs:[esp+#0*$1+0x$2], 0x$3
+IMUL_WORD_SP_MEMFSSPREGMULRELIMM_IMM imul sp, word fs:[esp+#0*$1+?0x$2], 0x$3
+IMUL_WORD_SP_MEMGSIMM_IMM imul sp, word gs:[0x$0], 0x$1
+IMUL_WORD_SP_MEMGSRELIMM_IMM imul sp, word gs:[?0x$0], 0x$1
+IMUL_WORD_SP_MEMGSREG_IMM imul sp, word gs:[#0], 0x$1
+IMUL_WORD_SP_MEMGSREGIMM_IMM imul sp, word gs:[#0+0x$1], 0x$2
+IMUL_WORD_SP_MEMGSREGRELIMM_IMM imul sp, word gs:[#0+?0x$1], 0x$2
+IMUL_WORD_SP_MEMGSREGREG_IMM imul sp, word gs:[#0+#1], 0x$2
+IMUL_WORD_SP_MEMGSREGREGIMM_IMM imul sp, word gs:[#0+#1+0x$2], 0x$3
+IMUL_WORD_SP_MEMGSREGREGRELIMM_IMM imul sp, word gs:[#0+#1+?0x$2], 0x$3
+IMUL_WORD_SP_MEMGSREGMUL_IMM imul sp, word gs:[#0*$1], 0x$2
+IMUL_WORD_SP_MEMGSREGMULIMM_IMM imul sp, word gs:[#0*$1+0x$2], 0x$3
+IMUL_WORD_SP_MEMGSREGMULRELIMM_IMM imul sp, word gs:[#0*$1+?0x$2], 0x$3
+IMUL_WORD_SP_MEMGSREGREGMUL_IMM imul sp, word gs:[#0+#1*$2], 0x$3
+IMUL_WORD_SP_MEMGSREGREGMULIMM_IMM imul sp, word gs:[#0+#1*$2+0x$3], 0x$4
+IMUL_WORD_SP_MEMGSREGREGMULRELIMM_IMM imul sp, word gs:[#0+#1*$2+?0x$3], 0x$4
+IMUL_WORD_SP_MEMGSSP_IMM imul sp, word gs:[esp], 0x$0
+IMUL_WORD_SP_MEMGSSPIMM_IMM imul sp, word gs:[esp+0x$0], 0x$1
+IMUL_WORD_SP_MEMGSSPRELIMM_IMM imul sp, word gs:[esp+?0x$0], 0x$1
+IMUL_WORD_SP_MEMGSSPREG_IMM imul sp, word gs:[esp+#0], 0x$1
+IMUL_WORD_SP_MEMGSSPREGIMM_IMM imul sp, word gs:[esp+#0+0x$1], 0x$2
+IMUL_WORD_SP_MEMGSSPREGRELIMM_IMM imul sp, word gs:[esp+#0+?0x$1], 0x$2
+IMUL_WORD_SP_MEMGSSPREGMUL_IMM imul sp, word gs:[esp+#0*$1], 0x$2
+IMUL_WORD_SP_MEMGSSPREGMULIMM_IMM imul sp, word gs:[esp+#0*$1+0x$2], 0x$3
+IMUL_WORD_SP_MEMGSSPREGMULRELIMM_IMM imul sp, word gs:[esp+#0*$1+?0x$2], 0x$3
+IMUL_WORD_SP_IMM_IMM imul sp, 0x$0, 0x$1
 MOV_WORD_REG_REG mov @0, @1
 MOV_WORD_REG_SP mov @0, sp
 MOV_WORD_REG_MEMIMM mov @0, word [0x$1]
@@ -12105,150 +12105,150 @@ BTC_WORD_MEMGSSPREGMULIMM_IMM btc word gs:[esp+#0*$1+0x$2], 0x$3
 BTC_WORD_MEMGSSPREGMULRELIMM_REG btc word gs:[esp+#0*$1+?0x$2], @3
 BTC_WORD_MEMGSSPREGMULRELIMM_SP btc word gs:[esp+#0*$1+?0x$2], sp
 BTC_WORD_MEMGSSPREGMULRELIMM_IMM btc word gs:[esp+#0*$1+?0x$2], 0x$3
-IMULTWO_WORD_REG_REG imul @0, @1
-IMULTWO_WORD_REG_SP imul @0, sp
-IMULTWO_WORD_REG_MEMIMM imul @0, word [0x$1]
-IMULTWO_WORD_REG_MEMRELIMM imul @0, word [?0x$1]
-IMULTWO_WORD_REG_MEMREG imul @0, word [#1]
-IMULTWO_WORD_REG_MEMREGIMM imul @0, word [#1+0x$2]
-IMULTWO_WORD_REG_MEMREGRELIMM imul @0, word [#1+?0x$2]
-IMULTWO_WORD_REG_MEMREGREG imul @0, word [#1+#2]
-IMULTWO_WORD_REG_MEMREGREGIMM imul @0, word [#1+#2+0x$3]
-IMULTWO_WORD_REG_MEMREGREGRELIMM imul @0, word [#1+#2+?0x$3]
-IMULTWO_WORD_REG_MEMREGMUL imul @0, word [#1*$2]
-IMULTWO_WORD_REG_MEMREGMULIMM imul @0, word [#1*$2+0x$3]
-IMULTWO_WORD_REG_MEMREGMULRELIMM imul @0, word [#1*$2+?0x$3]
-IMULTWO_WORD_REG_MEMREGREGMUL imul @0, word [#1+#2*$3]
-IMULTWO_WORD_REG_MEMREGREGMULIMM imul @0, word [#1+#2*$3+0x$4]
-IMULTWO_WORD_REG_MEMREGREGMULRELIMM imul @0, word [#1+#2*$3+?0x$4]
-IMULTWO_WORD_REG_MEMSP imul @0, word [esp]
-IMULTWO_WORD_REG_MEMSPIMM imul @0, word [esp+0x$1]
-IMULTWO_WORD_REG_MEMSPRELIMM imul @0, word [esp+?0x$1]
-IMULTWO_WORD_REG_MEMSPREG imul @0, word [esp+#1]
-IMULTWO_WORD_REG_MEMSPREGIMM imul @0, word [esp+#1+0x$2]
-IMULTWO_WORD_REG_MEMSPREGRELIMM imul @0, word [esp+#1+?0x$2]
-IMULTWO_WORD_REG_MEMSPREGMUL imul @0, word [esp+#1*$2]
-IMULTWO_WORD_REG_MEMSPREGMULIMM imul @0, word [esp+#1*$2+0x$3]
-IMULTWO_WORD_REG_MEMSPREGMULRELIMM imul @0, word [esp+#1*$2+?0x$3]
-IMULTWO_WORD_REG_MEMFSIMM imul @0, word fs:[0x$1]
-IMULTWO_WORD_REG_MEMFSRELIMM imul @0, word fs:[?0x$1]
-IMULTWO_WORD_REG_MEMFSREG imul @0, word fs:[#1]
-IMULTWO_WORD_REG_MEMFSREGIMM imul @0, word fs:[#1+0x$2]
-IMULTWO_WORD_REG_MEMFSREGRELIMM imul @0, word fs:[#1+?0x$2]
-IMULTWO_WORD_REG_MEMFSREGREG imul @0, word fs:[#1+#2]
-IMULTWO_WORD_REG_MEMFSREGREGIMM imul @0, word fs:[#1+#2+0x$3]
-IMULTWO_WORD_REG_MEMFSREGREGRELIMM imul @0, word fs:[#1+#2+?0x$3]
-IMULTWO_WORD_REG_MEMFSREGMUL imul @0, word fs:[#1*$2]
-IMULTWO_WORD_REG_MEMFSREGMULIMM imul @0, word fs:[#1*$2+0x$3]
-IMULTWO_WORD_REG_MEMFSREGMULRELIMM imul @0, word fs:[#1*$2+?0x$3]
-IMULTWO_WORD_REG_MEMFSREGREGMUL imul @0, word fs:[#1+#2*$3]
-IMULTWO_WORD_REG_MEMFSREGREGMULIMM imul @0, word fs:[#1+#2*$3+0x$4]
-IMULTWO_WORD_REG_MEMFSREGREGMULRELIMM imul @0, word fs:[#1+#2*$3+?0x$4]
-IMULTWO_WORD_REG_MEMFSSP imul @0, word fs:[esp]
-IMULTWO_WORD_REG_MEMFSSPIMM imul @0, word fs:[esp+0x$1]
-IMULTWO_WORD_REG_MEMFSSPRELIMM imul @0, word fs:[esp+?0x$1]
-IMULTWO_WORD_REG_MEMFSSPREG imul @0, word fs:[esp+#1]
-IMULTWO_WORD_REG_MEMFSSPREGIMM imul @0, word fs:[esp+#1+0x$2]
-IMULTWO_WORD_REG_MEMFSSPREGRELIMM imul @0, word fs:[esp+#1+?0x$2]
-IMULTWO_WORD_REG_MEMFSSPREGMUL imul @0, word fs:[esp+#1*$2]
-IMULTWO_WORD_REG_MEMFSSPREGMULIMM imul @0, word fs:[esp+#1*$2+0x$3]
-IMULTWO_WORD_REG_MEMFSSPREGMULRELIMM imul @0, word fs:[esp+#1*$2+?0x$3]
-IMULTWO_WORD_REG_MEMGSIMM imul @0, word gs:[0x$1]
-IMULTWO_WORD_REG_MEMGSRELIMM imul @0, word gs:[?0x$1]
-IMULTWO_WORD_REG_MEMGSREG imul @0, word gs:[#1]
-IMULTWO_WORD_REG_MEMGSREGIMM imul @0, word gs:[#1+0x$2]
-IMULTWO_WORD_REG_MEMGSREGRELIMM imul @0, word gs:[#1+?0x$2]
-IMULTWO_WORD_REG_MEMGSREGREG imul @0, word gs:[#1+#2]
-IMULTWO_WORD_REG_MEMGSREGREGIMM imul @0, word gs:[#1+#2+0x$3]
-IMULTWO_WORD_REG_MEMGSREGREGRELIMM imul @0, word gs:[#1+#2+?0x$3]
-IMULTWO_WORD_REG_MEMGSREGMUL imul @0, word gs:[#1*$2]
-IMULTWO_WORD_REG_MEMGSREGMULIMM imul @0, word gs:[#1*$2+0x$3]
-IMULTWO_WORD_REG_MEMGSREGMULRELIMM imul @0, word gs:[#1*$2+?0x$3]
-IMULTWO_WORD_REG_MEMGSREGREGMUL imul @0, word gs:[#1+#2*$3]
-IMULTWO_WORD_REG_MEMGSREGREGMULIMM imul @0, word gs:[#1+#2*$3+0x$4]
-IMULTWO_WORD_REG_MEMGSREGREGMULRELIMM imul @0, word gs:[#1+#2*$3+?0x$4]
-IMULTWO_WORD_REG_MEMGSSP imul @0, word gs:[esp]
-IMULTWO_WORD_REG_MEMGSSPIMM imul @0, word gs:[esp+0x$1]
-IMULTWO_WORD_REG_MEMGSSPRELIMM imul @0, word gs:[esp+?0x$1]
-IMULTWO_WORD_REG_MEMGSSPREG imul @0, word gs:[esp+#1]
-IMULTWO_WORD_REG_MEMGSSPREGIMM imul @0, word gs:[esp+#1+0x$2]
-IMULTWO_WORD_REG_MEMGSSPREGRELIMM imul @0, word gs:[esp+#1+?0x$2]
-IMULTWO_WORD_REG_MEMGSSPREGMUL imul @0, word gs:[esp+#1*$2]
-IMULTWO_WORD_REG_MEMGSSPREGMULIMM imul @0, word gs:[esp+#1*$2+0x$3]
-IMULTWO_WORD_REG_MEMGSSPREGMULRELIMM imul @0, word gs:[esp+#1*$2+?0x$3]
-IMULTWO_WORD_REG_IMM imul @0, 0x$1
-IMULTWO_WORD_SP_REG imul sp, @0
-IMULTWO_WORD_SP_SP imul sp, sp
-IMULTWO_WORD_SP_MEMIMM imul sp, word [0x$0]
-IMULTWO_WORD_SP_MEMRELIMM imul sp, word [?0x$0]
-IMULTWO_WORD_SP_MEMREG imul sp, word [#0]
-IMULTWO_WORD_SP_MEMREGIMM imul sp, word [#0+0x$1]
-IMULTWO_WORD_SP_MEMREGRELIMM imul sp, word [#0+?0x$1]
-IMULTWO_WORD_SP_MEMREGREG imul sp, word [#0+#1]
-IMULTWO_WORD_SP_MEMREGREGIMM imul sp, word [#0+#1+0x$2]
-IMULTWO_WORD_SP_MEMREGREGRELIMM imul sp, word [#0+#1+?0x$2]
-IMULTWO_WORD_SP_MEMREGMUL imul sp, word [#0*$1]
-IMULTWO_WORD_SP_MEMREGMULIMM imul sp, word [#0*$1+0x$2]
-IMULTWO_WORD_SP_MEMREGMULRELIMM imul sp, word [#0*$1+?0x$2]
-IMULTWO_WORD_SP_MEMREGREGMUL imul sp, word [#0+#1*$2]
-IMULTWO_WORD_SP_MEMREGREGMULIMM imul sp, word [#0+#1*$2+0x$3]
-IMULTWO_WORD_SP_MEMREGREGMULRELIMM imul sp, word [#0+#1*$2+?0x$3]
-IMULTWO_WORD_SP_MEMSP imul sp, word [esp]
-IMULTWO_WORD_SP_MEMSPIMM imul sp, word [esp+0x$0]
-IMULTWO_WORD_SP_MEMSPRELIMM imul sp, word [esp+?0x$0]
-IMULTWO_WORD_SP_MEMSPREG imul sp, word [esp+#0]
-IMULTWO_WORD_SP_MEMSPREGIMM imul sp, word [esp+#0+0x$1]
-IMULTWO_WORD_SP_MEMSPREGRELIMM imul sp, word [esp+#0+?0x$1]
-IMULTWO_WORD_SP_MEMSPREGMUL imul sp, word [esp+#0*$1]
-IMULTWO_WORD_SP_MEMSPREGMULIMM imul sp, word [esp+#0*$1+0x$2]
-IMULTWO_WORD_SP_MEMSPREGMULRELIMM imul sp, word [esp+#0*$1+?0x$2]
-IMULTWO_WORD_SP_MEMFSIMM imul sp, word fs:[0x$0]
-IMULTWO_WORD_SP_MEMFSRELIMM imul sp, word fs:[?0x$0]
-IMULTWO_WORD_SP_MEMFSREG imul sp, word fs:[#0]
-IMULTWO_WORD_SP_MEMFSREGIMM imul sp, word fs:[#0+0x$1]
-IMULTWO_WORD_SP_MEMFSREGRELIMM imul sp, word fs:[#0+?0x$1]
-IMULTWO_WORD_SP_MEMFSREGREG imul sp, word fs:[#0+#1]
-IMULTWO_WORD_SP_MEMFSREGREGIMM imul sp, word fs:[#0+#1+0x$2]
-IMULTWO_WORD_SP_MEMFSREGREGRELIMM imul sp, word fs:[#0+#1+?0x$2]
-IMULTWO_WORD_SP_MEMFSREGMUL imul sp, word fs:[#0*$1]
-IMULTWO_WORD_SP_MEMFSREGMULIMM imul sp, word fs:[#0*$1+0x$2]
-IMULTWO_WORD_SP_MEMFSREGMULRELIMM imul sp, word fs:[#0*$1+?0x$2]
-IMULTWO_WORD_SP_MEMFSREGREGMUL imul sp, word fs:[#0+#1*$2]
-IMULTWO_WORD_SP_MEMFSREGREGMULIMM imul sp, word fs:[#0+#1*$2+0x$3]
-IMULTWO_WORD_SP_MEMFSREGREGMULRELIMM imul sp, word fs:[#0+#1*$2+?0x$3]
-IMULTWO_WORD_SP_MEMFSSP imul sp, word fs:[esp]
-IMULTWO_WORD_SP_MEMFSSPIMM imul sp, word fs:[esp+0x$0]
-IMULTWO_WORD_SP_MEMFSSPRELIMM imul sp, word fs:[esp+?0x$0]
-IMULTWO_WORD_SP_MEMFSSPREG imul sp, word fs:[esp+#0]
-IMULTWO_WORD_SP_MEMFSSPREGIMM imul sp, word fs:[esp+#0+0x$1]
-IMULTWO_WORD_SP_MEMFSSPREGRELIMM imul sp, word fs:[esp+#0+?0x$1]
-IMULTWO_WORD_SP_MEMFSSPREGMUL imul sp, word fs:[esp+#0*$1]
-IMULTWO_WORD_SP_MEMFSSPREGMULIMM imul sp, word fs:[esp+#0*$1+0x$2]
-IMULTWO_WORD_SP_MEMFSSPREGMULRELIMM imul sp, word fs:[esp+#0*$1+?0x$2]
-IMULTWO_WORD_SP_MEMGSIMM imul sp, word gs:[0x$0]
-IMULTWO_WORD_SP_MEMGSRELIMM imul sp, word gs:[?0x$0]
-IMULTWO_WORD_SP_MEMGSREG imul sp, word gs:[#0]
-IMULTWO_WORD_SP_MEMGSREGIMM imul sp, word gs:[#0+0x$1]
-IMULTWO_WORD_SP_MEMGSREGRELIMM imul sp, word gs:[#0+?0x$1]
-IMULTWO_WORD_SP_MEMGSREGREG imul sp, word gs:[#0+#1]
-IMULTWO_WORD_SP_MEMGSREGREGIMM imul sp, word gs:[#0+#1+0x$2]
-IMULTWO_WORD_SP_MEMGSREGREGRELIMM imul sp, word gs:[#0+#1+?0x$2]
-IMULTWO_WORD_SP_MEMGSREGMUL imul sp, word gs:[#0*$1]
-IMULTWO_WORD_SP_MEMGSREGMULIMM imul sp, word gs:[#0*$1+0x$2]
-IMULTWO_WORD_SP_MEMGSREGMULRELIMM imul sp, word gs:[#0*$1+?0x$2]
-IMULTWO_WORD_SP_MEMGSREGREGMUL imul sp, word gs:[#0+#1*$2]
-IMULTWO_WORD_SP_MEMGSREGREGMULIMM imul sp, word gs:[#0+#1*$2+0x$3]
-IMULTWO_WORD_SP_MEMGSREGREGMULRELIMM imul sp, word gs:[#0+#1*$2+?0x$3]
-IMULTWO_WORD_SP_MEMGSSP imul sp, word gs:[esp]
-IMULTWO_WORD_SP_MEMGSSPIMM imul sp, word gs:[esp+0x$0]
-IMULTWO_WORD_SP_MEMGSSPRELIMM imul sp, word gs:[esp+?0x$0]
-IMULTWO_WORD_SP_MEMGSSPREG imul sp, word gs:[esp+#0]
-IMULTWO_WORD_SP_MEMGSSPREGIMM imul sp, word gs:[esp+#0+0x$1]
-IMULTWO_WORD_SP_MEMGSSPREGRELIMM imul sp, word gs:[esp+#0+?0x$1]
-IMULTWO_WORD_SP_MEMGSSPREGMUL imul sp, word gs:[esp+#0*$1]
-IMULTWO_WORD_SP_MEMGSSPREGMULIMM imul sp, word gs:[esp+#0*$1+0x$2]
-IMULTWO_WORD_SP_MEMGSSPREGMULRELIMM imul sp, word gs:[esp+#0*$1+?0x$2]
-IMULTWO_WORD_SP_IMM imul sp, 0x$0
+IMUL_WORD_REG_REG imul @0, @1
+IMUL_WORD_REG_SP imul @0, sp
+IMUL_WORD_REG_MEMIMM imul @0, word [0x$1]
+IMUL_WORD_REG_MEMRELIMM imul @0, word [?0x$1]
+IMUL_WORD_REG_MEMREG imul @0, word [#1]
+IMUL_WORD_REG_MEMREGIMM imul @0, word [#1+0x$2]
+IMUL_WORD_REG_MEMREGRELIMM imul @0, word [#1+?0x$2]
+IMUL_WORD_REG_MEMREGREG imul @0, word [#1+#2]
+IMUL_WORD_REG_MEMREGREGIMM imul @0, word [#1+#2+0x$3]
+IMUL_WORD_REG_MEMREGREGRELIMM imul @0, word [#1+#2+?0x$3]
+IMUL_WORD_REG_MEMREGMUL imul @0, word [#1*$2]
+IMUL_WORD_REG_MEMREGMULIMM imul @0, word [#1*$2+0x$3]
+IMUL_WORD_REG_MEMREGMULRELIMM imul @0, word [#1*$2+?0x$3]
+IMUL_WORD_REG_MEMREGREGMUL imul @0, word [#1+#2*$3]
+IMUL_WORD_REG_MEMREGREGMULIMM imul @0, word [#1+#2*$3+0x$4]
+IMUL_WORD_REG_MEMREGREGMULRELIMM imul @0, word [#1+#2*$3+?0x$4]
+IMUL_WORD_REG_MEMSP imul @0, word [esp]
+IMUL_WORD_REG_MEMSPIMM imul @0, word [esp+0x$1]
+IMUL_WORD_REG_MEMSPRELIMM imul @0, word [esp+?0x$1]
+IMUL_WORD_REG_MEMSPREG imul @0, word [esp+#1]
+IMUL_WORD_REG_MEMSPREGIMM imul @0, word [esp+#1+0x$2]
+IMUL_WORD_REG_MEMSPREGRELIMM imul @0, word [esp+#1+?0x$2]
+IMUL_WORD_REG_MEMSPREGMUL imul @0, word [esp+#1*$2]
+IMUL_WORD_REG_MEMSPREGMULIMM imul @0, word [esp+#1*$2+0x$3]
+IMUL_WORD_REG_MEMSPREGMULRELIMM imul @0, word [esp+#1*$2+?0x$3]
+IMUL_WORD_REG_MEMFSIMM imul @0, word fs:[0x$1]
+IMUL_WORD_REG_MEMFSRELIMM imul @0, word fs:[?0x$1]
+IMUL_WORD_REG_MEMFSREG imul @0, word fs:[#1]
+IMUL_WORD_REG_MEMFSREGIMM imul @0, word fs:[#1+0x$2]
+IMUL_WORD_REG_MEMFSREGRELIMM imul @0, word fs:[#1+?0x$2]
+IMUL_WORD_REG_MEMFSREGREG imul @0, word fs:[#1+#2]
+IMUL_WORD_REG_MEMFSREGREGIMM imul @0, word fs:[#1+#2+0x$3]
+IMUL_WORD_REG_MEMFSREGREGRELIMM imul @0, word fs:[#1+#2+?0x$3]
+IMUL_WORD_REG_MEMFSREGMUL imul @0, word fs:[#1*$2]
+IMUL_WORD_REG_MEMFSREGMULIMM imul @0, word fs:[#1*$2+0x$3]
+IMUL_WORD_REG_MEMFSREGMULRELIMM imul @0, word fs:[#1*$2+?0x$3]
+IMUL_WORD_REG_MEMFSREGREGMUL imul @0, word fs:[#1+#2*$3]
+IMUL_WORD_REG_MEMFSREGREGMULIMM imul @0, word fs:[#1+#2*$3+0x$4]
+IMUL_WORD_REG_MEMFSREGREGMULRELIMM imul @0, word fs:[#1+#2*$3+?0x$4]
+IMUL_WORD_REG_MEMFSSP imul @0, word fs:[esp]
+IMUL_WORD_REG_MEMFSSPIMM imul @0, word fs:[esp+0x$1]
+IMUL_WORD_REG_MEMFSSPRELIMM imul @0, word fs:[esp+?0x$1]
+IMUL_WORD_REG_MEMFSSPREG imul @0, word fs:[esp+#1]
+IMUL_WORD_REG_MEMFSSPREGIMM imul @0, word fs:[esp+#1+0x$2]
+IMUL_WORD_REG_MEMFSSPREGRELIMM imul @0, word fs:[esp+#1+?0x$2]
+IMUL_WORD_REG_MEMFSSPREGMUL imul @0, word fs:[esp+#1*$2]
+IMUL_WORD_REG_MEMFSSPREGMULIMM imul @0, word fs:[esp+#1*$2+0x$3]
+IMUL_WORD_REG_MEMFSSPREGMULRELIMM imul @0, word fs:[esp+#1*$2+?0x$3]
+IMUL_WORD_REG_MEMGSIMM imul @0, word gs:[0x$1]
+IMUL_WORD_REG_MEMGSRELIMM imul @0, word gs:[?0x$1]
+IMUL_WORD_REG_MEMGSREG imul @0, word gs:[#1]
+IMUL_WORD_REG_MEMGSREGIMM imul @0, word gs:[#1+0x$2]
+IMUL_WORD_REG_MEMGSREGRELIMM imul @0, word gs:[#1+?0x$2]
+IMUL_WORD_REG_MEMGSREGREG imul @0, word gs:[#1+#2]
+IMUL_WORD_REG_MEMGSREGREGIMM imul @0, word gs:[#1+#2+0x$3]
+IMUL_WORD_REG_MEMGSREGREGRELIMM imul @0, word gs:[#1+#2+?0x$3]
+IMUL_WORD_REG_MEMGSREGMUL imul @0, word gs:[#1*$2]
+IMUL_WORD_REG_MEMGSREGMULIMM imul @0, word gs:[#1*$2+0x$3]
+IMUL_WORD_REG_MEMGSREGMULRELIMM imul @0, word gs:[#1*$2+?0x$3]
+IMUL_WORD_REG_MEMGSREGREGMUL imul @0, word gs:[#1+#2*$3]
+IMUL_WORD_REG_MEMGSREGREGMULIMM imul @0, word gs:[#1+#2*$3+0x$4]
+IMUL_WORD_REG_MEMGSREGREGMULRELIMM imul @0, word gs:[#1+#2*$3+?0x$4]
+IMUL_WORD_REG_MEMGSSP imul @0, word gs:[esp]
+IMUL_WORD_REG_MEMGSSPIMM imul @0, word gs:[esp+0x$1]
+IMUL_WORD_REG_MEMGSSPRELIMM imul @0, word gs:[esp+?0x$1]
+IMUL_WORD_REG_MEMGSSPREG imul @0, word gs:[esp+#1]
+IMUL_WORD_REG_MEMGSSPREGIMM imul @0, word gs:[esp+#1+0x$2]
+IMUL_WORD_REG_MEMGSSPREGRELIMM imul @0, word gs:[esp+#1+?0x$2]
+IMUL_WORD_REG_MEMGSSPREGMUL imul @0, word gs:[esp+#1*$2]
+IMUL_WORD_REG_MEMGSSPREGMULIMM imul @0, word gs:[esp+#1*$2+0x$3]
+IMUL_WORD_REG_MEMGSSPREGMULRELIMM imul @0, word gs:[esp+#1*$2+?0x$3]
+IMUL_WORD_REG_IMM imul @0, 0x$1
+IMUL_WORD_SP_REG imul sp, @0
+IMUL_WORD_SP_SP imul sp, sp
+IMUL_WORD_SP_MEMIMM imul sp, word [0x$0]
+IMUL_WORD_SP_MEMRELIMM imul sp, word [?0x$0]
+IMUL_WORD_SP_MEMREG imul sp, word [#0]
+IMUL_WORD_SP_MEMREGIMM imul sp, word [#0+0x$1]
+IMUL_WORD_SP_MEMREGRELIMM imul sp, word [#0+?0x$1]
+IMUL_WORD_SP_MEMREGREG imul sp, word [#0+#1]
+IMUL_WORD_SP_MEMREGREGIMM imul sp, word [#0+#1+0x$2]
+IMUL_WORD_SP_MEMREGREGRELIMM imul sp, word [#0+#1+?0x$2]
+IMUL_WORD_SP_MEMREGMUL imul sp, word [#0*$1]
+IMUL_WORD_SP_MEMREGMULIMM imul sp, word [#0*$1+0x$2]
+IMUL_WORD_SP_MEMREGMULRELIMM imul sp, word [#0*$1+?0x$2]
+IMUL_WORD_SP_MEMREGREGMUL imul sp, word [#0+#1*$2]
+IMUL_WORD_SP_MEMREGREGMULIMM imul sp, word [#0+#1*$2+0x$3]
+IMUL_WORD_SP_MEMREGREGMULRELIMM imul sp, word [#0+#1*$2+?0x$3]
+IMUL_WORD_SP_MEMSP imul sp, word [esp]
+IMUL_WORD_SP_MEMSPIMM imul sp, word [esp+0x$0]
+IMUL_WORD_SP_MEMSPRELIMM imul sp, word [esp+?0x$0]
+IMUL_WORD_SP_MEMSPREG imul sp, word [esp+#0]
+IMUL_WORD_SP_MEMSPREGIMM imul sp, word [esp+#0+0x$1]
+IMUL_WORD_SP_MEMSPREGRELIMM imul sp, word [esp+#0+?0x$1]
+IMUL_WORD_SP_MEMSPREGMUL imul sp, word [esp+#0*$1]
+IMUL_WORD_SP_MEMSPREGMULIMM imul sp, word [esp+#0*$1+0x$2]
+IMUL_WORD_SP_MEMSPREGMULRELIMM imul sp, word [esp+#0*$1+?0x$2]
+IMUL_WORD_SP_MEMFSIMM imul sp, word fs:[0x$0]
+IMUL_WORD_SP_MEMFSRELIMM imul sp, word fs:[?0x$0]
+IMUL_WORD_SP_MEMFSREG imul sp, word fs:[#0]
+IMUL_WORD_SP_MEMFSREGIMM imul sp, word fs:[#0+0x$1]
+IMUL_WORD_SP_MEMFSREGRELIMM imul sp, word fs:[#0+?0x$1]
+IMUL_WORD_SP_MEMFSREGREG imul sp, word fs:[#0+#1]
+IMUL_WORD_SP_MEMFSREGREGIMM imul sp, word fs:[#0+#1+0x$2]
+IMUL_WORD_SP_MEMFSREGREGRELIMM imul sp, word fs:[#0+#1+?0x$2]
+IMUL_WORD_SP_MEMFSREGMUL imul sp, word fs:[#0*$1]
+IMUL_WORD_SP_MEMFSREGMULIMM imul sp, word fs:[#0*$1+0x$2]
+IMUL_WORD_SP_MEMFSREGMULRELIMM imul sp, word fs:[#0*$1+?0x$2]
+IMUL_WORD_SP_MEMFSREGREGMUL imul sp, word fs:[#0+#1*$2]
+IMUL_WORD_SP_MEMFSREGREGMULIMM imul sp, word fs:[#0+#1*$2+0x$3]
+IMUL_WORD_SP_MEMFSREGREGMULRELIMM imul sp, word fs:[#0+#1*$2+?0x$3]
+IMUL_WORD_SP_MEMFSSP imul sp, word fs:[esp]
+IMUL_WORD_SP_MEMFSSPIMM imul sp, word fs:[esp+0x$0]
+IMUL_WORD_SP_MEMFSSPRELIMM imul sp, word fs:[esp+?0x$0]
+IMUL_WORD_SP_MEMFSSPREG imul sp, word fs:[esp+#0]
+IMUL_WORD_SP_MEMFSSPREGIMM imul sp, word fs:[esp+#0+0x$1]
+IMUL_WORD_SP_MEMFSSPREGRELIMM imul sp, word fs:[esp+#0+?0x$1]
+IMUL_WORD_SP_MEMFSSPREGMUL imul sp, word fs:[esp+#0*$1]
+IMUL_WORD_SP_MEMFSSPREGMULIMM imul sp, word fs:[esp+#0*$1+0x$2]
+IMUL_WORD_SP_MEMFSSPREGMULRELIMM imul sp, word fs:[esp+#0*$1+?0x$2]
+IMUL_WORD_SP_MEMGSIMM imul sp, word gs:[0x$0]
+IMUL_WORD_SP_MEMGSRELIMM imul sp, word gs:[?0x$0]
+IMUL_WORD_SP_MEMGSREG imul sp, word gs:[#0]
+IMUL_WORD_SP_MEMGSREGIMM imul sp, word gs:[#0+0x$1]
+IMUL_WORD_SP_MEMGSREGRELIMM imul sp, word gs:[#0+?0x$1]
+IMUL_WORD_SP_MEMGSREGREG imul sp, word gs:[#0+#1]
+IMUL_WORD_SP_MEMGSREGREGIMM imul sp, word gs:[#0+#1+0x$2]
+IMUL_WORD_SP_MEMGSREGREGRELIMM imul sp, word gs:[#0+#1+?0x$2]
+IMUL_WORD_SP_MEMGSREGMUL imul sp, word gs:[#0*$1]
+IMUL_WORD_SP_MEMGSREGMULIMM imul sp, word gs:[#0*$1+0x$2]
+IMUL_WORD_SP_MEMGSREGMULRELIMM imul sp, word gs:[#0*$1+?0x$2]
+IMUL_WORD_SP_MEMGSREGREGMUL imul sp, word gs:[#0+#1*$2]
+IMUL_WORD_SP_MEMGSREGREGMULIMM imul sp, word gs:[#0+#1*$2+0x$3]
+IMUL_WORD_SP_MEMGSREGREGMULRELIMM imul sp, word gs:[#0+#1*$2+?0x$3]
+IMUL_WORD_SP_MEMGSSP imul sp, word gs:[esp]
+IMUL_WORD_SP_MEMGSSPIMM imul sp, word gs:[esp+0x$0]
+IMUL_WORD_SP_MEMGSSPRELIMM imul sp, word gs:[esp+?0x$0]
+IMUL_WORD_SP_MEMGSSPREG imul sp, word gs:[esp+#0]
+IMUL_WORD_SP_MEMGSSPREGIMM imul sp, word gs:[esp+#0+0x$1]
+IMUL_WORD_SP_MEMGSSPREGRELIMM imul sp, word gs:[esp+#0+?0x$1]
+IMUL_WORD_SP_MEMGSSPREGMUL imul sp, word gs:[esp+#0*$1]
+IMUL_WORD_SP_MEMGSSPREGMULIMM imul sp, word gs:[esp+#0*$1+0x$2]
+IMUL_WORD_SP_MEMGSSPREGMULRELIMM imul sp, word gs:[esp+#0*$1+?0x$2]
+IMUL_WORD_SP_IMM imul sp, 0x$0
 XCHG_WORD_REG_REG xchg @0, @1
 XCHG_WORD_REG_SP xchg @0, sp
 XCHG_WORD_REG_MEMIMM xchg @0, word [0x$1]
@@ -15686,150 +15686,150 @@ MOVSX_DWORD_WORD_MEMGSSPREGMULIMM_IMM movsx dword gs:[esp+#0*$1+0x$2], 0x$3
 MOVSX_DWORD_WORD_MEMGSSPREGMULRELIMM_REG movsx dword gs:[esp+#0*$1+?0x$2], @3
 MOVSX_DWORD_WORD_MEMGSSPREGMULRELIMM_SP movsx dword gs:[esp+#0*$1+?0x$2], sp
 MOVSX_DWORD_WORD_MEMGSSPREGMULRELIMM_IMM movsx dword gs:[esp+#0*$1+?0x$2], 0x$3
-IMULTHREE_DWORD_REG_REG_IMM imul #0, #1, 0x$2
-IMULTHREE_DWORD_REG_SP_IMM imul #0, esp, 0x$1
-IMULTHREE_DWORD_REG_MEMIMM_IMM imul #0, dword [0x$1], 0x$2
-IMULTHREE_DWORD_REG_MEMRELIMM_IMM imul #0, dword [?0x$1], 0x$2
-IMULTHREE_DWORD_REG_MEMREG_IMM imul #0, dword [#1], 0x$2
-IMULTHREE_DWORD_REG_MEMREGIMM_IMM imul #0, dword [#1+0x$2], 0x$3
-IMULTHREE_DWORD_REG_MEMREGRELIMM_IMM imul #0, dword [#1+?0x$2], 0x$3
-IMULTHREE_DWORD_REG_MEMREGREG_IMM imul #0, dword [#1+#2], 0x$3
-IMULTHREE_DWORD_REG_MEMREGREGIMM_IMM imul #0, dword [#1+#2+0x$3], 0x$4
-IMULTHREE_DWORD_REG_MEMREGREGRELIMM_IMM imul #0, dword [#1+#2+?0x$3], 0x$4
-IMULTHREE_DWORD_REG_MEMREGMUL_IMM imul #0, dword [#1*$2], 0x$3
-IMULTHREE_DWORD_REG_MEMREGMULIMM_IMM imul #0, dword [#1*$2+0x$3], 0x$4
-IMULTHREE_DWORD_REG_MEMREGMULRELIMM_IMM imul #0, dword [#1*$2+?0x$3], 0x$4
-IMULTHREE_DWORD_REG_MEMREGREGMUL_IMM imul #0, dword [#1+#2*$3], 0x$4
-IMULTHREE_DWORD_REG_MEMREGREGMULIMM_IMM imul #0, dword [#1+#2*$3+0x$4], 0x$5
-IMULTHREE_DWORD_REG_MEMREGREGMULRELIMM_IMM imul #0, dword [#1+#2*$3+?0x$4], 0x$5
-IMULTHREE_DWORD_REG_MEMSP_IMM imul #0, dword [esp], 0x$1
-IMULTHREE_DWORD_REG_MEMSPIMM_IMM imul #0, dword [esp+0x$1], 0x$2
-IMULTHREE_DWORD_REG_MEMSPRELIMM_IMM imul #0, dword [esp+?0x$1], 0x$2
-IMULTHREE_DWORD_REG_MEMSPREG_IMM imul #0, dword [esp+#1], 0x$2
-IMULTHREE_DWORD_REG_MEMSPREGIMM_IMM imul #0, dword [esp+#1+0x$2], 0x$3
-IMULTHREE_DWORD_REG_MEMSPREGRELIMM_IMM imul #0, dword [esp+#1+?0x$2], 0x$3
-IMULTHREE_DWORD_REG_MEMSPREGMUL_IMM imul #0, dword [esp+#1*$2], 0x$3
-IMULTHREE_DWORD_REG_MEMSPREGMULIMM_IMM imul #0, dword [esp+#1*$2+0x$3], 0x$4
-IMULTHREE_DWORD_REG_MEMSPREGMULRELIMM_IMM imul #0, dword [esp+#1*$2+?0x$3], 0x$4
-IMULTHREE_DWORD_REG_MEMFSIMM_IMM imul #0, dword fs:[0x$1], 0x$2
-IMULTHREE_DWORD_REG_MEMFSRELIMM_IMM imul #0, dword fs:[?0x$1], 0x$2
-IMULTHREE_DWORD_REG_MEMFSREG_IMM imul #0, dword fs:[#1], 0x$2
-IMULTHREE_DWORD_REG_MEMFSREGIMM_IMM imul #0, dword fs:[#1+0x$2], 0x$3
-IMULTHREE_DWORD_REG_MEMFSREGRELIMM_IMM imul #0, dword fs:[#1+?0x$2], 0x$3
-IMULTHREE_DWORD_REG_MEMFSREGREG_IMM imul #0, dword fs:[#1+#2], 0x$3
-IMULTHREE_DWORD_REG_MEMFSREGREGIMM_IMM imul #0, dword fs:[#1+#2+0x$3], 0x$4
-IMULTHREE_DWORD_REG_MEMFSREGREGRELIMM_IMM imul #0, dword fs:[#1+#2+?0x$3], 0x$4
-IMULTHREE_DWORD_REG_MEMFSREGMUL_IMM imul #0, dword fs:[#1*$2], 0x$3
-IMULTHREE_DWORD_REG_MEMFSREGMULIMM_IMM imul #0, dword fs:[#1*$2+0x$3], 0x$4
-IMULTHREE_DWORD_REG_MEMFSREGMULRELIMM_IMM imul #0, dword fs:[#1*$2+?0x$3], 0x$4
-IMULTHREE_DWORD_REG_MEMFSREGREGMUL_IMM imul #0, dword fs:[#1+#2*$3], 0x$4
-IMULTHREE_DWORD_REG_MEMFSREGREGMULIMM_IMM imul #0, dword fs:[#1+#2*$3+0x$4], 0x$5
-IMULTHREE_DWORD_REG_MEMFSREGREGMULRELIMM_IMM imul #0, dword fs:[#1+#2*$3+?0x$4], 0x$5
-IMULTHREE_DWORD_REG_MEMFSSP_IMM imul #0, dword fs:[esp], 0x$1
-IMULTHREE_DWORD_REG_MEMFSSPIMM_IMM imul #0, dword fs:[esp+0x$1], 0x$2
-IMULTHREE_DWORD_REG_MEMFSSPRELIMM_IMM imul #0, dword fs:[esp+?0x$1], 0x$2
-IMULTHREE_DWORD_REG_MEMFSSPREG_IMM imul #0, dword fs:[esp+#1], 0x$2
-IMULTHREE_DWORD_REG_MEMFSSPREGIMM_IMM imul #0, dword fs:[esp+#1+0x$2], 0x$3
-IMULTHREE_DWORD_REG_MEMFSSPREGRELIMM_IMM imul #0, dword fs:[esp+#1+?0x$2], 0x$3
-IMULTHREE_DWORD_REG_MEMFSSPREGMUL_IMM imul #0, dword fs:[esp+#1*$2], 0x$3
-IMULTHREE_DWORD_REG_MEMFSSPREGMULIMM_IMM imul #0, dword fs:[esp+#1*$2+0x$3], 0x$4
-IMULTHREE_DWORD_REG_MEMFSSPREGMULRELIMM_IMM imul #0, dword fs:[esp+#1*$2+?0x$3], 0x$4
-IMULTHREE_DWORD_REG_MEMGSIMM_IMM imul #0, dword gs:[0x$1], 0x$2
-IMULTHREE_DWORD_REG_MEMGSRELIMM_IMM imul #0, dword gs:[?0x$1], 0x$2
-IMULTHREE_DWORD_REG_MEMGSREG_IMM imul #0, dword gs:[#1], 0x$2
-IMULTHREE_DWORD_REG_MEMGSREGIMM_IMM imul #0, dword gs:[#1+0x$2], 0x$3
-IMULTHREE_DWORD_REG_MEMGSREGRELIMM_IMM imul #0, dword gs:[#1+?0x$2], 0x$3
-IMULTHREE_DWORD_REG_MEMGSREGREG_IMM imul #0, dword gs:[#1+#2], 0x$3
-IMULTHREE_DWORD_REG_MEMGSREGREGIMM_IMM imul #0, dword gs:[#1+#2+0x$3], 0x$4
-IMULTHREE_DWORD_REG_MEMGSREGREGRELIMM_IMM imul #0, dword gs:[#1+#2+?0x$3], 0x$4
-IMULTHREE_DWORD_REG_MEMGSREGMUL_IMM imul #0, dword gs:[#1*$2], 0x$3
-IMULTHREE_DWORD_REG_MEMGSREGMULIMM_IMM imul #0, dword gs:[#1*$2+0x$3], 0x$4
-IMULTHREE_DWORD_REG_MEMGSREGMULRELIMM_IMM imul #0, dword gs:[#1*$2+?0x$3], 0x$4
-IMULTHREE_DWORD_REG_MEMGSREGREGMUL_IMM imul #0, dword gs:[#1+#2*$3], 0x$4
-IMULTHREE_DWORD_REG_MEMGSREGREGMULIMM_IMM imul #0, dword gs:[#1+#2*$3+0x$4], 0x$5
-IMULTHREE_DWORD_REG_MEMGSREGREGMULRELIMM_IMM imul #0, dword gs:[#1+#2*$3+?0x$4], 0x$5
-IMULTHREE_DWORD_REG_MEMGSSP_IMM imul #0, dword gs:[esp], 0x$1
-IMULTHREE_DWORD_REG_MEMGSSPIMM_IMM imul #0, dword gs:[esp+0x$1], 0x$2
-IMULTHREE_DWORD_REG_MEMGSSPRELIMM_IMM imul #0, dword gs:[esp+?0x$1], 0x$2
-IMULTHREE_DWORD_REG_MEMGSSPREG_IMM imul #0, dword gs:[esp+#1], 0x$2
-IMULTHREE_DWORD_REG_MEMGSSPREGIMM_IMM imul #0, dword gs:[esp+#1+0x$2], 0x$3
-IMULTHREE_DWORD_REG_MEMGSSPREGRELIMM_IMM imul #0, dword gs:[esp+#1+?0x$2], 0x$3
-IMULTHREE_DWORD_REG_MEMGSSPREGMUL_IMM imul #0, dword gs:[esp+#1*$2], 0x$3
-IMULTHREE_DWORD_REG_MEMGSSPREGMULIMM_IMM imul #0, dword gs:[esp+#1*$2+0x$3], 0x$4
-IMULTHREE_DWORD_REG_MEMGSSPREGMULRELIMM_IMM imul #0, dword gs:[esp+#1*$2+?0x$3], 0x$4
-IMULTHREE_DWORD_REG_IMM_IMM imul #0, 0x$1, 0x$2
-IMULTHREE_DWORD_SP_REG_IMM imul esp, #0, 0x$1
-IMULTHREE_DWORD_SP_SP_IMM imul esp, esp, 0x$0
-IMULTHREE_DWORD_SP_MEMIMM_IMM imul esp, dword [0x$0], 0x$1
-IMULTHREE_DWORD_SP_MEMRELIMM_IMM imul esp, dword [?0x$0], 0x$1
-IMULTHREE_DWORD_SP_MEMREG_IMM imul esp, dword [#0], 0x$1
-IMULTHREE_DWORD_SP_MEMREGIMM_IMM imul esp, dword [#0+0x$1], 0x$2
-IMULTHREE_DWORD_SP_MEMREGRELIMM_IMM imul esp, dword [#0+?0x$1], 0x$2
-IMULTHREE_DWORD_SP_MEMREGREG_IMM imul esp, dword [#0+#1], 0x$2
-IMULTHREE_DWORD_SP_MEMREGREGIMM_IMM imul esp, dword [#0+#1+0x$2], 0x$3
-IMULTHREE_DWORD_SP_MEMREGREGRELIMM_IMM imul esp, dword [#0+#1+?0x$2], 0x$3
-IMULTHREE_DWORD_SP_MEMREGMUL_IMM imul esp, dword [#0*$1], 0x$2
-IMULTHREE_DWORD_SP_MEMREGMULIMM_IMM imul esp, dword [#0*$1+0x$2], 0x$3
-IMULTHREE_DWORD_SP_MEMREGMULRELIMM_IMM imul esp, dword [#0*$1+?0x$2], 0x$3
-IMULTHREE_DWORD_SP_MEMREGREGMUL_IMM imul esp, dword [#0+#1*$2], 0x$3
-IMULTHREE_DWORD_SP_MEMREGREGMULIMM_IMM imul esp, dword [#0+#1*$2+0x$3], 0x$4
-IMULTHREE_DWORD_SP_MEMREGREGMULRELIMM_IMM imul esp, dword [#0+#1*$2+?0x$3], 0x$4
-IMULTHREE_DWORD_SP_MEMSP_IMM imul esp, dword [esp], 0x$0
-IMULTHREE_DWORD_SP_MEMSPIMM_IMM imul esp, dword [esp+0x$0], 0x$1
-IMULTHREE_DWORD_SP_MEMSPRELIMM_IMM imul esp, dword [esp+?0x$0], 0x$1
-IMULTHREE_DWORD_SP_MEMSPREG_IMM imul esp, dword [esp+#0], 0x$1
-IMULTHREE_DWORD_SP_MEMSPREGIMM_IMM imul esp, dword [esp+#0+0x$1], 0x$2
-IMULTHREE_DWORD_SP_MEMSPREGRELIMM_IMM imul esp, dword [esp+#0+?0x$1], 0x$2
-IMULTHREE_DWORD_SP_MEMSPREGMUL_IMM imul esp, dword [esp+#0*$1], 0x$2
-IMULTHREE_DWORD_SP_MEMSPREGMULIMM_IMM imul esp, dword [esp+#0*$1+0x$2], 0x$3
-IMULTHREE_DWORD_SP_MEMSPREGMULRELIMM_IMM imul esp, dword [esp+#0*$1+?0x$2], 0x$3
-IMULTHREE_DWORD_SP_MEMFSIMM_IMM imul esp, dword fs:[0x$0], 0x$1
-IMULTHREE_DWORD_SP_MEMFSRELIMM_IMM imul esp, dword fs:[?0x$0], 0x$1
-IMULTHREE_DWORD_SP_MEMFSREG_IMM imul esp, dword fs:[#0], 0x$1
-IMULTHREE_DWORD_SP_MEMFSREGIMM_IMM imul esp, dword fs:[#0+0x$1], 0x$2
-IMULTHREE_DWORD_SP_MEMFSREGRELIMM_IMM imul esp, dword fs:[#0+?0x$1], 0x$2
-IMULTHREE_DWORD_SP_MEMFSREGREG_IMM imul esp, dword fs:[#0+#1], 0x$2
-IMULTHREE_DWORD_SP_MEMFSREGREGIMM_IMM imul esp, dword fs:[#0+#1+0x$2], 0x$3
-IMULTHREE_DWORD_SP_MEMFSREGREGRELIMM_IMM imul esp, dword fs:[#0+#1+?0x$2], 0x$3
-IMULTHREE_DWORD_SP_MEMFSREGMUL_IMM imul esp, dword fs:[#0*$1], 0x$2
-IMULTHREE_DWORD_SP_MEMFSREGMULIMM_IMM imul esp, dword fs:[#0*$1+0x$2], 0x$3
-IMULTHREE_DWORD_SP_MEMFSREGMULRELIMM_IMM imul esp, dword fs:[#0*$1+?0x$2], 0x$3
-IMULTHREE_DWORD_SP_MEMFSREGREGMUL_IMM imul esp, dword fs:[#0+#1*$2], 0x$3
-IMULTHREE_DWORD_SP_MEMFSREGREGMULIMM_IMM imul esp, dword fs:[#0+#1*$2+0x$3], 0x$4
-IMULTHREE_DWORD_SP_MEMFSREGREGMULRELIMM_IMM imul esp, dword fs:[#0+#1*$2+?0x$3], 0x$4
-IMULTHREE_DWORD_SP_MEMFSSP_IMM imul esp, dword fs:[esp], 0x$0
-IMULTHREE_DWORD_SP_MEMFSSPIMM_IMM imul esp, dword fs:[esp+0x$0], 0x$1
-IMULTHREE_DWORD_SP_MEMFSSPRELIMM_IMM imul esp, dword fs:[esp+?0x$0], 0x$1
-IMULTHREE_DWORD_SP_MEMFSSPREG_IMM imul esp, dword fs:[esp+#0], 0x$1
-IMULTHREE_DWORD_SP_MEMFSSPREGIMM_IMM imul esp, dword fs:[esp+#0+0x$1], 0x$2
-IMULTHREE_DWORD_SP_MEMFSSPREGRELIMM_IMM imul esp, dword fs:[esp+#0+?0x$1], 0x$2
-IMULTHREE_DWORD_SP_MEMFSSPREGMUL_IMM imul esp, dword fs:[esp+#0*$1], 0x$2
-IMULTHREE_DWORD_SP_MEMFSSPREGMULIMM_IMM imul esp, dword fs:[esp+#0*$1+0x$2], 0x$3
-IMULTHREE_DWORD_SP_MEMFSSPREGMULRELIMM_IMM imul esp, dword fs:[esp+#0*$1+?0x$2], 0x$3
-IMULTHREE_DWORD_SP_MEMGSIMM_IMM imul esp, dword gs:[0x$0], 0x$1
-IMULTHREE_DWORD_SP_MEMGSRELIMM_IMM imul esp, dword gs:[?0x$0], 0x$1
-IMULTHREE_DWORD_SP_MEMGSREG_IMM imul esp, dword gs:[#0], 0x$1
-IMULTHREE_DWORD_SP_MEMGSREGIMM_IMM imul esp, dword gs:[#0+0x$1], 0x$2
-IMULTHREE_DWORD_SP_MEMGSREGRELIMM_IMM imul esp, dword gs:[#0+?0x$1], 0x$2
-IMULTHREE_DWORD_SP_MEMGSREGREG_IMM imul esp, dword gs:[#0+#1], 0x$2
-IMULTHREE_DWORD_SP_MEMGSREGREGIMM_IMM imul esp, dword gs:[#0+#1+0x$2], 0x$3
-IMULTHREE_DWORD_SP_MEMGSREGREGRELIMM_IMM imul esp, dword gs:[#0+#1+?0x$2], 0x$3
-IMULTHREE_DWORD_SP_MEMGSREGMUL_IMM imul esp, dword gs:[#0*$1], 0x$2
-IMULTHREE_DWORD_SP_MEMGSREGMULIMM_IMM imul esp, dword gs:[#0*$1+0x$2], 0x$3
-IMULTHREE_DWORD_SP_MEMGSREGMULRELIMM_IMM imul esp, dword gs:[#0*$1+?0x$2], 0x$3
-IMULTHREE_DWORD_SP_MEMGSREGREGMUL_IMM imul esp, dword gs:[#0+#1*$2], 0x$3
-IMULTHREE_DWORD_SP_MEMGSREGREGMULIMM_IMM imul esp, dword gs:[#0+#1*$2+0x$3], 0x$4
-IMULTHREE_DWORD_SP_MEMGSREGREGMULRELIMM_IMM imul esp, dword gs:[#0+#1*$2+?0x$3], 0x$4
-IMULTHREE_DWORD_SP_MEMGSSP_IMM imul esp, dword gs:[esp], 0x$0
-IMULTHREE_DWORD_SP_MEMGSSPIMM_IMM imul esp, dword gs:[esp+0x$0], 0x$1
-IMULTHREE_DWORD_SP_MEMGSSPRELIMM_IMM imul esp, dword gs:[esp+?0x$0], 0x$1
-IMULTHREE_DWORD_SP_MEMGSSPREG_IMM imul esp, dword gs:[esp+#0], 0x$1
-IMULTHREE_DWORD_SP_MEMGSSPREGIMM_IMM imul esp, dword gs:[esp+#0+0x$1], 0x$2
-IMULTHREE_DWORD_SP_MEMGSSPREGRELIMM_IMM imul esp, dword gs:[esp+#0+?0x$1], 0x$2
-IMULTHREE_DWORD_SP_MEMGSSPREGMUL_IMM imul esp, dword gs:[esp+#0*$1], 0x$2
-IMULTHREE_DWORD_SP_MEMGSSPREGMULIMM_IMM imul esp, dword gs:[esp+#0*$1+0x$2], 0x$3
-IMULTHREE_DWORD_SP_MEMGSSPREGMULRELIMM_IMM imul esp, dword gs:[esp+#0*$1+?0x$2], 0x$3
-IMULTHREE_DWORD_SP_IMM_IMM imul esp, 0x$0, 0x$1
+IMUL_DWORD_REG_REG_IMM imul #0, #1, 0x$2
+IMUL_DWORD_REG_SP_IMM imul #0, esp, 0x$1
+IMUL_DWORD_REG_MEMIMM_IMM imul #0, dword [0x$1], 0x$2
+IMUL_DWORD_REG_MEMRELIMM_IMM imul #0, dword [?0x$1], 0x$2
+IMUL_DWORD_REG_MEMREG_IMM imul #0, dword [#1], 0x$2
+IMUL_DWORD_REG_MEMREGIMM_IMM imul #0, dword [#1+0x$2], 0x$3
+IMUL_DWORD_REG_MEMREGRELIMM_IMM imul #0, dword [#1+?0x$2], 0x$3
+IMUL_DWORD_REG_MEMREGREG_IMM imul #0, dword [#1+#2], 0x$3
+IMUL_DWORD_REG_MEMREGREGIMM_IMM imul #0, dword [#1+#2+0x$3], 0x$4
+IMUL_DWORD_REG_MEMREGREGRELIMM_IMM imul #0, dword [#1+#2+?0x$3], 0x$4
+IMUL_DWORD_REG_MEMREGMUL_IMM imul #0, dword [#1*$2], 0x$3
+IMUL_DWORD_REG_MEMREGMULIMM_IMM imul #0, dword [#1*$2+0x$3], 0x$4
+IMUL_DWORD_REG_MEMREGMULRELIMM_IMM imul #0, dword [#1*$2+?0x$3], 0x$4
+IMUL_DWORD_REG_MEMREGREGMUL_IMM imul #0, dword [#1+#2*$3], 0x$4
+IMUL_DWORD_REG_MEMREGREGMULIMM_IMM imul #0, dword [#1+#2*$3+0x$4], 0x$5
+IMUL_DWORD_REG_MEMREGREGMULRELIMM_IMM imul #0, dword [#1+#2*$3+?0x$4], 0x$5
+IMUL_DWORD_REG_MEMSP_IMM imul #0, dword [esp], 0x$1
+IMUL_DWORD_REG_MEMSPIMM_IMM imul #0, dword [esp+0x$1], 0x$2
+IMUL_DWORD_REG_MEMSPRELIMM_IMM imul #0, dword [esp+?0x$1], 0x$2
+IMUL_DWORD_REG_MEMSPREG_IMM imul #0, dword [esp+#1], 0x$2
+IMUL_DWORD_REG_MEMSPREGIMM_IMM imul #0, dword [esp+#1+0x$2], 0x$3
+IMUL_DWORD_REG_MEMSPREGRELIMM_IMM imul #0, dword [esp+#1+?0x$2], 0x$3
+IMUL_DWORD_REG_MEMSPREGMUL_IMM imul #0, dword [esp+#1*$2], 0x$3
+IMUL_DWORD_REG_MEMSPREGMULIMM_IMM imul #0, dword [esp+#1*$2+0x$3], 0x$4
+IMUL_DWORD_REG_MEMSPREGMULRELIMM_IMM imul #0, dword [esp+#1*$2+?0x$3], 0x$4
+IMUL_DWORD_REG_MEMFSIMM_IMM imul #0, dword fs:[0x$1], 0x$2
+IMUL_DWORD_REG_MEMFSRELIMM_IMM imul #0, dword fs:[?0x$1], 0x$2
+IMUL_DWORD_REG_MEMFSREG_IMM imul #0, dword fs:[#1], 0x$2
+IMUL_DWORD_REG_MEMFSREGIMM_IMM imul #0, dword fs:[#1+0x$2], 0x$3
+IMUL_DWORD_REG_MEMFSREGRELIMM_IMM imul #0, dword fs:[#1+?0x$2], 0x$3
+IMUL_DWORD_REG_MEMFSREGREG_IMM imul #0, dword fs:[#1+#2], 0x$3
+IMUL_DWORD_REG_MEMFSREGREGIMM_IMM imul #0, dword fs:[#1+#2+0x$3], 0x$4
+IMUL_DWORD_REG_MEMFSREGREGRELIMM_IMM imul #0, dword fs:[#1+#2+?0x$3], 0x$4
+IMUL_DWORD_REG_MEMFSREGMUL_IMM imul #0, dword fs:[#1*$2], 0x$3
+IMUL_DWORD_REG_MEMFSREGMULIMM_IMM imul #0, dword fs:[#1*$2+0x$3], 0x$4
+IMUL_DWORD_REG_MEMFSREGMULRELIMM_IMM imul #0, dword fs:[#1*$2+?0x$3], 0x$4
+IMUL_DWORD_REG_MEMFSREGREGMUL_IMM imul #0, dword fs:[#1+#2*$3], 0x$4
+IMUL_DWORD_REG_MEMFSREGREGMULIMM_IMM imul #0, dword fs:[#1+#2*$3+0x$4], 0x$5
+IMUL_DWORD_REG_MEMFSREGREGMULRELIMM_IMM imul #0, dword fs:[#1+#2*$3+?0x$4], 0x$5
+IMUL_DWORD_REG_MEMFSSP_IMM imul #0, dword fs:[esp], 0x$1
+IMUL_DWORD_REG_MEMFSSPIMM_IMM imul #0, dword fs:[esp+0x$1], 0x$2
+IMUL_DWORD_REG_MEMFSSPRELIMM_IMM imul #0, dword fs:[esp+?0x$1], 0x$2
+IMUL_DWORD_REG_MEMFSSPREG_IMM imul #0, dword fs:[esp+#1], 0x$2
+IMUL_DWORD_REG_MEMFSSPREGIMM_IMM imul #0, dword fs:[esp+#1+0x$2], 0x$3
+IMUL_DWORD_REG_MEMFSSPREGRELIMM_IMM imul #0, dword fs:[esp+#1+?0x$2], 0x$3
+IMUL_DWORD_REG_MEMFSSPREGMUL_IMM imul #0, dword fs:[esp+#1*$2], 0x$3
+IMUL_DWORD_REG_MEMFSSPREGMULIMM_IMM imul #0, dword fs:[esp+#1*$2+0x$3], 0x$4
+IMUL_DWORD_REG_MEMFSSPREGMULRELIMM_IMM imul #0, dword fs:[esp+#1*$2+?0x$3], 0x$4
+IMUL_DWORD_REG_MEMGSIMM_IMM imul #0, dword gs:[0x$1], 0x$2
+IMUL_DWORD_REG_MEMGSRELIMM_IMM imul #0, dword gs:[?0x$1], 0x$2
+IMUL_DWORD_REG_MEMGSREG_IMM imul #0, dword gs:[#1], 0x$2
+IMUL_DWORD_REG_MEMGSREGIMM_IMM imul #0, dword gs:[#1+0x$2], 0x$3
+IMUL_DWORD_REG_MEMGSREGRELIMM_IMM imul #0, dword gs:[#1+?0x$2], 0x$3
+IMUL_DWORD_REG_MEMGSREGREG_IMM imul #0, dword gs:[#1+#2], 0x$3
+IMUL_DWORD_REG_MEMGSREGREGIMM_IMM imul #0, dword gs:[#1+#2+0x$3], 0x$4
+IMUL_DWORD_REG_MEMGSREGREGRELIMM_IMM imul #0, dword gs:[#1+#2+?0x$3], 0x$4
+IMUL_DWORD_REG_MEMGSREGMUL_IMM imul #0, dword gs:[#1*$2], 0x$3
+IMUL_DWORD_REG_MEMGSREGMULIMM_IMM imul #0, dword gs:[#1*$2+0x$3], 0x$4
+IMUL_DWORD_REG_MEMGSREGMULRELIMM_IMM imul #0, dword gs:[#1*$2+?0x$3], 0x$4
+IMUL_DWORD_REG_MEMGSREGREGMUL_IMM imul #0, dword gs:[#1+#2*$3], 0x$4
+IMUL_DWORD_REG_MEMGSREGREGMULIMM_IMM imul #0, dword gs:[#1+#2*$3+0x$4], 0x$5
+IMUL_DWORD_REG_MEMGSREGREGMULRELIMM_IMM imul #0, dword gs:[#1+#2*$3+?0x$4], 0x$5
+IMUL_DWORD_REG_MEMGSSP_IMM imul #0, dword gs:[esp], 0x$1
+IMUL_DWORD_REG_MEMGSSPIMM_IMM imul #0, dword gs:[esp+0x$1], 0x$2
+IMUL_DWORD_REG_MEMGSSPRELIMM_IMM imul #0, dword gs:[esp+?0x$1], 0x$2
+IMUL_DWORD_REG_MEMGSSPREG_IMM imul #0, dword gs:[esp+#1], 0x$2
+IMUL_DWORD_REG_MEMGSSPREGIMM_IMM imul #0, dword gs:[esp+#1+0x$2], 0x$3
+IMUL_DWORD_REG_MEMGSSPREGRELIMM_IMM imul #0, dword gs:[esp+#1+?0x$2], 0x$3
+IMUL_DWORD_REG_MEMGSSPREGMUL_IMM imul #0, dword gs:[esp+#1*$2], 0x$3
+IMUL_DWORD_REG_MEMGSSPREGMULIMM_IMM imul #0, dword gs:[esp+#1*$2+0x$3], 0x$4
+IMUL_DWORD_REG_MEMGSSPREGMULRELIMM_IMM imul #0, dword gs:[esp+#1*$2+?0x$3], 0x$4
+IMUL_DWORD_REG_IMM_IMM imul #0, 0x$1, 0x$2
+IMUL_DWORD_SP_REG_IMM imul esp, #0, 0x$1
+IMUL_DWORD_SP_SP_IMM imul esp, esp, 0x$0
+IMUL_DWORD_SP_MEMIMM_IMM imul esp, dword [0x$0], 0x$1
+IMUL_DWORD_SP_MEMRELIMM_IMM imul esp, dword [?0x$0], 0x$1
+IMUL_DWORD_SP_MEMREG_IMM imul esp, dword [#0], 0x$1
+IMUL_DWORD_SP_MEMREGIMM_IMM imul esp, dword [#0+0x$1], 0x$2
+IMUL_DWORD_SP_MEMREGRELIMM_IMM imul esp, dword [#0+?0x$1], 0x$2
+IMUL_DWORD_SP_MEMREGREG_IMM imul esp, dword [#0+#1], 0x$2
+IMUL_DWORD_SP_MEMREGREGIMM_IMM imul esp, dword [#0+#1+0x$2], 0x$3
+IMUL_DWORD_SP_MEMREGREGRELIMM_IMM imul esp, dword [#0+#1+?0x$2], 0x$3
+IMUL_DWORD_SP_MEMREGMUL_IMM imul esp, dword [#0*$1], 0x$2
+IMUL_DWORD_SP_MEMREGMULIMM_IMM imul esp, dword [#0*$1+0x$2], 0x$3
+IMUL_DWORD_SP_MEMREGMULRELIMM_IMM imul esp, dword [#0*$1+?0x$2], 0x$3
+IMUL_DWORD_SP_MEMREGREGMUL_IMM imul esp, dword [#0+#1*$2], 0x$3
+IMUL_DWORD_SP_MEMREGREGMULIMM_IMM imul esp, dword [#0+#1*$2+0x$3], 0x$4
+IMUL_DWORD_SP_MEMREGREGMULRELIMM_IMM imul esp, dword [#0+#1*$2+?0x$3], 0x$4
+IMUL_DWORD_SP_MEMSP_IMM imul esp, dword [esp], 0x$0
+IMUL_DWORD_SP_MEMSPIMM_IMM imul esp, dword [esp+0x$0], 0x$1
+IMUL_DWORD_SP_MEMSPRELIMM_IMM imul esp, dword [esp+?0x$0], 0x$1
+IMUL_DWORD_SP_MEMSPREG_IMM imul esp, dword [esp+#0], 0x$1
+IMUL_DWORD_SP_MEMSPREGIMM_IMM imul esp, dword [esp+#0+0x$1], 0x$2
+IMUL_DWORD_SP_MEMSPREGRELIMM_IMM imul esp, dword [esp+#0+?0x$1], 0x$2
+IMUL_DWORD_SP_MEMSPREGMUL_IMM imul esp, dword [esp+#0*$1], 0x$2
+IMUL_DWORD_SP_MEMSPREGMULIMM_IMM imul esp, dword [esp+#0*$1+0x$2], 0x$3
+IMUL_DWORD_SP_MEMSPREGMULRELIMM_IMM imul esp, dword [esp+#0*$1+?0x$2], 0x$3
+IMUL_DWORD_SP_MEMFSIMM_IMM imul esp, dword fs:[0x$0], 0x$1
+IMUL_DWORD_SP_MEMFSRELIMM_IMM imul esp, dword fs:[?0x$0], 0x$1
+IMUL_DWORD_SP_MEMFSREG_IMM imul esp, dword fs:[#0], 0x$1
+IMUL_DWORD_SP_MEMFSREGIMM_IMM imul esp, dword fs:[#0+0x$1], 0x$2
+IMUL_DWORD_SP_MEMFSREGRELIMM_IMM imul esp, dword fs:[#0+?0x$1], 0x$2
+IMUL_DWORD_SP_MEMFSREGREG_IMM imul esp, dword fs:[#0+#1], 0x$2
+IMUL_DWORD_SP_MEMFSREGREGIMM_IMM imul esp, dword fs:[#0+#1+0x$2], 0x$3
+IMUL_DWORD_SP_MEMFSREGREGRELIMM_IMM imul esp, dword fs:[#0+#1+?0x$2], 0x$3
+IMUL_DWORD_SP_MEMFSREGMUL_IMM imul esp, dword fs:[#0*$1], 0x$2
+IMUL_DWORD_SP_MEMFSREGMULIMM_IMM imul esp, dword fs:[#0*$1+0x$2], 0x$3
+IMUL_DWORD_SP_MEMFSREGMULRELIMM_IMM imul esp, dword fs:[#0*$1+?0x$2], 0x$3
+IMUL_DWORD_SP_MEMFSREGREGMUL_IMM imul esp, dword fs:[#0+#1*$2], 0x$3
+IMUL_DWORD_SP_MEMFSREGREGMULIMM_IMM imul esp, dword fs:[#0+#1*$2+0x$3], 0x$4
+IMUL_DWORD_SP_MEMFSREGREGMULRELIMM_IMM imul esp, dword fs:[#0+#1*$2+?0x$3], 0x$4
+IMUL_DWORD_SP_MEMFSSP_IMM imul esp, dword fs:[esp], 0x$0
+IMUL_DWORD_SP_MEMFSSPIMM_IMM imul esp, dword fs:[esp+0x$0], 0x$1
+IMUL_DWORD_SP_MEMFSSPRELIMM_IMM imul esp, dword fs:[esp+?0x$0], 0x$1
+IMUL_DWORD_SP_MEMFSSPREG_IMM imul esp, dword fs:[esp+#0], 0x$1
+IMUL_DWORD_SP_MEMFSSPREGIMM_IMM imul esp, dword fs:[esp+#0+0x$1], 0x$2
+IMUL_DWORD_SP_MEMFSSPREGRELIMM_IMM imul esp, dword fs:[esp+#0+?0x$1], 0x$2
+IMUL_DWORD_SP_MEMFSSPREGMUL_IMM imul esp, dword fs:[esp+#0*$1], 0x$2
+IMUL_DWORD_SP_MEMFSSPREGMULIMM_IMM imul esp, dword fs:[esp+#0*$1+0x$2], 0x$3
+IMUL_DWORD_SP_MEMFSSPREGMULRELIMM_IMM imul esp, dword fs:[esp+#0*$1+?0x$2], 0x$3
+IMUL_DWORD_SP_MEMGSIMM_IMM imul esp, dword gs:[0x$0], 0x$1
+IMUL_DWORD_SP_MEMGSRELIMM_IMM imul esp, dword gs:[?0x$0], 0x$1
+IMUL_DWORD_SP_MEMGSREG_IMM imul esp, dword gs:[#0], 0x$1
+IMUL_DWORD_SP_MEMGSREGIMM_IMM imul esp, dword gs:[#0+0x$1], 0x$2
+IMUL_DWORD_SP_MEMGSREGRELIMM_IMM imul esp, dword gs:[#0+?0x$1], 0x$2
+IMUL_DWORD_SP_MEMGSREGREG_IMM imul esp, dword gs:[#0+#1], 0x$2
+IMUL_DWORD_SP_MEMGSREGREGIMM_IMM imul esp, dword gs:[#0+#1+0x$2], 0x$3
+IMUL_DWORD_SP_MEMGSREGREGRELIMM_IMM imul esp, dword gs:[#0+#1+?0x$2], 0x$3
+IMUL_DWORD_SP_MEMGSREGMUL_IMM imul esp, dword gs:[#0*$1], 0x$2
+IMUL_DWORD_SP_MEMGSREGMULIMM_IMM imul esp, dword gs:[#0*$1+0x$2], 0x$3
+IMUL_DWORD_SP_MEMGSREGMULRELIMM_IMM imul esp, dword gs:[#0*$1+?0x$2], 0x$3
+IMUL_DWORD_SP_MEMGSREGREGMUL_IMM imul esp, dword gs:[#0+#1*$2], 0x$3
+IMUL_DWORD_SP_MEMGSREGREGMULIMM_IMM imul esp, dword gs:[#0+#1*$2+0x$3], 0x$4
+IMUL_DWORD_SP_MEMGSREGREGMULRELIMM_IMM imul esp, dword gs:[#0+#1*$2+?0x$3], 0x$4
+IMUL_DWORD_SP_MEMGSSP_IMM imul esp, dword gs:[esp], 0x$0
+IMUL_DWORD_SP_MEMGSSPIMM_IMM imul esp, dword gs:[esp+0x$0], 0x$1
+IMUL_DWORD_SP_MEMGSSPRELIMM_IMM imul esp, dword gs:[esp+?0x$0], 0x$1
+IMUL_DWORD_SP_MEMGSSPREG_IMM imul esp, dword gs:[esp+#0], 0x$1
+IMUL_DWORD_SP_MEMGSSPREGIMM_IMM imul esp, dword gs:[esp+#0+0x$1], 0x$2
+IMUL_DWORD_SP_MEMGSSPREGRELIMM_IMM imul esp, dword gs:[esp+#0+?0x$1], 0x$2
+IMUL_DWORD_SP_MEMGSSPREGMUL_IMM imul esp, dword gs:[esp+#0*$1], 0x$2
+IMUL_DWORD_SP_MEMGSSPREGMULIMM_IMM imul esp, dword gs:[esp+#0*$1+0x$2], 0x$3
+IMUL_DWORD_SP_MEMGSSPREGMULRELIMM_IMM imul esp, dword gs:[esp+#0*$1+?0x$2], 0x$3
+IMUL_DWORD_SP_IMM_IMM imul esp, 0x$0, 0x$1
 MOV_DWORD_REG_REG mov #0, #1
 MOV_DWORD_REG_SP mov #0, esp
 MOV_DWORD_REG_MEMIMM mov #0, dword [0x$1]
@@ -21738,150 +21738,150 @@ BTC_DWORD_MEMGSSPREGMULRELIMM_REG btc dword gs:[esp+#0*$1+?0x$2], #3
 BTC_DWORD_MEMGSSPREGMULRELIMM_SP btc dword gs:[esp+#0*$1+?0x$2], esp
 BTC_DWORD_MEMGSSPREGMULRELIMM_IMM btc dword gs:[esp+#0*$1+?0x$2], 0x$3
 BTC_DWORD_MEMGSSPREGMULRELIMM_RELIMM btc dword gs:[esp+#0*$1+?0x$2], ?0x$3
-IMULTWO_DWORD_REG_REG imul #0, #1
-IMULTWO_DWORD_REG_SP imul #0, esp
-IMULTWO_DWORD_REG_MEMIMM imul #0, dword [0x$1]
-IMULTWO_DWORD_REG_MEMRELIMM imul #0, dword [?0x$1]
-IMULTWO_DWORD_REG_MEMREG imul #0, dword [#1]
-IMULTWO_DWORD_REG_MEMREGIMM imul #0, dword [#1+0x$2]
-IMULTWO_DWORD_REG_MEMREGRELIMM imul #0, dword [#1+?0x$2]
-IMULTWO_DWORD_REG_MEMREGREG imul #0, dword [#1+#2]
-IMULTWO_DWORD_REG_MEMREGREGIMM imul #0, dword [#1+#2+0x$3]
-IMULTWO_DWORD_REG_MEMREGREGRELIMM imul #0, dword [#1+#2+?0x$3]
-IMULTWO_DWORD_REG_MEMREGMUL imul #0, dword [#1*$2]
-IMULTWO_DWORD_REG_MEMREGMULIMM imul #0, dword [#1*$2+0x$3]
-IMULTWO_DWORD_REG_MEMREGMULRELIMM imul #0, dword [#1*$2+?0x$3]
-IMULTWO_DWORD_REG_MEMREGREGMUL imul #0, dword [#1+#2*$3]
-IMULTWO_DWORD_REG_MEMREGREGMULIMM imul #0, dword [#1+#2*$3+0x$4]
-IMULTWO_DWORD_REG_MEMREGREGMULRELIMM imul #0, dword [#1+#2*$3+?0x$4]
-IMULTWO_DWORD_REG_MEMSP imul #0, dword [esp]
-IMULTWO_DWORD_REG_MEMSPIMM imul #0, dword [esp+0x$1]
-IMULTWO_DWORD_REG_MEMSPRELIMM imul #0, dword [esp+?0x$1]
-IMULTWO_DWORD_REG_MEMSPREG imul #0, dword [esp+#1]
-IMULTWO_DWORD_REG_MEMSPREGIMM imul #0, dword [esp+#1+0x$2]
-IMULTWO_DWORD_REG_MEMSPREGRELIMM imul #0, dword [esp+#1+?0x$2]
-IMULTWO_DWORD_REG_MEMSPREGMUL imul #0, dword [esp+#1*$2]
-IMULTWO_DWORD_REG_MEMSPREGMULIMM imul #0, dword [esp+#1*$2+0x$3]
-IMULTWO_DWORD_REG_MEMSPREGMULRELIMM imul #0, dword [esp+#1*$2+?0x$3]
-IMULTWO_DWORD_REG_MEMFSIMM imul #0, dword fs:[0x$1]
-IMULTWO_DWORD_REG_MEMFSRELIMM imul #0, dword fs:[?0x$1]
-IMULTWO_DWORD_REG_MEMFSREG imul #0, dword fs:[#1]
-IMULTWO_DWORD_REG_MEMFSREGIMM imul #0, dword fs:[#1+0x$2]
-IMULTWO_DWORD_REG_MEMFSREGRELIMM imul #0, dword fs:[#1+?0x$2]
-IMULTWO_DWORD_REG_MEMFSREGREG imul #0, dword fs:[#1+#2]
-IMULTWO_DWORD_REG_MEMFSREGREGIMM imul #0, dword fs:[#1+#2+0x$3]
-IMULTWO_DWORD_REG_MEMFSREGREGRELIMM imul #0, dword fs:[#1+#2+?0x$3]
-IMULTWO_DWORD_REG_MEMFSREGMUL imul #0, dword fs:[#1*$2]
-IMULTWO_DWORD_REG_MEMFSREGMULIMM imul #0, dword fs:[#1*$2+0x$3]
-IMULTWO_DWORD_REG_MEMFSREGMULRELIMM imul #0, dword fs:[#1*$2+?0x$3]
-IMULTWO_DWORD_REG_MEMFSREGREGMUL imul #0, dword fs:[#1+#2*$3]
-IMULTWO_DWORD_REG_MEMFSREGREGMULIMM imul #0, dword fs:[#1+#2*$3+0x$4]
-IMULTWO_DWORD_REG_MEMFSREGREGMULRELIMM imul #0, dword fs:[#1+#2*$3+?0x$4]
-IMULTWO_DWORD_REG_MEMFSSP imul #0, dword fs:[esp]
-IMULTWO_DWORD_REG_MEMFSSPIMM imul #0, dword fs:[esp+0x$1]
-IMULTWO_DWORD_REG_MEMFSSPRELIMM imul #0, dword fs:[esp+?0x$1]
-IMULTWO_DWORD_REG_MEMFSSPREG imul #0, dword fs:[esp+#1]
-IMULTWO_DWORD_REG_MEMFSSPREGIMM imul #0, dword fs:[esp+#1+0x$2]
-IMULTWO_DWORD_REG_MEMFSSPREGRELIMM imul #0, dword fs:[esp+#1+?0x$2]
-IMULTWO_DWORD_REG_MEMFSSPREGMUL imul #0, dword fs:[esp+#1*$2]
-IMULTWO_DWORD_REG_MEMFSSPREGMULIMM imul #0, dword fs:[esp+#1*$2+0x$3]
-IMULTWO_DWORD_REG_MEMFSSPREGMULRELIMM imul #0, dword fs:[esp+#1*$2+?0x$3]
-IMULTWO_DWORD_REG_MEMGSIMM imul #0, dword gs:[0x$1]
-IMULTWO_DWORD_REG_MEMGSRELIMM imul #0, dword gs:[?0x$1]
-IMULTWO_DWORD_REG_MEMGSREG imul #0, dword gs:[#1]
-IMULTWO_DWORD_REG_MEMGSREGIMM imul #0, dword gs:[#1+0x$2]
-IMULTWO_DWORD_REG_MEMGSREGRELIMM imul #0, dword gs:[#1+?0x$2]
-IMULTWO_DWORD_REG_MEMGSREGREG imul #0, dword gs:[#1+#2]
-IMULTWO_DWORD_REG_MEMGSREGREGIMM imul #0, dword gs:[#1+#2+0x$3]
-IMULTWO_DWORD_REG_MEMGSREGREGRELIMM imul #0, dword gs:[#1+#2+?0x$3]
-IMULTWO_DWORD_REG_MEMGSREGMUL imul #0, dword gs:[#1*$2]
-IMULTWO_DWORD_REG_MEMGSREGMULIMM imul #0, dword gs:[#1*$2+0x$3]
-IMULTWO_DWORD_REG_MEMGSREGMULRELIMM imul #0, dword gs:[#1*$2+?0x$3]
-IMULTWO_DWORD_REG_MEMGSREGREGMUL imul #0, dword gs:[#1+#2*$3]
-IMULTWO_DWORD_REG_MEMGSREGREGMULIMM imul #0, dword gs:[#1+#2*$3+0x$4]
-IMULTWO_DWORD_REG_MEMGSREGREGMULRELIMM imul #0, dword gs:[#1+#2*$3+?0x$4]
-IMULTWO_DWORD_REG_MEMGSSP imul #0, dword gs:[esp]
-IMULTWO_DWORD_REG_MEMGSSPIMM imul #0, dword gs:[esp+0x$1]
-IMULTWO_DWORD_REG_MEMGSSPRELIMM imul #0, dword gs:[esp+?0x$1]
-IMULTWO_DWORD_REG_MEMGSSPREG imul #0, dword gs:[esp+#1]
-IMULTWO_DWORD_REG_MEMGSSPREGIMM imul #0, dword gs:[esp+#1+0x$2]
-IMULTWO_DWORD_REG_MEMGSSPREGRELIMM imul #0, dword gs:[esp+#1+?0x$2]
-IMULTWO_DWORD_REG_MEMGSSPREGMUL imul #0, dword gs:[esp+#1*$2]
-IMULTWO_DWORD_REG_MEMGSSPREGMULIMM imul #0, dword gs:[esp+#1*$2+0x$3]
-IMULTWO_DWORD_REG_MEMGSSPREGMULRELIMM imul #0, dword gs:[esp+#1*$2+?0x$3]
-IMULTWO_DWORD_REG_IMM imul #0, 0x$1
-IMULTWO_DWORD_SP_REG imul esp, #0
-IMULTWO_DWORD_SP_SP imul esp, esp
-IMULTWO_DWORD_SP_MEMIMM imul esp, dword [0x$0]
-IMULTWO_DWORD_SP_MEMRELIMM imul esp, dword [?0x$0]
-IMULTWO_DWORD_SP_MEMREG imul esp, dword [#0]
-IMULTWO_DWORD_SP_MEMREGIMM imul esp, dword [#0+0x$1]
-IMULTWO_DWORD_SP_MEMREGRELIMM imul esp, dword [#0+?0x$1]
-IMULTWO_DWORD_SP_MEMREGREG imul esp, dword [#0+#1]
-IMULTWO_DWORD_SP_MEMREGREGIMM imul esp, dword [#0+#1+0x$2]
-IMULTWO_DWORD_SP_MEMREGREGRELIMM imul esp, dword [#0+#1+?0x$2]
-IMULTWO_DWORD_SP_MEMREGMUL imul esp, dword [#0*$1]
-IMULTWO_DWORD_SP_MEMREGMULIMM imul esp, dword [#0*$1+0x$2]
-IMULTWO_DWORD_SP_MEMREGMULRELIMM imul esp, dword [#0*$1+?0x$2]
-IMULTWO_DWORD_SP_MEMREGREGMUL imul esp, dword [#0+#1*$2]
-IMULTWO_DWORD_SP_MEMREGREGMULIMM imul esp, dword [#0+#1*$2+0x$3]
-IMULTWO_DWORD_SP_MEMREGREGMULRELIMM imul esp, dword [#0+#1*$2+?0x$3]
-IMULTWO_DWORD_SP_MEMSP imul esp, dword [esp]
-IMULTWO_DWORD_SP_MEMSPIMM imul esp, dword [esp+0x$0]
-IMULTWO_DWORD_SP_MEMSPRELIMM imul esp, dword [esp+?0x$0]
-IMULTWO_DWORD_SP_MEMSPREG imul esp, dword [esp+#0]
-IMULTWO_DWORD_SP_MEMSPREGIMM imul esp, dword [esp+#0+0x$1]
-IMULTWO_DWORD_SP_MEMSPREGRELIMM imul esp, dword [esp+#0+?0x$1]
-IMULTWO_DWORD_SP_MEMSPREGMUL imul esp, dword [esp+#0*$1]
-IMULTWO_DWORD_SP_MEMSPREGMULIMM imul esp, dword [esp+#0*$1+0x$2]
-IMULTWO_DWORD_SP_MEMSPREGMULRELIMM imul esp, dword [esp+#0*$1+?0x$2]
-IMULTWO_DWORD_SP_MEMFSIMM imul esp, dword fs:[0x$0]
-IMULTWO_DWORD_SP_MEMFSRELIMM imul esp, dword fs:[?0x$0]
-IMULTWO_DWORD_SP_MEMFSREG imul esp, dword fs:[#0]
-IMULTWO_DWORD_SP_MEMFSREGIMM imul esp, dword fs:[#0+0x$1]
-IMULTWO_DWORD_SP_MEMFSREGRELIMM imul esp, dword fs:[#0+?0x$1]
-IMULTWO_DWORD_SP_MEMFSREGREG imul esp, dword fs:[#0+#1]
-IMULTWO_DWORD_SP_MEMFSREGREGIMM imul esp, dword fs:[#0+#1+0x$2]
-IMULTWO_DWORD_SP_MEMFSREGREGRELIMM imul esp, dword fs:[#0+#1+?0x$2]
-IMULTWO_DWORD_SP_MEMFSREGMUL imul esp, dword fs:[#0*$1]
-IMULTWO_DWORD_SP_MEMFSREGMULIMM imul esp, dword fs:[#0*$1+0x$2]
-IMULTWO_DWORD_SP_MEMFSREGMULRELIMM imul esp, dword fs:[#0*$1+?0x$2]
-IMULTWO_DWORD_SP_MEMFSREGREGMUL imul esp, dword fs:[#0+#1*$2]
-IMULTWO_DWORD_SP_MEMFSREGREGMULIMM imul esp, dword fs:[#0+#1*$2+0x$3]
-IMULTWO_DWORD_SP_MEMFSREGREGMULRELIMM imul esp, dword fs:[#0+#1*$2+?0x$3]
-IMULTWO_DWORD_SP_MEMFSSP imul esp, dword fs:[esp]
-IMULTWO_DWORD_SP_MEMFSSPIMM imul esp, dword fs:[esp+0x$0]
-IMULTWO_DWORD_SP_MEMFSSPRELIMM imul esp, dword fs:[esp+?0x$0]
-IMULTWO_DWORD_SP_MEMFSSPREG imul esp, dword fs:[esp+#0]
-IMULTWO_DWORD_SP_MEMFSSPREGIMM imul esp, dword fs:[esp+#0+0x$1]
-IMULTWO_DWORD_SP_MEMFSSPREGRELIMM imul esp, dword fs:[esp+#0+?0x$1]
-IMULTWO_DWORD_SP_MEMFSSPREGMUL imul esp, dword fs:[esp+#0*$1]
-IMULTWO_DWORD_SP_MEMFSSPREGMULIMM imul esp, dword fs:[esp+#0*$1+0x$2]
-IMULTWO_DWORD_SP_MEMFSSPREGMULRELIMM imul esp, dword fs:[esp+#0*$1+?0x$2]
-IMULTWO_DWORD_SP_MEMGSIMM imul esp, dword gs:[0x$0]
-IMULTWO_DWORD_SP_MEMGSRELIMM imul esp, dword gs:[?0x$0]
-IMULTWO_DWORD_SP_MEMGSREG imul esp, dword gs:[#0]
-IMULTWO_DWORD_SP_MEMGSREGIMM imul esp, dword gs:[#0+0x$1]
-IMULTWO_DWORD_SP_MEMGSREGRELIMM imul esp, dword gs:[#0+?0x$1]
-IMULTWO_DWORD_SP_MEMGSREGREG imul esp, dword gs:[#0+#1]
-IMULTWO_DWORD_SP_MEMGSREGREGIMM imul esp, dword gs:[#0+#1+0x$2]
-IMULTWO_DWORD_SP_MEMGSREGREGRELIMM imul esp, dword gs:[#0+#1+?0x$2]
-IMULTWO_DWORD_SP_MEMGSREGMUL imul esp, dword gs:[#0*$1]
-IMULTWO_DWORD_SP_MEMGSREGMULIMM imul esp, dword gs:[#0*$1+0x$2]
-IMULTWO_DWORD_SP_MEMGSREGMULRELIMM imul esp, dword gs:[#0*$1+?0x$2]
-IMULTWO_DWORD_SP_MEMGSREGREGMUL imul esp, dword gs:[#0+#1*$2]
-IMULTWO_DWORD_SP_MEMGSREGREGMULIMM imul esp, dword gs:[#0+#1*$2+0x$3]
-IMULTWO_DWORD_SP_MEMGSREGREGMULRELIMM imul esp, dword gs:[#0+#1*$2+?0x$3]
-IMULTWO_DWORD_SP_MEMGSSP imul esp, dword gs:[esp]
-IMULTWO_DWORD_SP_MEMGSSPIMM imul esp, dword gs:[esp+0x$0]
-IMULTWO_DWORD_SP_MEMGSSPRELIMM imul esp, dword gs:[esp+?0x$0]
-IMULTWO_DWORD_SP_MEMGSSPREG imul esp, dword gs:[esp+#0]
-IMULTWO_DWORD_SP_MEMGSSPREGIMM imul esp, dword gs:[esp+#0+0x$1]
-IMULTWO_DWORD_SP_MEMGSSPREGRELIMM imul esp, dword gs:[esp+#0+?0x$1]
-IMULTWO_DWORD_SP_MEMGSSPREGMUL imul esp, dword gs:[esp+#0*$1]
-IMULTWO_DWORD_SP_MEMGSSPREGMULIMM imul esp, dword gs:[esp+#0*$1+0x$2]
-IMULTWO_DWORD_SP_MEMGSSPREGMULRELIMM imul esp, dword gs:[esp+#0*$1+?0x$2]
-IMULTWO_DWORD_SP_IMM imul esp, 0x$0
+IMUL_DWORD_REG_REG imul #0, #1
+IMUL_DWORD_REG_SP imul #0, esp
+IMUL_DWORD_REG_MEMIMM imul #0, dword [0x$1]
+IMUL_DWORD_REG_MEMRELIMM imul #0, dword [?0x$1]
+IMUL_DWORD_REG_MEMREG imul #0, dword [#1]
+IMUL_DWORD_REG_MEMREGIMM imul #0, dword [#1+0x$2]
+IMUL_DWORD_REG_MEMREGRELIMM imul #0, dword [#1+?0x$2]
+IMUL_DWORD_REG_MEMREGREG imul #0, dword [#1+#2]
+IMUL_DWORD_REG_MEMREGREGIMM imul #0, dword [#1+#2+0x$3]
+IMUL_DWORD_REG_MEMREGREGRELIMM imul #0, dword [#1+#2+?0x$3]
+IMUL_DWORD_REG_MEMREGMUL imul #0, dword [#1*$2]
+IMUL_DWORD_REG_MEMREGMULIMM imul #0, dword [#1*$2+0x$3]
+IMUL_DWORD_REG_MEMREGMULRELIMM imul #0, dword [#1*$2+?0x$3]
+IMUL_DWORD_REG_MEMREGREGMUL imul #0, dword [#1+#2*$3]
+IMUL_DWORD_REG_MEMREGREGMULIMM imul #0, dword [#1+#2*$3+0x$4]
+IMUL_DWORD_REG_MEMREGREGMULRELIMM imul #0, dword [#1+#2*$3+?0x$4]
+IMUL_DWORD_REG_MEMSP imul #0, dword [esp]
+IMUL_DWORD_REG_MEMSPIMM imul #0, dword [esp+0x$1]
+IMUL_DWORD_REG_MEMSPRELIMM imul #0, dword [esp+?0x$1]
+IMUL_DWORD_REG_MEMSPREG imul #0, dword [esp+#1]
+IMUL_DWORD_REG_MEMSPREGIMM imul #0, dword [esp+#1+0x$2]
+IMUL_DWORD_REG_MEMSPREGRELIMM imul #0, dword [esp+#1+?0x$2]
+IMUL_DWORD_REG_MEMSPREGMUL imul #0, dword [esp+#1*$2]
+IMUL_DWORD_REG_MEMSPREGMULIMM imul #0, dword [esp+#1*$2+0x$3]
+IMUL_DWORD_REG_MEMSPREGMULRELIMM imul #0, dword [esp+#1*$2+?0x$3]
+IMUL_DWORD_REG_MEMFSIMM imul #0, dword fs:[0x$1]
+IMUL_DWORD_REG_MEMFSRELIMM imul #0, dword fs:[?0x$1]
+IMUL_DWORD_REG_MEMFSREG imul #0, dword fs:[#1]
+IMUL_DWORD_REG_MEMFSREGIMM imul #0, dword fs:[#1+0x$2]
+IMUL_DWORD_REG_MEMFSREGRELIMM imul #0, dword fs:[#1+?0x$2]
+IMUL_DWORD_REG_MEMFSREGREG imul #0, dword fs:[#1+#2]
+IMUL_DWORD_REG_MEMFSREGREGIMM imul #0, dword fs:[#1+#2+0x$3]
+IMUL_DWORD_REG_MEMFSREGREGRELIMM imul #0, dword fs:[#1+#2+?0x$3]
+IMUL_DWORD_REG_MEMFSREGMUL imul #0, dword fs:[#1*$2]
+IMUL_DWORD_REG_MEMFSREGMULIMM imul #0, dword fs:[#1*$2+0x$3]
+IMUL_DWORD_REG_MEMFSREGMULRELIMM imul #0, dword fs:[#1*$2+?0x$3]
+IMUL_DWORD_REG_MEMFSREGREGMUL imul #0, dword fs:[#1+#2*$3]
+IMUL_DWORD_REG_MEMFSREGREGMULIMM imul #0, dword fs:[#1+#2*$3+0x$4]
+IMUL_DWORD_REG_MEMFSREGREGMULRELIMM imul #0, dword fs:[#1+#2*$3+?0x$4]
+IMUL_DWORD_REG_MEMFSSP imul #0, dword fs:[esp]
+IMUL_DWORD_REG_MEMFSSPIMM imul #0, dword fs:[esp+0x$1]
+IMUL_DWORD_REG_MEMFSSPRELIMM imul #0, dword fs:[esp+?0x$1]
+IMUL_DWORD_REG_MEMFSSPREG imul #0, dword fs:[esp+#1]
+IMUL_DWORD_REG_MEMFSSPREGIMM imul #0, dword fs:[esp+#1+0x$2]
+IMUL_DWORD_REG_MEMFSSPREGRELIMM imul #0, dword fs:[esp+#1+?0x$2]
+IMUL_DWORD_REG_MEMFSSPREGMUL imul #0, dword fs:[esp+#1*$2]
+IMUL_DWORD_REG_MEMFSSPREGMULIMM imul #0, dword fs:[esp+#1*$2+0x$3]
+IMUL_DWORD_REG_MEMFSSPREGMULRELIMM imul #0, dword fs:[esp+#1*$2+?0x$3]
+IMUL_DWORD_REG_MEMGSIMM imul #0, dword gs:[0x$1]
+IMUL_DWORD_REG_MEMGSRELIMM imul #0, dword gs:[?0x$1]
+IMUL_DWORD_REG_MEMGSREG imul #0, dword gs:[#1]
+IMUL_DWORD_REG_MEMGSREGIMM imul #0, dword gs:[#1+0x$2]
+IMUL_DWORD_REG_MEMGSREGRELIMM imul #0, dword gs:[#1+?0x$2]
+IMUL_DWORD_REG_MEMGSREGREG imul #0, dword gs:[#1+#2]
+IMUL_DWORD_REG_MEMGSREGREGIMM imul #0, dword gs:[#1+#2+0x$3]
+IMUL_DWORD_REG_MEMGSREGREGRELIMM imul #0, dword gs:[#1+#2+?0x$3]
+IMUL_DWORD_REG_MEMGSREGMUL imul #0, dword gs:[#1*$2]
+IMUL_DWORD_REG_MEMGSREGMULIMM imul #0, dword gs:[#1*$2+0x$3]
+IMUL_DWORD_REG_MEMGSREGMULRELIMM imul #0, dword gs:[#1*$2+?0x$3]
+IMUL_DWORD_REG_MEMGSREGREGMUL imul #0, dword gs:[#1+#2*$3]
+IMUL_DWORD_REG_MEMGSREGREGMULIMM imul #0, dword gs:[#1+#2*$3+0x$4]
+IMUL_DWORD_REG_MEMGSREGREGMULRELIMM imul #0, dword gs:[#1+#2*$3+?0x$4]
+IMUL_DWORD_REG_MEMGSSP imul #0, dword gs:[esp]
+IMUL_DWORD_REG_MEMGSSPIMM imul #0, dword gs:[esp+0x$1]
+IMUL_DWORD_REG_MEMGSSPRELIMM imul #0, dword gs:[esp+?0x$1]
+IMUL_DWORD_REG_MEMGSSPREG imul #0, dword gs:[esp+#1]
+IMUL_DWORD_REG_MEMGSSPREGIMM imul #0, dword gs:[esp+#1+0x$2]
+IMUL_DWORD_REG_MEMGSSPREGRELIMM imul #0, dword gs:[esp+#1+?0x$2]
+IMUL_DWORD_REG_MEMGSSPREGMUL imul #0, dword gs:[esp+#1*$2]
+IMUL_DWORD_REG_MEMGSSPREGMULIMM imul #0, dword gs:[esp+#1*$2+0x$3]
+IMUL_DWORD_REG_MEMGSSPREGMULRELIMM imul #0, dword gs:[esp+#1*$2+?0x$3]
+IMUL_DWORD_REG_IMM imul #0, 0x$1
+IMUL_DWORD_SP_REG imul esp, #0
+IMUL_DWORD_SP_SP imul esp, esp
+IMUL_DWORD_SP_MEMIMM imul esp, dword [0x$0]
+IMUL_DWORD_SP_MEMRELIMM imul esp, dword [?0x$0]
+IMUL_DWORD_SP_MEMREG imul esp, dword [#0]
+IMUL_DWORD_SP_MEMREGIMM imul esp, dword [#0+0x$1]
+IMUL_DWORD_SP_MEMREGRELIMM imul esp, dword [#0+?0x$1]
+IMUL_DWORD_SP_MEMREGREG imul esp, dword [#0+#1]
+IMUL_DWORD_SP_MEMREGREGIMM imul esp, dword [#0+#1+0x$2]
+IMUL_DWORD_SP_MEMREGREGRELIMM imul esp, dword [#0+#1+?0x$2]
+IMUL_DWORD_SP_MEMREGMUL imul esp, dword [#0*$1]
+IMUL_DWORD_SP_MEMREGMULIMM imul esp, dword [#0*$1+0x$2]
+IMUL_DWORD_SP_MEMREGMULRELIMM imul esp, dword [#0*$1+?0x$2]
+IMUL_DWORD_SP_MEMREGREGMUL imul esp, dword [#0+#1*$2]
+IMUL_DWORD_SP_MEMREGREGMULIMM imul esp, dword [#0+#1*$2+0x$3]
+IMUL_DWORD_SP_MEMREGREGMULRELIMM imul esp, dword [#0+#1*$2+?0x$3]
+IMUL_DWORD_SP_MEMSP imul esp, dword [esp]
+IMUL_DWORD_SP_MEMSPIMM imul esp, dword [esp+0x$0]
+IMUL_DWORD_SP_MEMSPRELIMM imul esp, dword [esp+?0x$0]
+IMUL_DWORD_SP_MEMSPREG imul esp, dword [esp+#0]
+IMUL_DWORD_SP_MEMSPREGIMM imul esp, dword [esp+#0+0x$1]
+IMUL_DWORD_SP_MEMSPREGRELIMM imul esp, dword [esp+#0+?0x$1]
+IMUL_DWORD_SP_MEMSPREGMUL imul esp, dword [esp+#0*$1]
+IMUL_DWORD_SP_MEMSPREGMULIMM imul esp, dword [esp+#0*$1+0x$2]
+IMUL_DWORD_SP_MEMSPREGMULRELIMM imul esp, dword [esp+#0*$1+?0x$2]
+IMUL_DWORD_SP_MEMFSIMM imul esp, dword fs:[0x$0]
+IMUL_DWORD_SP_MEMFSRELIMM imul esp, dword fs:[?0x$0]
+IMUL_DWORD_SP_MEMFSREG imul esp, dword fs:[#0]
+IMUL_DWORD_SP_MEMFSREGIMM imul esp, dword fs:[#0+0x$1]
+IMUL_DWORD_SP_MEMFSREGRELIMM imul esp, dword fs:[#0+?0x$1]
+IMUL_DWORD_SP_MEMFSREGREG imul esp, dword fs:[#0+#1]
+IMUL_DWORD_SP_MEMFSREGREGIMM imul esp, dword fs:[#0+#1+0x$2]
+IMUL_DWORD_SP_MEMFSREGREGRELIMM imul esp, dword fs:[#0+#1+?0x$2]
+IMUL_DWORD_SP_MEMFSREGMUL imul esp, dword fs:[#0*$1]
+IMUL_DWORD_SP_MEMFSREGMULIMM imul esp, dword fs:[#0*$1+0x$2]
+IMUL_DWORD_SP_MEMFSREGMULRELIMM imul esp, dword fs:[#0*$1+?0x$2]
+IMUL_DWORD_SP_MEMFSREGREGMUL imul esp, dword fs:[#0+#1*$2]
+IMUL_DWORD_SP_MEMFSREGREGMULIMM imul esp, dword fs:[#0+#1*$2+0x$3]
+IMUL_DWORD_SP_MEMFSREGREGMULRELIMM imul esp, dword fs:[#0+#1*$2+?0x$3]
+IMUL_DWORD_SP_MEMFSSP imul esp, dword fs:[esp]
+IMUL_DWORD_SP_MEMFSSPIMM imul esp, dword fs:[esp+0x$0]
+IMUL_DWORD_SP_MEMFSSPRELIMM imul esp, dword fs:[esp+?0x$0]
+IMUL_DWORD_SP_MEMFSSPREG imul esp, dword fs:[esp+#0]
+IMUL_DWORD_SP_MEMFSSPREGIMM imul esp, dword fs:[esp+#0+0x$1]
+IMUL_DWORD_SP_MEMFSSPREGRELIMM imul esp, dword fs:[esp+#0+?0x$1]
+IMUL_DWORD_SP_MEMFSSPREGMUL imul esp, dword fs:[esp+#0*$1]
+IMUL_DWORD_SP_MEMFSSPREGMULIMM imul esp, dword fs:[esp+#0*$1+0x$2]
+IMUL_DWORD_SP_MEMFSSPREGMULRELIMM imul esp, dword fs:[esp+#0*$1+?0x$2]
+IMUL_DWORD_SP_MEMGSIMM imul esp, dword gs:[0x$0]
+IMUL_DWORD_SP_MEMGSRELIMM imul esp, dword gs:[?0x$0]
+IMUL_DWORD_SP_MEMGSREG imul esp, dword gs:[#0]
+IMUL_DWORD_SP_MEMGSREGIMM imul esp, dword gs:[#0+0x$1]
+IMUL_DWORD_SP_MEMGSREGRELIMM imul esp, dword gs:[#0+?0x$1]
+IMUL_DWORD_SP_MEMGSREGREG imul esp, dword gs:[#0+#1]
+IMUL_DWORD_SP_MEMGSREGREGIMM imul esp, dword gs:[#0+#1+0x$2]
+IMUL_DWORD_SP_MEMGSREGREGRELIMM imul esp, dword gs:[#0+#1+?0x$2]
+IMUL_DWORD_SP_MEMGSREGMUL imul esp, dword gs:[#0*$1]
+IMUL_DWORD_SP_MEMGSREGMULIMM imul esp, dword gs:[#0*$1+0x$2]
+IMUL_DWORD_SP_MEMGSREGMULRELIMM imul esp, dword gs:[#0*$1+?0x$2]
+IMUL_DWORD_SP_MEMGSREGREGMUL imul esp, dword gs:[#0+#1*$2]
+IMUL_DWORD_SP_MEMGSREGREGMULIMM imul esp, dword gs:[#0+#1*$2+0x$3]
+IMUL_DWORD_SP_MEMGSREGREGMULRELIMM imul esp, dword gs:[#0+#1*$2+?0x$3]
+IMUL_DWORD_SP_MEMGSSP imul esp, dword gs:[esp]
+IMUL_DWORD_SP_MEMGSSPIMM imul esp, dword gs:[esp+0x$0]
+IMUL_DWORD_SP_MEMGSSPRELIMM imul esp, dword gs:[esp+?0x$0]
+IMUL_DWORD_SP_MEMGSSPREG imul esp, dword gs:[esp+#0]
+IMUL_DWORD_SP_MEMGSSPREGIMM imul esp, dword gs:[esp+#0+0x$1]
+IMUL_DWORD_SP_MEMGSSPREGRELIMM imul esp, dword gs:[esp+#0+?0x$1]
+IMUL_DWORD_SP_MEMGSSPREGMUL imul esp, dword gs:[esp+#0*$1]
+IMUL_DWORD_SP_MEMGSSPREGMULIMM imul esp, dword gs:[esp+#0*$1+0x$2]
+IMUL_DWORD_SP_MEMGSSPREGMULRELIMM imul esp, dword gs:[esp+#0*$1+?0x$2]
+IMUL_DWORD_SP_IMM imul esp, 0x$0
 XCHG_DWORD_REG_REG xchg #0, #1
 XCHG_DWORD_REG_SP xchg #0, esp
 XCHG_DWORD_REG_MEMIMM xchg #0, dword [0x$1]

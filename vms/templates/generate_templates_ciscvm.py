@@ -16,13 +16,20 @@ def generate_templates(mode):
         operand1 = OperandPos(1, opcode.operand1)
         operand2 = OperandPos(2, opcode.operand2)
         operand3 = OperandPos(3, opcode.operand3)
+        operands = 0
+        if opcode.operand1 is not None:
+            operands += 1
+        if opcode.operand2 is not None:
+            operands += 1
+        if opcode.operand3 is not None:
+            operands += 1
         operation = opcode.name.split("_")[0]
         if operation in ("MOV"):
             # PUSH SIZE2 ARG2
             # POP SIZE1 ARG1
             instructions = [(["PUSH", opcode.size2, operand2], None),
                             (["POP", opcode.size1, operand1], None)]
-        elif operation in ("ADD", "SUB", "XOR", "AND", "OR", "BT", "BTR", "BTS", "BTC", "SBB", "ADC", "SHL", "SHR", "SAR", "ROL", "ROR", "RCR", "RCL", "IMULTWO"):
+        elif operation in ("ADD", "SUB", "XOR", "AND", "OR", "BT", "BTR", "BTS", "BTC", "SBB", "ADC", "SHL", "SHR", "SAR", "ROL", "ROR", "RCR", "RCL"):
             # PUSH SIZE1 ARG1
             # PUSH SIZE2 ARG2
             # OP SIZE1
@@ -80,7 +87,7 @@ def generate_templates(mode):
             # POP SIZE1 ARG1
             instructions = [(["PUSH", "ADDRESS", operand2], None),
                             (["POP", opcode.size1, operand1], None)]
-        elif operation in ("MUL", "IMUL"):
+        elif operands == 1 and operation in ("MUL", "IMUL"):
             # PUSH SIZE1 REG X
             # PUSH SIZE1 ARG1
             # OP SIZE1
@@ -113,11 +120,23 @@ def generate_templates(mode):
                 instructions.append((["STACK", "POP", opcode.size1, "REGHIGH"], ["ARG1"]))
             else:
                 instructions.append((["STACK", "POP", opcode.size1, "REG"], ["ARG1"]))
-        elif operation in ("IMULTHREE"):
+        elif operands == 2 and operation in ("IMUL",):
+            # PUSH SIZE1 ARG1
+            # PUSH SIZE2 ARG2
+            # OP SIZE1
+            # POP SIZE1 ARG1
+            instructions = [(["PUSH", opcode.size1, operand1], None),
+                            (["PUSH", opcode.size2, operand2], None),
+                            (["IMULTWO", opcode.size1], None),
+                            (["POP", opcode.size1, operand1], None)]
+        elif operands == 3 and operation in ("IMUL",):
             # MOV SIZE1 ARG1 ARG2
             # IMULTWO SIZE1 ARG1 ARG3
             instructions = [(["MOV", opcode.size1, operand1, operand2], None),
-                            (["IMULTWO", opcode.size1, operand1, operand3], None)]
+                            (["PUSH", opcode.size1, operand1], None),
+                            (["PUSH", opcode.size3, operand3], None),
+                            (["IMULTWO", opcode.size1], None),
+                            (["POP", opcode.size1, operand1], None)]
         else:
             continue
         
