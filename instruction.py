@@ -346,22 +346,16 @@ class Function(object):
         self._clean_blocks()
 
     def _clean_blocks(self):
-        changed = True
-        while changed:
-            changed = False
-            for block in self.blocks.values():
-                if len(block.instructions) == 0 and block.next_cond is None:
-                    if block in block.next.froms:
-                        block.next.froms.remove(block)
-                    for f in block.froms:
-                        if f.next == block:
-                            f.next = block.next
-                            if f not in block.next.froms:
-                                block.next.froms.append(f)
-                            changed = True
-                        if f.next_cond == block:
-                            f.next_cond = block.next
-                            if f not in block.next.froms:
-                                block.next.froms.append(f)
-                            changed = True
+        for block in self.blocks.values():
+            if len(block.instructions) == 0 and block.next_cond is None:
+                block.next.froms.remove(block)
+                for f in block.froms:
+                    if f.next == block:
+                        f.next = block.next
+                        block.next.froms.append(f)
+                    if f.next_cond == block:
+                        f.next_cond = block.next
+                        # We assume that f.next != f.next_cond
+                        # Because we doesn't even handle this case in the main function
+                        block.next.froms.append(f)
 
