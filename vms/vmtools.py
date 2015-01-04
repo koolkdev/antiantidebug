@@ -90,7 +90,7 @@ class VMType(object):
                 inst = file.get_instruction(inst.next)
 
             # In 64 bit
-            inst = file.get_instruction(end_address)
+            inst = file.get_instruction(inst.address)
             inst2 = file.get_instruction(inst.next)
             while inst.opcode == "push" and inst2.opcode == "pop" and str(inst.operands[0]) == str(inst2.operands[0]):
                 inst = file.get_instruction(inst2.next)

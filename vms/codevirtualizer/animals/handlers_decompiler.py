@@ -845,7 +845,6 @@ class Handler(object):
                                 new_block = True
                                 break
 
-                    assert next_block != block.next
                     cond = None
                     if isinstance(state.flags.value, Cmp):
                         if inst.opcode == "jz":
@@ -873,6 +872,8 @@ class Handler(object):
                         self.make_visible(instructions[-1])
                         break
 
+                    assert next_block != block.next
+
                     if next_block == block.next_cond:
                         # Only if
                         new_state, new_instructions = self._get_handler_block(block.next, state, next_block)
@@ -886,14 +887,12 @@ class Handler(object):
                         if len(block.next_cond.froms) > 1:
                             # hack for Ors
                             if_block = block.next_cond
+                            else_block = None
                             condition_blocks = []
                             b = block.next
                             while b != next_block:
-                                if b.next_cond == block.next_cond:
-                                    condition_blocks.append(b)
-                                else:
-                                    assert b.next == next_block and b.next_cond is None
-                                    else_block = b
+                                assert b.next_cond == block.next_cond
+                                condition_blocks.append(b)
                                 b = b.next
                             assert len(block.next_cond.froms) == len(condition_blocks) + 1
                             cond = cond.invert()
@@ -905,19 +904,23 @@ class Handler(object):
                                 cond = OrCond(cond, new_instructions[-1].value.invert())
 
                         state1, instructions1 = self._get_handler_block(if_block, state, next_block)
-                        state2, instructions2 = self._get_handler_block(else_block, state, next_block)
+                        if else_block is not None:
+                            state2, instructions2 = self._get_handler_block(else_block, state, next_block)
                         instructions.append(If(cond, instructions1))
                         self.make_visible(instructions[-1])
                         # TODO check for visible instructions
-                        if next_block is None:
-                            # No else if not needed
-                            instructions.extend(instructions2)
-                            break
-                        if len(instructions2) > 0:
-                            instructions.append(Else(instructions2))
-                        state2.invalidate_diff(state1)
-                        # Update state
-                        state = state2
+                        if else_block is not None:
+                            if next_block is None:
+                                # No else if not needed
+                                instructions.extend(instructions2)
+                                break
+                            if len(instructions2) > 0:
+                                instructions.append(Else(instructions2))
+                            state2.invalidate_diff(state1)
+                            # Update state
+                            state = state2
+                        else:
+                            state.invalidate_diff(state1)
                     if next_block == end:
                         break
                     block = next_block

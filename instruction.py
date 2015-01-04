@@ -281,6 +281,12 @@ class Function(object):
                 old_block.instructions = old_block.instructions[:index]
                 for inst in block.instructions:
                     instructions_blocks[inst.address] = block
+                if old_block.next is not None:
+                    old_block.next.froms.remove(old_block)
+                    old_block.next.froms.append(block)
+                if old_block.next_cond is not None:
+                    old_block.next_cond.froms.remove(old_block)
+                    old_block.next_cond.froms.append(block)
                 block.next = old_block.next
                 block.next_cond = old_block.next_cond
                 block.froms.append(old_block)
@@ -304,6 +310,12 @@ class Function(object):
                         old_block.instructions = old_block.instructions[:index]
                         for inst in nblock.instructions:
                             instructions_blocks[inst.address] = nblock
+                        if old_block.next is not None:
+                            old_block.next.froms.remove(old_block)
+                            old_block.next.froms.append(nblock)
+                        if old_block.next_cond is not None:
+                            old_block.next_cond.froms.remove(old_block)
+                            old_block.next_cond.froms.append(nblock)
                         nblock.next = old_block.next
                         nblock.next_cond = old_block.next_cond
                         nblock.froms.append(old_block)
@@ -331,4 +343,25 @@ class Function(object):
                     block.next_cond.froms.append(block)
                     break
                 address = inst.next
+        self._clean_blocks()
+
+    def _clean_blocks(self):
+        changed = True
+        while changed:
+            changed = False
+            for block in self.blocks.values():
+                if len(block.instructions) == 0 and block.next_cond is None:
+                    if block in block.next.froms:
+                        block.next.froms.remove(block)
+                    for f in block.froms:
+                        if f.next == block:
+                            f.next = block.next
+                            if f not in block.next.froms:
+                                block.next.froms.append(f)
+                            changed = True
+                        if f.next_cond == block:
+                            f.next_cond = block.next
+                            if f not in block.next.froms:
+                                block.next.froms.append(f)
+                            changed = True
 
