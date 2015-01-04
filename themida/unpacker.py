@@ -153,7 +153,7 @@ def old_follow(binary):
     cc = cleaner.Cleaner(d.get_as_mapped_file())
     cc.set_option("fixOperationConstantThruRegOnStack", True)
     cc.set_option("fixPush_allowConstants", True)
-    res = cc.get_clean_instruction(d.thread.get_pc())
+    res = cc.get_instruction(d.thread.get_pc())
     jmp_to_vm = d.get_instruction(res.next)
     first_vm = vm.get_vm_code(d.get_as_mapped_file(), res, jmp_to_vm)
     
@@ -259,7 +259,7 @@ def goto_jmp_eax(debugger):
     print "Looking for jmp eax"
     cc = cleaner.Cleaner(debugger.get_as_mapped_file())
     cc.set_option("ignore_calls", True)
-    inst = cc.get_clean_instruction(debugger.thread.get_pc())    
+    inst = cc.get_instruction(debugger.thread.get_pc())
     exceptions = False
     saw = []
     loop_detector = []
@@ -295,19 +295,19 @@ def goto_jmp_eax(debugger):
                     isnt = debugger.go(inst.address)
                     inst = debugger.step()
             loop_detector = []
-            inst = cc.get_clean_instruction(inst.address)
+            inst = cc.get_instruction(inst.address)
             continue
         if inst.opcode.startswith("j") or inst.opcode == "ret":
             inst = debugger.go(inst.address)
             inst = debugger.step()
             loop_detector = []
-            inst = cc.get_clean_instruction(inst.address)
+            inst = cc.get_instruction(inst.address)
         else:
-            inst = cc.get_clean_instruction(inst.next)
+            inst = cc.get_instruction(inst.next)
 
         if loop_detector.count(inst.address) != 0:
             inst = debugger.go(inst.address)
-            inst = cc.get_clean_instruction(inst.address)
+            inst = cc.get_instruction(inst.address)
             loop_detector = []
         loop_detector.append(inst.address)
 
@@ -320,7 +320,7 @@ def new_goto_jmp_eax(debugger):
     cc = cleaner.Cleaner(debugger.get_as_mapped_file())
     cc.set_option("ignore_calls", True)
     try_address = debugger.thread.get_pc()
-    inst = cc.get_clean_instruction(debugger.thread.get_pc())    
+    inst = cc.get_instruction(debugger.thread.get_pc())
     exceptions = False
     saw = []
     old_inst = inst
@@ -339,7 +339,7 @@ def new_goto_jmp_eax(debugger):
             debugger.go(inst.address)
             inst = debugger.step()
             try_address = inst.address
-            inst = cc.get_clean_instruction(inst.address)
+            inst = cc.get_instruction(inst.address)
             continue
         if inst.opcode == "jnz":
             if exceptions:
@@ -361,16 +361,16 @@ def new_goto_jmp_eax(debugger):
                     isnt = debugger.go(inst.address)
                     inst = debugger.step()
             try_address = inst.address
-            inst = cc.get_clean_instruction(inst.address)
+            inst = cc.get_instruction(inst.address)
             continue
         if inst.opcode.startswith("j") or inst.opcode == "ret":
             inst = debugger.go(inst.address)
             inst = debugger.step()
             try_address = inst.address
-            inst = cc.get_clean_instruction(inst.address)
+            inst = cc.get_instruction(inst.address)
         else:
             try_address = inst.next
-            inst = cc.get_clean_instruction(inst.next)
+            inst = cc.get_instruction(inst.next)
             
     debugger.go(inst.address)
     print "Found jmp eax"
@@ -542,10 +542,10 @@ def get_debugger(binary):
 def run_clean(debugger):
     cc = cleaner.Cleaner(debugger.get_as_mapped_file())
     cc.set_option("ignore_calls", True)
-    inst = cc.get_clean_instruction(debugger.thread.get_pc())
+    inst = cc.get_instruction(debugger.thread.get_pc())
     while True:
         print "0x%08X: %s" % (inst.address, inst)
-        inst = cc.get_clean_instruction(inst.next)
+        inst = cc.get_instruction(inst.next)
         
 def do(binary):
     follow(binary).dump(True)

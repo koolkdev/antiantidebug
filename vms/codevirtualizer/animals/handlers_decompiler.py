@@ -836,7 +836,9 @@ class Handler(object):
                         if str(state.flags) == state.mode.translate("Flags(Compare(var_{R:cx}, 0x0))"):
                             if len(block.next.instructions) == 2 and \
                                             str(block.next.instructions[0]) == state.mode.translate("movs{SB}") and \
-                                            str(block.next.instructions[1]) == state.mode.translate("dec ecx"):
+                                            (str(block.next.instructions[1]) == state.mode.translate("dec ecx") or \
+                                             str(block.next.instructions[1]) == state.mode.translate("sub ecx, 0x1") or \
+                                             str(block.next.instructions[1]) == state.mode.translate("add ecx, 0xffffffff")):
                                 instructions.append(MemCopy(state.get_register("di"),
                                                             state.get_register("si"),
                                                             state.get_register("cx")))
@@ -986,7 +988,7 @@ class Handler(object):
                 elif inst.opcode == "std":
                     instructions.append(Std())
                 else:
-                    print inst
+                    #print inst
                     assert False
         return state, instructions
 
@@ -997,7 +999,7 @@ class Handler(object):
         for inst in instructions:
             if isinstance(inst, ConditionBlock):
                 inst.instructions = self._clean_instructions(inst.instructions)
-        return [x for x in instructions if not isinstance(x, NonVisible) or x.visible]
+        return [x for x in instructions if not ((isinstance(x, NonVisible) and not x.visible) or (isinstance(x, Else) and len(x.instructions) == 0))]
 
     def print_instructions(self, instructions = None, pre=''):
         if instructions == None:

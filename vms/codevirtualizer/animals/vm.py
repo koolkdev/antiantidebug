@@ -179,8 +179,32 @@ class VMHandlers(object):
         self.mode = file.mode
         arch = file.get_arch()
 
+        black = False
+
+        reader = file
+
+        if black:
+            reader = cleaner.Cleaner(reader)
+            reader.set_option("ignore_jumps", False)
+            reader.set_option("fix_inc_dec", False)
+
         self.handlers = {}
         addrs = {}
+        # # If fish
+        # # Check if black
+        # handler_address = file.read_pointer(vm_info.init_handler.handlers_address)
+        # if fix_handlers:
+        #     handler_address = handler_address + vm_info.init_handler.base_address
+        # try:
+        #     func = handlers_decompiler.Handler(instruction.Function(reader, handler_address))
+        # except:
+        #     print "Black"
+        #     reader = cleaner.Cleaner(reader)
+        #     reader.set_option("ignore_jumps", False)
+        #     reader.set_option("fix_inc_dec", False)
+        #     func = handlers_decompiler.Handler(instruction.Function(reader, handler_address))
+
+
         # Let's find all the handlers now
         print "Decompiling handlers... (%d handlers)" % vm_info.init_handler.handlers_count
         if PROGRESSBAR:
@@ -192,7 +216,7 @@ class VMHandlers(object):
             if fix_handlers:
                 handler_address = handler_address + vm_info.init_handler.base_address
             #if handler_address == 0x4219f9L:
-            func = handlers_decompiler.Handler(instruction.Function(file, handler_address))
+            func = handlers_decompiler.Handler(instruction.Function(reader, handler_address))
             self.handlers[i] = VMOpcodeHandler(func)
             addrs[i] = handler_address
         if PROGRESSBAR:

@@ -7,6 +7,7 @@ class Cleaner(object):
     # pe should have the function get_instruction_at
     def __init__(self, file):
         self.file = file
+        self.mode = file.mode
         def read(address, size):
             return file.read(address, size)
         self.cleaner = oreans_deobfuscator.Cleaner(read, self.file.mode)
@@ -18,7 +19,7 @@ class Cleaner(object):
     def set_option(self, option, value):
         self.cleaner.set_option(option, value)
         
-    def get_clean_instruction(self, address):
+    def get_instruction(self, address):
         next_address, data = self.cleaner.get_clean_instruction(address)
         if next_address is None:
             return None
@@ -40,7 +41,7 @@ class CleanReader(object):
         self.cleaner = cleaner
 
     def get(self):
-        res = self.cleaner.get_clean_instruction(self.address)
+        res = self.cleaner.get_instruction(self.address)
         self.address = res.next
         return res
 
