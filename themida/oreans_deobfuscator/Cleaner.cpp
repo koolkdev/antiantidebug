@@ -488,30 +488,21 @@ int Cleaner::cleanIncDec(uint64_t * address, instruction_info * result) {
 	return false;
 }
 int Cleaner::cleanIncDecSure(uint64_t * address, instruction_info * result) {
-	if (GET_OPERAND_SIZE(*result, 0) < 4) return false;
-	if ((GET_OPCODE(*result) == ADD && IS_OPERAND_IMM(*result, 1) && get_immediate_value(result, 1) == 1) ||
-		(GET_OPCODE(*result) == SUB && IS_OPERAND_IMM(*result, 1) && get_immediate_value(result, 1) == -1)) {
-			SET_OPCODE(*result, INC);
-			REMOVE_OPERAND(*result, 1);
-			return true;
-	}
-	if ((GET_OPCODE(*result) == ADD && IS_OPERAND_IMM(*result, 1) && get_immediate_value(result, 1) == -1) || 
-		(GET_OPCODE(*result) == SUB && IS_OPERAND_IMM(*result, 1) && get_immediate_value(result, 1) == 1)) {
-			SET_OPCODE(*result, DEC);
-			REMOVE_OPERAND(*result, 1);
-			return true;
-	}
-	/*if (GET_OPCODE(*result) == ADD && (result->operands[1] & 0xF0) == OPH_CONSTANT && get_immediate_value(result, 1) == 1) {
-		// @@@@@@@@@@@@@@@@@
-		int current_address = *address;
-		instruction_info next = getCleanInstructionAt(address);
-		if (GET_OPCODE(next) == XCHG || GET_OPCODE(next) == NOT) {
-			*address = current_address;
-			GET_OPCODE(*result) = INC;
-			result->operands[1] = OP_NONE;
-			return true;
+	if (options[StringHash("fix_inc_dec")]) {
+		if (GET_OPERAND_SIZE(*result, 0) < 4) return false;
+		if ((GET_OPCODE(*result) == ADD && IS_OPERAND_IMM(*result, 1) && get_immediate_value(result, 1) == 1) ||
+			(GET_OPCODE(*result) == SUB && IS_OPERAND_IMM(*result, 1) && get_immediate_value(result, 1) == -1)) {
+				SET_OPCODE(*result, INC);
+				REMOVE_OPERAND(*result, 1);
+				return true;
 		}
-	}*/
+		if ((GET_OPCODE(*result) == ADD && IS_OPERAND_IMM(*result, 1) && get_immediate_value(result, 1) == -1) || 
+			(GET_OPCODE(*result) == SUB && IS_OPERAND_IMM(*result, 1) && get_immediate_value(result, 1) == 1)) {
+				SET_OPCODE(*result, DEC);
+				REMOVE_OPERAND(*result, 1);
+				return true;
+		}
+	}
 	return false;
 }
 // Obfuscators: ADD, XOR, MOV
@@ -1838,6 +1829,7 @@ Cleaner::Cleaner(reader_f reader, int mode, void * opaque) : reader(reader), mod
 	
 	options[StringHash("ignore_jumps")] = true;
 	options[StringHash("ignore_calls")] = false;
+	options[StringHash("fix_inc_dec")] = true;
 	
 	options[StringHash("end_address")] = 0;
 }
