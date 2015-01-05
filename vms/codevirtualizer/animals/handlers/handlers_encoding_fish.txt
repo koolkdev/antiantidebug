@@ -1,0 +1,20 @@
+OPTION DONT_OPTIMIZE
+
+DEFINE_GROUP SIMPLE_MATH + - ^
+DEFINE_GROUP COMPARE == !=
+
+### Value Byte ###
+DEFINE_EXPRESSION_TEMPLATE
+((VMStructFieldByte(?O[VALUE_BYTE]) - $N[VALUE]) $G[COMPARE:COMP_OP] 0x0)
+=>
+(ValueDecode(VMStructFieldByte(?O[VALUE_BYTE]), None, None) $[COMP_OP] $[VALUE])
+
+DEFINE_EXPRESSION_TEMPLATE
+(((VMStructFieldByte(?O[VALUE_BYTE]) $G[SIMPLE_MATH:OP] $N[NUMBER]) - $N[VALUE]) $G[COMPARE:COMP_OP] 0x0)
+=>
+(ValueDecode(VMStructFieldByte(?O[VALUE_BYTE]), SimpleOperation(Operation($[OP]), $[NUMBER]), None) $[COMP_OP] $[VALUE])
+
+DEFINE_EXPRESSION_TEMPLATE
+((((VMStructFieldByte(?O[VALUE_BYTE]) $G[SIMPLE_MATH:OP1] $N[NUMBER1]) $G[SIMPLE_MATH:OP2] $N[NUMBER2]) - $N[VALUE]) $G[COMPARE:COMP_OP] 0x0)
+=>
+(ValueDecode(VMStructFieldByte(?O[VALUE_BYTE]), SimpleOperation(Operation($[OP1]), $[NUMBER1]), SimpleOperation(Operation($[OP2]), $[NUMBER2])) $[COMP_OP] $[VALUE])

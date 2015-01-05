@@ -133,31 +133,6 @@ def fix_encoding_values(handler, fields):
             # BUG!! For specific case size decoding in 64 bit
             res = (str(current_expression).replace("VMStructFieldByte", "VMStructFieldQword"), str(parser.create_macro_result("DecodedValueByte($[X1])", nparams)))
             to_replace.append(res)
-        elif parser.match_expression(instructions_container.instructions[index], "If((DecodedAccByte($[OP1T], $[OP2T]) $G[COMPARE:COMP_OP] $N[VALUE]))", nparams):
-            value = nparams.vars["VALUE"].value
-            if type(nparams.vars["OP2T"]) is not handlers_parser.NoneExpression:
-                assert parser.match_expression(nparams.vars["OP2T"], "SimpleOperation(Operation($[OP2]), $N[NUM2])", nparams)
-                if str(nparams.vars["OP2"]) == "+":
-                    value -= nparams.vars["NUM2"].value
-                elif str(nparams.vars["OP2"]) == "-":
-                    value += nparams.vars["NUM2"].value
-                elif str(nparams.vars["OP2"]) == "^":
-                    value ^= nparams.vars["NUM2"].value
-                else:
-                    assert False
-            if type(nparams.vars["OP1T"]) is not handlers_parser.NoneExpression:
-                assert parser.match_expression(nparams.vars["OP1T"], "SimpleOperation(Operation($[OP1]), $N[NUM1])", nparams)
-                if str(nparams.vars["OP1"]) == "+":
-                    value -= nparams.vars["NUM1"].value
-                elif str(nparams.vars["OP1"]) == "-":
-                    value += nparams.vars["NUM1"].value
-                elif str(nparams.vars["OP1"]) == "^":
-                    value ^= nparams.vars["NUM1"].value
-                else:
-                    assert False
-            value &= 0xff
-            nparams.vars["VALUE"] = handlers_parser.Immediate(value)
-            instructions_container.instructions[index].value = parser.create_macro_result("(DecodedAccByte() $[COMP_OP] $[VALUE])", nparams)
 
         return False
     parser.clean_handler(handler.handler, fields, [fix_func], reverse=False)

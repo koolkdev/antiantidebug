@@ -520,9 +520,10 @@ def merge_variables(var1, var2):
     return var
 
 class State(object):
-    def __init__(self, copy_state=None, mode=None):
+    def __init__(self, copy_state=None, mode=None, fish=False):
         if copy_state:
             self.mode = copy_state.mode
+            self.fish = copy_state.fish
             self.registers = dict(copy_state.registers)
             self.registers_variables = dict(copy_state.registers_variables)
             self.stack = list(copy_state.stack)
@@ -533,6 +534,7 @@ class State(object):
             self.handler = copy_state.handler
         else:
             self.mode = instruction.Arch(mode)
+            self.fish = fish
             self.registers = {}
             self.registers_variables = {}
             for reg in self.mode.get_registers():
@@ -564,7 +566,7 @@ class State(object):
         self.has_flags = self.has_flags or other.has_flags
         if len(self.stack) != len(other.stack):
             # Hack for flags
-            if self.has_flags:
+            if self.has_flags and self.fish:
                 assert len(self.stack) + 1 == len(other.stack)
                 assert len(self.stack) == 0 or len(self.stack) == 1
                 # I think that I don't want this becuse I don't want to make the condition visible
@@ -610,8 +612,8 @@ class State(object):
         return var
 
 class Handler(object):
-    def __init__(self, function):
-        state = State(mode=function.mode)
+    def __init__(self, function, fish=False):
+        state = State(mode=function.mode, fish=fish)
         state.handler = self
         nstate, instructions = self._get_handler_block(function.start_block, state)
         state.invalidate_diff(nstate) # For push instructions taking effect

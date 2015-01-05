@@ -1,0 +1,22 @@
+OPTION DONT_OPTIMIZE
+
+DEFINE_GROUP SIMPLE_MATH + - ^
+DEFINE_GROUP UPDATE_MATH + - ^ & |
+DEFINE_GROUP FIELDS VMStructFieldWord VMStructFieldDword
+
+### Value ###
+#DEFINE_EXPRESSION_TEMPLATE
+#$G[FIELDS:FIELD](?O[VALUED_*:VALUE])
+#=>
+#ValueDecode($[FIELD](?O[VALUE]), None, None)
+
+DEFINE_EXPRESSION_TEMPLATE
+($G[FIELDS:FIELD](?O[VALUE_*:VALUE]) $G[SIMPLE_MATH:OP] $N[NUMBER])
+=>
+ValueDecode($[FIELD](?O[VALUE]), SimpleOperation(Operation($[OP]), $[NUMBER]), None)
+
+
+DEFINE_TEMPLATE
+VMStructFieldDword(?O[KEY_DECODE_POST]) $G[UPDATE_MATH:OP]= VMStructFieldDword(?O[KEY_COND])
+=>
+UpdateKeySpecialCond(Operation($[OP]))

@@ -6,6 +6,8 @@ import handlers_decompiler
 import handlers_parser
 import fish_handlers_cleaner
 import fish_handlers
+import tiger_handlers
+import common_handlers
 import vm_encoding
 
 import instruction
@@ -179,11 +181,12 @@ class VMHandlers(object):
         self.mode = file.mode
         arch = file.get_arch()
 
-        black = False
+        fish = False # Otherwise tiger
+        fish_black = False
 
         reader = file
 
-        if black:
+        if fish_black :
             reader = cleaner.Cleaner(reader)
             reader.set_option("ignore_jumps", False)
             reader.set_option("fix_inc_dec", False)
@@ -216,7 +219,7 @@ class VMHandlers(object):
             if fix_handlers:
                 handler_address = handler_address + vm_info.init_handler.base_address
             #if handler_address == 0x4219f9L:
-            func = handlers_decompiler.Handler(instruction.Function(reader, handler_address))
+            func = handlers_decompiler.Handler(instruction.Function(reader, handler_address), fish)
             self.handlers[i] = VMOpcodeHandler(func)
             addrs[i] = handler_address
         if PROGRESSBAR:
@@ -225,10 +228,11 @@ class VMHandlers(object):
 
         fields = dict(vm_info.struct_fields)
 
-        fish_handlers_cleaner.clean_junk_field(self.handlers.values(), fields, arch)
-        fish_handlers_cleaner.clean_junk_check(self.handlers.values(), fields, arch)
-        if self.mode == 64:
-            fish_handlers_cleaner.fix_64_junk_bool_field(self.handlers.values(), fields)
+        if fish:
+            fish_handlers_cleaner.clean_junk_field(self.handlers.values(), fields, arch)
+            fish_handlers_cleaner.clean_junk_check(self.handlers.values(), fields, arch)
+            if self.mode == 64:
+                fish_handlers_cleaner.fix_64_junk_bool_field(self.handlers.values(), fields)
 
         parser = handlers_parser.HandlerParser.get_parser(r"handlers\handlers_basic.txt", self.mode)
         print "Analyzing handlers... PASS 1/2"
@@ -238,11 +242,16 @@ class VMHandlers(object):
             parser.clean_handler(self.handlers[i].handler, fields)
         if PROGRESSBAR: prog.finish()
 
+        if fish:
+            target = fish_handlers.RESET_KEYS
+        else:
+            target = tiger_handlers.RESET_KEYS
+
         parser = handlers_parser.HandlerParser.get_default_parser()
         print "Looking for RESET_KEYS...",
         found = False
         for handler in self.handlers.itervalues():
-            handler_info = fish_handlers.match_handlers(parser, handler.handler, fields, [fish_handlers.RESET_KEYS], arch)
+            handler_info = common_handlers.match_handlers(parser, handler.handler, fields, [target], arch)
             if handler_info is not None:
                 handler.info = handler_info
                 assert not found
@@ -250,27 +259,37 @@ class VMHandlers(object):
         assert found
         print "SUCCESS"
 
-        parser_pre = handlers_parser.HandlerParser.get_parser(r"handlers\handlers_encoding_pre.txt", self.mode)
-        parser = handlers_parser.HandlerParser.get_parser(r"handlers\handlers_encoding.txt", self.mode)
+        parser_encoding = handlers_parser.HandlerParser.get_parser(r"handlers\handlers_encoding.txt", self.mode)
+        if fish:
+            parser_encoding_specific = handlers_parser.HandlerParser.get_parser(r"handlers\handlers_encoding_fish.txt", self.mode)
+        else:
+            parser_encoding_specific = handlers_parser.HandlerParser.get_parser(r"handlers\handlers_encoding_tiger.txt", self.mode)
+        if fish:
+            parser_fish_encoding = handlers_parser.HandlerParser.get_parser(r"handlers\fish_encoded_value.txt", self.mode)
         parser_final = handlers_parser.HandlerParser.get_parser(r"handlers\handlers_final.txt", self.mode)
         print "Analyzing handlers... PASS 2/2"
         if PROGRESSBAR: prog.start()
         for i in xrange(vm_info.init_handler.handlers_count):
             if PROGRESSBAR: prog.update(i)
-            parser_pre.clean_handler(self.handlers[i].handler, fields)
+            parser_encoding.clean_handler(self.handlers[i].handler, fields)
+            parser_encoding_specific.clean_handler(self.handlers[i].handler, fields)
             self.handlers[i].decode = vm_encoding.get_reading_decoding_info(self.handlers[i].handler, fields, arch)
-            parser.clean_handler(self.handlers[i].handler, fields)
-            fish_handlers_cleaner.fix_encoding_values(self.handlers[i], fields)
+            if fish:
+                parser_fish_encoding.clean_handler(self.handlers[i].handler, fields)
+                fish_handlers_cleaner.fix_encoding_values(self.handlers[i], fields)
             self.handlers[i].handler.optimize_instructions()
             self.handlers[i].handler.clean_instructions()
             parser_final.clean_handler(self.handlers[i].handler, fields)
         if PROGRESSBAR: prog.finish()
 
-
+        if fish:
+            handlers = fish_handlers.HANDLERS
+        else:
+            handlers = tiger_handlers.HANDLERS
         print "Detecting handlers...",
         for handler in self.handlers.itervalues():
             if handler.info is None:
-                handler_info = fish_handlers.match_handlers(parser, handler.handler, fields, fish_handlers.HANDLERS, arch)
+                handler_info = fish_handlers.match_handlers(parser, handler.handler, fields, handlers, arch)
                 if handler_info is None:
                     handler.handler.print_instructions()
                     raise Exception("Failed to detect handler")
@@ -455,7 +474,7 @@ class VMFunction(object):
             regs = list(self.vm_info.init_handler.regs[::-1])
             for reg in regs:
                 if reg == "flags":
-                    self.vm_info.regs_fields["FLAGS"] = reader.get_cond(lambda x: x.name == "POP_VAR").args[0]
+                    reader.get_cond(lambda x: x.name == "POPF")
                 else:
                     reg = reg.upper()
                     if not reg[1].isdigit():

@@ -22,7 +22,12 @@ class DwordKey(Key):
         Key.__init__(self, 32)
 
 
-class AccByte(Key):
+class WordKey(Key):
+    def __init__(self):
+        Key.__init__(self, 8)
+
+
+class ByteKey(Key):
     def __init__(self):
         Key.__init__(self, 8)
 
@@ -52,13 +57,13 @@ class DecodingState(object):
 
 def new_fish_state(address, read_func):
     return DecodingState({
-        "KEY1": DwordKey(),
-        "KEY2": DwordKey(),
-        "KEY3": DwordKey(),
-        "KEY4": DwordKey(),
-        "KEY5": DwordKey(),
-        "KEY6": DwordKey(),
-        "ACC_BYTE": AccByte(),
+        "KEY_DECODE": DwordKey(),
+        "KEY_COND": DwordKey(),
+        "KEY_REGULAR_1": DwordKey(),
+        "KEY_REGULAR_2": DwordKey(),
+        "KEY_UNUSED": DwordKey(),
+        "KEY_SPECIAL": DwordKey(),
+        "VALUE_BYTE": ByteKey(),
         }, address, read_func)
 
 
@@ -115,23 +120,31 @@ class UpdateKeyCond(DecodingOperation):
         self.op = op
 
     def decode(self, state):
-        if state.get_key("KEY2").get_value() & 1:
-            state.get_key("KEY2").do_operation(state, self.op)
+        if state.get_key("KEY_COND").get_value() & 1:
+            state.get_key("KEY_COND").do_operation(state, self.op)
 
 
-class UpdateKeySpecial(UpdateKey):
-    def __init__(self, op):
-        UpdateKey.__init__(self, "KEY6", DecodeKey(op, "KEY1"))
+class UpdateKeyKey(UpdateKey):
+    def __init__(self, key1, key2, op):
+        UpdateKey.__init__(self, key1, DecodeKey(op, key2))
 
 
-class UpdateAccByte(DecodingValueOperation):
-    def __init__(self, op, read):
+class UpdateValue(DecodingValueOperation):
+    def __init__(self, value, op, read):
         self.read = read
         self.op = op
+        self.value = value
+        self.ops = None
 
     def decode(self, state):
-        state.get_key("ACC_BYTE").do_operation(state, DecodeNumber(self.op, self.read.decode(state)))
-        return state.get_key("ACC_BYTE").get_value()
+        key = state.get_key(self.value)
+        key.do_operation(state, DecodeNumber(self.op, self.read.decode(state)))
+        res = key.get_value()
+        if self.ops is not None:
+            for op in self.ops:
+                res = op.decode(state, res)
+            res &= ((1 << key.bits) - 1)
+        return res
 
     def get_offset(self):
         return self.read.get_offset()
@@ -139,8 +152,9 @@ class UpdateAccByte(DecodingValueOperation):
 
 class DecodeParameter(DecodingValueOperation):
     class UpdateKeyDecode(object):
-        def __init__(self, op):
+        def __init__(self, key, op):
             self.op = op
+            self.key = key
 
     def __init__(self, offset, size, ops):
         self.offset = offset
@@ -151,7 +165,7 @@ class DecodeParameter(DecodingValueOperation):
         res = state.read_parameter(self.offset, self.size)
         for op in self.ops:
             if type(op) is DecodeParameter.UpdateKeyDecode:
-                UpdateKey("KEY1", DecodeNumber(op.op, res)).decode(state)
+                UpdateKey(op.key, DecodeNumber(op.op, res)).decode(state)
             elif type(op) is UpdateKey:
                 op.decode(state)
             else:
@@ -210,6 +224,7 @@ def get_reading_decoding_info(handler, fields, arch):
     parser.dont_optimize = True
 
     parser.groups["READ_PARAMETER"] = ["ReadParameterByte", "ReadParameterWord", "ReadParameterDword"]
+    parser.groups["FIELDS"] = ["VMStructFieldByte", "VMStructFieldWord", "VMStructFieldDword"]
     parser.groups["SIMPLE_MATH"] = ["+", "-", "^"]
     parser.groups["UPDATE_MATH"] = ["+", "-", "^", "&", "|"]
 
@@ -231,13 +246,15 @@ def get_reading_decoding_info(handler, fields, arch):
 
     offsets = {}
 
-    acc_byte = None
+    values = {}
+    values_replace = {}
+
+    do_inside = False
 
     def read_decode(i):
         inst = handler.instructions[i]
-        if arch.native_size() == 8 and isinstance(inst, handlers_parser.ConditionBlock) and len(inst.instructions) == 1 and " << 0x20) | " in str(inst.instructions[0]):
-            # Hack for inside condition decoding in 64bit
-            inst = inst.instructions[0]
+        if do_inside:
+           inst = inst.instructions[0]
         params = handlers_parser.Params(fields)
         res = find_child(inst, "DecodeWithNumber($G[READ_PARAMETER:READ_OP]($N[OFFSET]), SimpleOperation(Operation($[OP]), $N[NUMBER]))", params)
         if res is not None:
@@ -255,15 +272,59 @@ def get_reading_decoding_info(handler, fields, arch):
             dec = DecodeKey(params.vars["OP"].value, params.real_field_name["KEY"])
             parent.replace_child(expr, expr.parameters[0])
             return dec, offset, size
+        if do_inside:
+           return None
+        nparams = params.copy()
         if i + 1 < len(handler.instructions) and \
-                parser.match_expression(inst, "$V[VAR] = $G[READ_PARAMETER:READ_OP]($N[OFFSET])", params) and \
-                parser.match_expression(handler.instructions[i+1], "UpdateKeyDecode(SimpleOperation(Operation($[OP]), $V[VAR]))", params):
-            size = {"ReadParameterByte": 1, "ReadParameterWord": 2, "ReadParameterDword": 4}[params.vars["READ_OP"].value]
-            offset = params.vars["OFFSET"].value
-            dec = DecodeParameter.UpdateKeyDecode(params.vars["OP"].value)
+                parser.match_expression(inst, "$V[VAR] = $G[READ_PARAMETER:READ_OP]($N[OFFSET])", nparams) and \
+                parser.match_expression(handler.instructions[i+1], "UpdateKeyDecode(VMStructFieldDword(?O[KEY_DECODE]), SimpleOperation(Operation($[OP]), $V[VAR]))", nparams):
+            size = {"ReadParameterByte": 1, "ReadParameterWord": 2, "ReadParameterDword": 4}[nparams.vars["READ_OP"].value]
+            offset = nparams.vars["OFFSET"].value
+            dec = DecodeParameter.UpdateKeyDecode("KEY_DECODE", nparams.vars["OP"].value)
             parser.replace_instructions(handler, handler, i+1, 1, [])
             return dec, offset, size
+        nparams = params.copy()
+        if i + 2 < len(handler.instructions) and \
+                parser.match_expression(inst, "$V[VAR] = $G[READ_PARAMETER:READ_OP]($N[OFFSET])", nparams) and \
+                parser.match_expression(handler.instructions[i+1], "UpdateValue($G[FIELDS:FIELD](?O[VALUE_*:VALUE]), SimpleOperation(Operation($[OP1]), $V[VAR]))", nparams) and \
+                parser.match_expression(handler.instructions[i+2], "UpdateKeyDecode(VMStructFieldDword(?O[KEY_DECODE_POST]), SimpleOperation(Operation($[OP]), $V[VAR]))", nparams):
+            # We are dealing with UpdateKeyDecode first because it is still correct
+            # and we just simplify the expression (And we we handle UpdateValue next time)
+            size = {"ReadParameterByte": 1, "ReadParameterWord": 2, "ReadParameterDword": 4}[nparams.vars["READ_OP"].value]
+            assert size <= {"VMStructFieldByte": 1, "VMStructFieldWord": 2, "VMStructFieldDword": 4}[nparams.vars["FIELD"].value]
+            offset = nparams.vars["OFFSET"].value
+            dec = DecodeParameter.UpdateKeyDecode("KEY_DECODE_POST", nparams.vars["OP"].value)
+            parser.replace_instructions(handler, handler, i+2, 1, [])
+            return dec, offset, size
         return None
+
+    def replace_value_decoding(i):
+        inst = handler.instructions[i]
+        if do_inside:
+            inst = inst.instructions[0]
+        for name, (value_holder, read_op) in values_replace.iteritems():
+            nparams = params.copy()
+            res = find_child(inst, str(value_holder), nparams)
+            if res is not None:
+                expr, parent = res
+                nres = find_child(inst, "ValueDecode(%s, $[OP1T], $[OP2T])" % str(value_holder), nparams)
+                ops = []
+                if nres is not None:
+                    expr, parent = nres
+                    if type(nparams.vars["OP1T"]) is not handlers_parser.NoneExpression:
+                        assert parser.match_expression(nparams.vars["OP1T"], "SimpleOperation(Operation($[OP1]), $N[NUMBER1])", nparams)
+                        ops.append(DecodeNumber(nparams.vars["OP1"].value, nparams.vars["NUMBER1"].value))
+                        if type(nparams.vars["OP2T"]) is not handlers_parser.NoneExpression:
+                            assert parser.match_expression(nparams.vars["OP2T"], "SimpleOperation(Operation($[OP2]), $N[NUMBER2])", nparams)
+                            ops.append(DecodeNumber(nparams.vars["OP2"].value, nparams.vars["NUMBER2"].value))
+                if values[name].ops is not None:
+                    assert len(ops) == len(values[name].ops)
+                    for j in xrange(len(ops)):
+                        assert (ops[j].op, ops[j].value) == (values[name].ops[j].op, values[name].ops[j].value)
+                else:
+                    values[name].ops = ops
+
+                parent.replace_child(expr, read_op)
 
     i = 0
     while i < len(handler.instructions):
@@ -280,7 +341,11 @@ def get_reading_decoding_info(handler, fields, arch):
             assert current_decoding is None
             parser.replace_instructions(handler, handler, i, 1, [])
         elif parser.match_expression(inst, "UpdateKeySpecial(Operation($[X]))", params):
-            dec = UpdateKeySpecial(params.vars["X"].value)
+            dec = UpdateKeyKey("KEY_SPECIAL", "KEY_DECODE", params.vars["X"].value)
+            assert current_decoding is None
+            parser.replace_instructions(handler, handler, i, 1, [])
+        elif parser.match_expression(inst, "UpdateKeySpecialCond(Operation($[X]))", params):
+            dec = UpdateKeyKey("KEY_DECODE_POST", "KEY_COND", params.vars["X"].value)
             assert current_decoding is None
             parser.replace_instructions(handler, handler, i, 1, [])
         else:
@@ -301,22 +366,25 @@ def get_reading_decoding_info(handler, fields, arch):
                 if not simple_optimization(handler, handler, i):
                     i += 1
                 continue
-            elif parser.match_expression(inst, "UpdateAccByte(SimpleOperation(Operation($[OP]), ReadParameterByte($N[OFFSET])))", params):
+            elif parser.match_expression(inst, "UpdateValue($G[FIELDS:FIELD](?O[VALUE_*:VALUE]), SimpleOperation(Operation($[OP]), $G[READ_PARAMETER:READ_OP]($N[OFFSET])))", params):
                 if current_decoding is None:
                     current_decoding = []
                     offset = params.vars["OFFSET"].value
-                    size = 1
+                    size = {"ReadParameterByte": 1, "ReadParameterWord": 2, "ReadParameterDword": 4}[params.vars["READ_OP"].value]
+                    assert size <= {"VMStructFieldByte": 1, "VMStructFieldWord": 2, "VMStructFieldDword": 4}[params.vars["FIELD"].value]
                     assert offset not in offsets
                     offsets[offset] = size
-                assert acc_byte is None
-                acc_byte = UpdateAccByte(params.vars["OP"].value, DecodeParameter(offset, size, current_decoding))
+                value = params.real_field_name["VALUE"]
+                assert value not in values
+                values[value] = UpdateValue(value, params.vars["OP"].value, DecodeParameter(offset, size, current_decoding))
+                values_replace[value] = (parser.create_macro_result("$[FIELD](?O[VALUE])", params), parser.create_macro_result("$[READ_OP]($N[OFFSET])", params))
                 current_decoding = None
-                decoding.append(acc_byte)
-                parser.replace_instructions(handler, handler, i, 1, [parser.create_macro_result("UpdateAccByte(ReadParameterByte($N[OFFSET]))", params)])
-                i += 1
+                decoding.append(values[value])
+                parser.replace_instructions(handler, handler, i, 1, []) #parser.create_macro_result("UpdateValue($[FIELD](?O[VALUE]), $[READ_OP]($N[OFFSET]))", params)])
+                # i += 1
                 continue
             elif parser.match_expression(inst, "$V[VAR] = $G[READ_PARAMETER:READ_OP]($N[OFFSET])", params) and \
-                    len(params.vars["VAR"].instructions) == 1 and len(params.vars["VAR"].used_instructions) == 2 and \
+                    len(params.vars["VAR"].instructions) == 1 and len(params.vars["VAR"].used_instructions) >= 2 and \
                     type(handler.instructions[i+1]) is handlers_parser.Macro and handler.instructions[i+1].name == "UpdateKey":
                 # For UpdateKey,... UpdateKeyDecode
                 # TODO: Check for UpdateKey,.. UpdateKeyDecode, because right now this flow may do troubles
@@ -338,7 +406,12 @@ def get_reading_decoding_info(handler, fields, arch):
                 if current_decoding:
                     decoding.append(DecodeParameter(offset, size, current_decoding))
                     current_decoding = None
-                i += 1
+                replace_value_decoding(i)
+                if not do_inside and isinstance(inst, handlers_parser.ConditionBlock) and len(inst.instructions) == 1:
+                    do_inside = True
+                else:
+                    do_inside = False
+                    i += 1
                 continue
 
         if current_decoding is not None:
