@@ -58,6 +58,57 @@ RESET_KEYS = HandlerMatch(match_funcs([lines_matcher(\
     create_handler_reader_class("RESET_KEYS"))
 
 
+MOVS = HandlerMatch(match_funcs([
+    MOVS_MAIN,
+    match_one([match_funcs([READ_SI, READ_DI]), match_funcs([READ_DI, READ_SI])]),
+    UPDATE_SI_DI(True),
+    UPDATE_IP_AND_JUMP
+    ]), create_string_op_handler_reader("MOVS"))
+
+def update_flags_cond(op):
+    return match_condition("If((ReadParameterByte($P[UPDATE_FLAGS]) != 0x0))", [op])
+
+SCAS_1 = match_funcs([
+    SCAS_MAIN,
+    READ_DI,
+    UPDATE_DI2,
+    update_flags_cond(SCAS_UPDATE_FLAGS),
+    UPDATE_IP_AND_JUMP
+])
+
+SCAS_2 = match_funcs([
+    SCAS_MAIN,
+    SCAS_UPDATE_FLAGS_1,
+    READ_DI,
+    UPDATE_DI2,
+    update_flags_cond(SCAS_UPDATE_FLAGS_2),
+    UPDATE_IP_AND_JUMP
+])
+
+SCAS = HandlerMatch(match_one([SCAS_1, SCAS_2]), create_string_op_handler_reader("SCAS"))
+
+CMPS = HandlerMatch(match_funcs([
+    match_one([match_funcs([READ_SI, READ_DI]), match_funcs([READ_DI, READ_SI])]),
+    UPDATE_SI_DI(True),
+    match_one([update_flags_cond(CMPS_UPDATE_FLAGS_1), update_flags_cond(CMPS_UPDATE_FLAGS_2)]),
+    UPDATE_IP_AND_JUMP
+    ]), create_string_op_handler_reader("CMPS"))
+
+
+CLC = match_condition("If(($V[FLAGS_OP] == $H[FLAGS_OP_CLC]))", [disable_flag(0x1, False)])
+CMC = match_condition("If(($V[FLAGS_OP] == $H[FLAGS_OP_CMC]))",
+                      [match_condition("If(((*(DWORD*)$V[FLAGS_OFFSET] & 0x1) != 0x0))", [disable_flag(0x1, False)]),
+                       match_condition("Else", [enable_flag(0x1, False)])])
+STC = match_condition("If(($V[FLAGS_OP] == $H[FLAGS_OP_STC]))", [enable_flag(0x1, False)])
+
+FLAGS_OP = HandlerMatch(match_funcs([
+    lines_matcher([
+        "$V[FLAGS_OFFSET] = VMStructOffset(ReadParameterWord($P[FLAGS_OFFSET]))",
+        "$V[FLAGS_OP] = ReadParameterByte($P[FLAGS_OP])"
+    ]),
+    CLC, CLD, CLI, CMC, STC, STD, STI,
+    UPDATE_IP_AND_JUMP]), create_handler_reader_class("{O:FLAGS_OP}"))
+
 def read_two_nibbles(index, param_name=None, var_names=None):
     if param_name is None:
         param_name = "$N[P_%d]" % index
@@ -365,9 +416,19 @@ CALL = HandlerMatch(match_funcs([
     POP_RET
 ]), create_fish_handler_reader_class("CALL_{O:CALL_TYPE}_NEXT", ["VALUE", "RETURN_ADDRESS"]))
 
+ADD_VAR_BASEADDRESS = HandlerMatch(match_funcs([
+    lines_matcher(["VMStructField{SS}($N[VAR]) = EncodedValue(ReadParameterDword($P[VAR]))",
+                   "VMStructField{SS}((DecodedValue(VMStructField{SS}($N[VAR])) & 0xFFFF)) += VMStructField{SS}(?O[BASE_ADDRESS])"]),
+    UPDATE_IP_AND_JUMP,
+]), create_handler_reader_class("ADD_VAR_BASEADDRESS", ["VAR"]))
 
 HANDLERS = [
     RESET_KEYS,
+    FLAGS_OP,
+    MOVS,
+    CMPS,
+    SCAS,
+    ADD_VAR_BASEADDRESS,
     COMMON_BINARY_OP,
     COMMON_UNARY_OP,
     PUSH_POP,

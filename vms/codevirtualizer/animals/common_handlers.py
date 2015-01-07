@@ -115,6 +115,14 @@ def any_order(funcs):
 def lines_matcher_any_order(lines):
     return any_order([lines_matcher([x]) for x in lines])
 
+def only_32(func):
+    def _func(parser, instructions, index, params, arch, info):
+        if arch.native_size() == 4:
+            return func(parser, instructions, index, params, arch, info)
+        else:
+            return True, index
+    return _func
+
 def only_64(func):
     def _func(parser, instructions, index, params, arch, info):
         if arch.native_size() == 8:
@@ -208,11 +216,8 @@ def string_op(lines):
             for s in sizes[1:]:
                 if s != size:
                     return False, index
-            if "SIZE" in info.vars:
-                if info.vars["SIZE"] != size:
-                    return False, index
-            else:
-                info.vars["SIZE"] = size
+            if not params.set_handler_var_value("SIZE", size):
+                return False, index
         return True, index
     return _func
 
@@ -220,15 +225,20 @@ def string_op(lines):
 READ_SI = string_op(["$V[VAR_SI_OFFSET] = VMStructOffset(ReadParameterWord($P[SI_OFFSET]))"])
 READ_DI = string_op(["$V[VAR_DI_OFFSET] = VMStructOffset(ReadParameterWord($P[DI_OFFSET]))"])
 
-UPDATE_SI_DI = match_one([string_op(
-        ["If((((VMStructField{SS}(ReadParameterWord($P[FLAGS_OFFSET])) & 0x400) | (VMStructFieldDword($O[FLAGS]) & 0x400)) != 0x0))",
+def UPDATE_SI_DI(fish):
+    if fish:
+        n = "Dword"
+    else:
+        n = "{SS}"
+    return match_one([string_op(
+        ["If((((VMStructField{SS}(ReadParameterWord($P[FLAGS_OFFSET])) & 0x400) | (VMStructField%s($O[FLAGS]) & 0x400)) != 0x0))" % n,
          "    *({SU}*)$V[VAR_DI_OFFSET] -= 0x$G[SIZES_NUM:SIZE_NUM]",
          "    *({SU}*)$V[VAR_SI_OFFSET] -= 0x$G[SIZES_NUM:SIZE_NUM]",
          "Else",
          "    *({SU}*)$V[VAR_DI_OFFSET] += 0x$G[SIZES_NUM:SIZE_NUM]",
          "    *({SU}*)$V[VAR_SI_OFFSET] += 0x$G[SIZES_NUM:SIZE_NUM]"]),
                           string_op(
-        ["If((((VMStructField{SS}(ReadParameterWord($P[FLAGS_OFFSET])) & 0x400) | (VMStructFieldDword($O[FLAGS]) & 0x400)) != 0x0))",
+        ["If((((VMStructField{SS}(ReadParameterWord($P[FLAGS_OFFSET])) & 0x400) | (VMStructField%s($O[FLAGS]) & 0x400)) != 0x0))" % n,
          "    *({SU}*)$V[VAR_SI_OFFSET] -= 0x$G[SIZES_NUM:SIZE_NUM]",
          "    *({SU}*)$V[VAR_DI_OFFSET] -= 0x$G[SIZES_NUM:SIZE_NUM]",
          "Else",
@@ -243,6 +253,13 @@ UPDATE_DI = string_op(
 
 UPDATE_DI2 = string_op(
         ["If((((VMStructField{SS}(ReadParameterWord($P[FLAGS_OFFSET])) & 0x400) | (VMStructFieldDword($O[FLAGS]) & 0x400)) != 0x0))",
+         "    *({SU}*)$V[VAR_DI_OFFSET] -= 0x$G[SIZES_NUM:SIZE_NUM]",
+         "Else",
+         "    *({SU}*)$V[VAR_DI_OFFSET] += 0x$G[SIZES_NUM:SIZE_NUM]"])
+
+# For tiger
+UPDATE_DI3 = string_op(
+        ["If((((VMStructField{SS}(ReadParameterWord($P[FLAGS_OFFSET])) & 0x400) | (VMStructField{SS}($O[FLAGS]) & 0x400)) != 0x0))",
          "    *({SU}*)$V[VAR_DI_OFFSET] -= 0x$G[SIZES_NUM:SIZE_NUM]",
          "Else",
          "    *({SU}*)$V[VAR_DI_OFFSET] += 0x$G[SIZES_NUM:SIZE_NUM]"])
@@ -266,47 +283,18 @@ SCAS_MAIN = match_one([string_op(["$V[VAR_DI] = VMStructField{SS}(ReadParameterW
 
 SCAS_UPDATE_FLAGS_1 = string_op(["var_1 = Flags(*($G[SIZES:SIZE]*)$V[VAR_DI] -= $V[VAR_AX])"])
 
-SCAS_UPDATE_FLAGS_2 = string_op(["If((ReadParameterByte($P[UPDATE_FLAGS]) != 0x0))",
-                                 "    VMStructField{SS}(ReadParameterWord($P[SET_FLAGS_OFFSET])) = var_1"])
+SCAS_UPDATE_FLAGS_2 = string_op(["VMStructField{SS}(ReadParameterWord($P[SET_FLAGS_OFFSET])) = var_1"])
 
-SCAS_UPDATE_FLAGS = string_op(["If((ReadParameterByte($P[UPDATE_FLAGS]) != 0x0))",
-                               "    VMStructField{SS}(ReadParameterWord($P[SET_FLAGS_OFFSET])) = Flags(*($G[SIZES:SIZE]*)$V[VAR_DI] -= $V[VAR_AX])"])
-CMPS_UPDATE_FLAGS_1 = string_op(["If((ReadParameterByte($P[UPDATE_FLAGS]) != 0x0))",
-                                 "    VMStructField{SS}(ReadParameterWord($P[SET_FLAGS_OFFSET])) = Flags(Compare(*($G[SIZES:SIZE]*)VMStructField{SS}(ReadParameterWord($P[SI_OFFSET])), *($G[SIZES:SIZE]*)VMStructField{SS}(ReadParameterWord($P[DI_OFFSET]))))"])
+SCAS_UPDATE_FLAGS = string_op(["VMStructField{SS}(ReadParameterWord($P[SET_FLAGS_OFFSET])) = Flags(*($G[SIZES:SIZE]*)$V[VAR_DI] -= $V[VAR_AX])"])
 
-CMPS_UPDATE_FLAGS_2 = string_op(["If((ReadParameterByte($P[UPDATE_FLAGS]) != 0x0))",
-                                 "    VMStructField{SS}(ReadParameterWord($P[SET_FLAGS_OFFSET])) = Flags(Compare(*($G[SIZES:SIZE]*)VMStructField{SS}(ReadParameterWord($P[DI_OFFSET])), *($G[SIZES:SIZE]*)VMStructField{SS}(ReadParameterWord($P[SI_OFFSET]))))"])
+CMPS_UPDATE_FLAGS_1 = string_op(["VMStructField{SS}(ReadParameterWord($P[SET_FLAGS_OFFSET])) = Flags(Compare(*($G[SIZES:SIZE]*)VMStructField{SS}(ReadParameterWord($P[SI_OFFSET])), *($G[SIZES:SIZE]*)VMStructField{SS}(ReadParameterWord($P[DI_OFFSET]))))"])
+
+CMPS_UPDATE_FLAGS_2 = string_op(["VMStructField{SS}(ReadParameterWord($P[SET_FLAGS_OFFSET])) = Flags(Compare(*($G[SIZES:SIZE]*)VMStructField{SS}(ReadParameterWord($P[DI_OFFSET])), *($G[SIZES:SIZE]*)VMStructField{SS}(ReadParameterWord($P[SI_OFFSET]))))"])
 
 STOS_MAIN = string_op(["*($G[SIZES:SIZE]*)*({SU}*)$V[VAR_DI_OFFSET] = VMStructField$G[SIZES2:SIZE2](ReadParameterWord($P[AX_OFFSET]))"])
 
 LODS_MAIN = string_op(["VMStructField$G[SIZES2:SIZE2](ReadParameterWord($P[AX_OFFSET])) = *($G[SIZES:SIZE]*)*({SU}*)$V[VAR_SI_OFFSET]"])
 
-
-MOVS = HandlerMatch(match_funcs([
-    MOVS_MAIN,
-    match_one([match_funcs([READ_SI, READ_DI]), match_funcs([READ_DI, READ_SI])]),
-    UPDATE_SI_DI,
-    UPDATE_IP_AND_JUMP
-    ]), create_string_op_handler_reader("MOVS"))
-
-SCAS_1 = match_funcs([
-    SCAS_MAIN,
-    READ_DI,
-    UPDATE_DI2,
-    SCAS_UPDATE_FLAGS,
-    UPDATE_IP_AND_JUMP
-])
-
-SCAS_2 = match_funcs([
-    SCAS_MAIN,
-    SCAS_UPDATE_FLAGS_1,
-    READ_DI,
-    UPDATE_DI2,
-    SCAS_UPDATE_FLAGS_2,
-    UPDATE_IP_AND_JUMP
-])
-
-SCAS = HandlerMatch(match_one([SCAS_1, SCAS_2]), create_string_op_handler_reader("SCAS"))
 
 LODS = HandlerMatch(match_funcs([
     READ_SI,
@@ -321,14 +309,6 @@ STOS = HandlerMatch(match_funcs([
     UPDATE_DI,
     UPDATE_IP_AND_JUMP
     ]), create_string_op_handler_reader("STOS"))
-
-CMPS = HandlerMatch(match_funcs([
-    match_one([match_funcs([READ_SI, READ_DI]), match_funcs([READ_DI, READ_SI])]),
-    UPDATE_SI_DI,
-    match_one([CMPS_UPDATE_FLAGS_1, CMPS_UPDATE_FLAGS_2]),
-    UPDATE_IP_AND_JUMP
-    ]), create_string_op_handler_reader("CMPS"))
-
 
 POP_RET = match_funcs([
     lines_matcher(["VMStructFieldDword(?O[LOCK]) = 0x0"]),
@@ -416,12 +396,6 @@ UNK_CALLS = HandlerMatch(match_funcs([lines_matcher([
     "Push(VMStructOffset(0x0))",
     "Push(VMStructOffset(0x0))"])
 ]), create_handler_reader_class("{UNK_CALLS:}"))
-
-ADD_VAR_BASEADDRESS = HandlerMatch(match_funcs([
-    lines_matcher(["VMStructField{SS}($N[VAR]) = EncodedValue(ReadParameterDword($P[VAR]))",
-                   "VMStructField{SS}((DecodedValue(VMStructField{SS}($N[VAR])) & 0xFFFF)) += VMStructField{SS}(?O[BASE_ADDRESS])"]),
-    UPDATE_IP_AND_JUMP,
-]), create_handler_reader_class("ADD_VAR_BASEADDRESS", ["VAR"]))
 
 ADD_SP_IMM = HandlerMatch(match_funcs([
     lines_matcher(["$V[VAR] = ReadParameterByte($P[IMM])",
@@ -559,43 +533,37 @@ POPF = HandlerMatch(match_funcs([
 ]), create_handler_reader_class("POPF"))
 
 
-CLC = lines_matcher(["If(($V[FLAGS_OP] == $H[FLAGS_OP_CLC]))",
-                     "    *(DWORD*)$V[FLAGS_OFFSET] &= (~0x1)"])
+def enable_flag(flag, update_flag=True):
+    if update_flag:
+        return lines_matcher([
+            "*(DWORD*)$V[FLAGS_OFFSET] |= 0x%x" % flag,
+            "VMStructFieldDword($O[FLAGS]) |= 0x%x" % flag
+        ])
+    else:
+        return lines_matcher([
+            "*(DWORD*)$V[FLAGS_OFFSET] |= 0x%x" % flag,
+        ])
 
-CLD = lines_matcher(["If(($V[FLAGS_OP] == $H[FLAGS_OP_CLD]))",
-                     "    $V[FLAGS2] = (~0x400)",
-                     "    *(DWORD*)$V[FLAGS_OFFSET] &= $V[FLAGS2]",
-                     "    VMStructFieldDword($O[FLAGS]) &= $V[FLAGS2]"])
 
-CLI = lines_matcher(["If(($V[FLAGS_OP] == $H[FLAGS_OP_CLI]))",
-                     "    $V[FLAGS2] = (~0x200)",
-                     "    *(DWORD*)$V[FLAGS_OFFSET] &= $V[FLAGS2]",
-                     "    VMStructFieldDword($O[FLAGS]) &= $V[FLAGS2]"])
+def disable_flag(flag, update_flag=True):
+    if update_flag:
+        return lines_matcher([
+            "$V[FLAGS2] = (~0x%x)" % flag,
+            "*(DWORD*)$V[FLAGS_OFFSET] &= $V[FLAGS2]",
+            "VMStructFieldDword($O[FLAGS]) &= $V[FLAGS2]"
+        ])
+    else:
+        return lines_matcher([
+            "*(DWORD*)$V[FLAGS_OFFSET] &= (~0x%x)" % flag,
+        ])
 
-CMC = lines_matcher(["If(($V[FLAGS_OP] == $H[FLAGS_OP_CMC]))",
-                     "    If(((*(DWORD*)$V[FLAGS_OFFSET] & 0x1) != 0x0))",
-                     "        *(DWORD*)$V[FLAGS_OFFSET] &= (~0x1)",
-                     "    Else",
-                     "        *(DWORD*)$V[FLAGS_OFFSET] |= 0x1"])
 
-STC = lines_matcher(["If(($V[FLAGS_OP] == $H[FLAGS_OP_STC]))",
-                     "    *(DWORD*)$V[FLAGS_OFFSET] |= 0x1"])
+CLD = match_condition("If(($V[FLAGS_OP] == $H[FLAGS_OP_CLD]))", [disable_flag(0x400)])
+CLI = match_condition("If(($V[FLAGS_OP] == $H[FLAGS_OP_CLI]))", [disable_flag(0x200)])
 
-STD = lines_matcher(["If(($V[FLAGS_OP] == $H[FLAGS_OP_STD]))",
-                     "    *(DWORD*)$V[FLAGS_OFFSET] |= 0x400",
-                     "    VMStructFieldDword($O[FLAGS]) |= 0x400"])
+STD = match_condition("If(($V[FLAGS_OP] == $H[FLAGS_OP_STD]))", [enable_flag(0x400)])
+STI = match_condition("If(($V[FLAGS_OP] == $H[FLAGS_OP_STI]))", [enable_flag(0x200)])
 
-STI = lines_matcher(["If(($V[FLAGS_OP] == $H[FLAGS_OP_STI]))",
-                     "    *(DWORD*)$V[FLAGS_OFFSET] |= 0x200",
-                     "    VMStructFieldDword($O[FLAGS]) |= 0x200"])
-
-FLAGS_OP = HandlerMatch(match_funcs([
-    lines_matcher([
-        "$V[FLAGS_OFFSET] = VMStructOffset(ReadParameterWord($P[FLAGS_OFFSET]))",
-        "$V[FLAGS_OP] = ReadParameterByte($P[FLAGS_OP])"
-    ]),
-    CLC, CLD, CLI, CMC, STC, STD, STI,
-    UPDATE_IP_AND_JUMP]), create_handler_reader_class("{O:FLAGS_OP}"))
 
 RESET_FLAGS = HandlerMatch(match_funcs([
     lines_matcher(["VMStructFieldDword($O[FLAGS]) = 0x0"]),
@@ -604,11 +572,8 @@ RESET_FLAGS = HandlerMatch(match_funcs([
 
 
 COMMON_HANDLERS = [
-    MOVS,
     LODS,
     STOS,
-    SCAS,
-    CMPS,
     JMP,
     JMP_IMM,
     JMP_VAR,
@@ -618,19 +583,16 @@ COMMON_HANDLERS = [
     MOV_VAR_UNKVAR,
     MOV_VAR_SP,
     MOV_SP_VAR,
-    ADD_VAR_BASEADDRESS,
     ADD_SP_IMM,
     PUSHF,
     POPF,
     UNK_CALLS,
-    FLAGS_OP,
     RESET_FLAGS,
     UNK_JMP_IMM,
     RETURN
 ]
 
 
-import fish_handlers
 def match_handlers(parser, handler, fields, handlers, arch):
     instructions = handler.get_instructions()
     for h in handlers:

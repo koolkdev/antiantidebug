@@ -181,7 +181,7 @@ class VMHandlers(object):
         self.mode = file.mode
         arch = file.get_arch()
 
-        fish = False # Otherwise tiger
+        fish = True # Otherwise tiger
         fish_black = False
 
         reader = file
@@ -193,19 +193,19 @@ class VMHandlers(object):
 
         self.handlers = {}
         addrs = {}
-        # # If fish
-        # # Check if black
-        # handler_address = file.read_pointer(vm_info.init_handler.handlers_address)
-        # if fix_handlers:
-        #     handler_address = handler_address + vm_info.init_handler.base_address
-        # try:
-        #     func = handlers_decompiler.Handler(instruction.Function(reader, handler_address))
-        # except:
-        #     print "Black"
-        #     reader = cleaner.Cleaner(reader)
-        #     reader.set_option("ignore_jumps", False)
-        #     reader.set_option("fix_inc_dec", False)
-        #     func = handlers_decompiler.Handler(instruction.Function(reader, handler_address))
+        # If fish
+        # Check if black
+        handler_address = file.read_pointer(vm_info.init_handler.handlers_address)
+        if fix_handlers:
+            handler_address = handler_address + vm_info.init_handler.base_address
+        try:
+            func = handlers_decompiler.Handler(instruction.Function(reader, handler_address))
+        except:
+            print "Black"
+            reader = cleaner.Cleaner(reader)
+            reader.set_option("ignore_jumps", False)
+            reader.set_option("fix_inc_dec", False)
+            func = handlers_decompiler.Handler(instruction.Function(reader, handler_address))
 
 
         # Let's find all the handlers now
@@ -218,7 +218,7 @@ class VMHandlers(object):
             handler_address = file.read_pointer(vm_info.init_handler.handlers_address + i * arch.native_size())
             if fix_handlers:
                 handler_address = handler_address + vm_info.init_handler.base_address
-            #if handler_address == 0x4219f9L:
+            #if handler_address == 0x476221:
             func = handlers_decompiler.Handler(instruction.Function(reader, handler_address), fish)
             self.handlers[i] = VMOpcodeHandler(func)
             addrs[i] = handler_address
@@ -266,6 +266,8 @@ class VMHandlers(object):
             parser_encoding_specific = handlers_parser.HandlerParser.get_parser(r"handlers\handlers_encoding_tiger.txt", self.mode)
         if fish:
             parser_fish_encoding = handlers_parser.HandlerParser.get_parser(r"handlers\fish_encoded_value.txt", self.mode)
+        else:
+            parser_tiger_final = handlers_parser.HandlerParser.get_parser(r"handlers\handlers_final_tiger.txt", self.mode)
         parser_final = handlers_parser.HandlerParser.get_parser(r"handlers\handlers_final.txt", self.mode)
         print "Analyzing handlers... PASS 2/2"
         if PROGRESSBAR: prog.start()
@@ -277,10 +279,17 @@ class VMHandlers(object):
             if fish:
                 parser_fish_encoding.clean_handler(self.handlers[i].handler, fields)
                 fish_handlers_cleaner.fix_encoding_values(self.handlers[i], fields)
+            else:
+                parser_tiger_final.clean_handler(self.handlers[i].handler, fields)
             self.handlers[i].handler.optimize_instructions()
             self.handlers[i].handler.clean_instructions()
             parser_final.clean_handler(self.handlers[i].handler, fields)
         if PROGRESSBAR: prog.finish()
+
+        # import pickle
+        # for i in self.handlers.keys():
+        #     self.handlers[i].decode = None
+        #     self.handlers[i].info = None
 
         if fish:
             handlers = fish_handlers.HANDLERS
@@ -291,6 +300,7 @@ class VMHandlers(object):
             if handler.info is None:
                 handler_info = fish_handlers.match_handlers(parser, handler.handler, fields, handlers, arch)
                 if handler_info is None:
+                    print "--------------------------------"
                     handler.handler.print_instructions()
                     raise Exception("Failed to detect handler")
                 handler.info = handler_info

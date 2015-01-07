@@ -383,15 +383,16 @@ class HandlerParser(object):
                     found = False
                     if group_name not in self.groups:
                         assert False
+                    max_found = ""
                     for value in self.groups[group_name]:
-                        if fmt[fmt_index:fmt_index+len(value)] == value:
-                            if not nparams.set_var_value(var_name, Str(value)):
-                                return False
+                        if fmt[fmt_index:fmt_index+len(value)] == value and len(value) >= len(max_found):
                             found = True
-                            fmt_index += len(value)
-                            break
+                            max_found = value
                     if not found:
                         return False
+                    if not nparams.set_var_value(var_name, Str(max_found)):
+                        return False
+                    fmt_index += len(max_found)
                 else:
                     if fmt[fmt_index] != match[match_index]:
                         return False

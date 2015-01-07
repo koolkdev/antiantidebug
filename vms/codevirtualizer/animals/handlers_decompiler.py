@@ -961,7 +961,7 @@ class Handler(object):
 
                     if inst.opcode == "pop" and inst.operands[0].is_reg() and state.mode.reg_native(inst.operands[0].reg) != state.mode.reg_native("sp"):
                         assert inst.operands[0].size == state.mode.native_size()
-                        if pop:
+                        if pop and block.instructions[-1].opcode == "ret":
                             instructions.append(SetValue(Register(inst.operands[0].reg), value))
                             self.make_visible(instructions[-1])
                             set_register_value(inst.operands[0].reg, Invalid())

@@ -263,7 +263,7 @@ def get_reading_decoding_info(handler, fields, arch):
             size = {"ReadParameterByte": 1, "ReadParameterWord": 2, "ReadParameterDword": 4}[params.vars["READ_OP"].value]
             dec = DecodeNumber(params.vars["OP"].value, params.vars["NUMBER"].value)
             parent.replace_child(expr, expr.parameters[0])
-            return dec, offset, size
+            return dec, offset, size, False
         res = find_child(inst, "DecodeWithKey($G[READ_PARAMETER:READ_OP]($N[OFFSET]), SimpleOperation(Operation($[OP]), VMStructFieldDword(?O[KEY*:KEY])))", params)
         if res is not None:
             expr, parent = res
@@ -271,9 +271,16 @@ def get_reading_decoding_info(handler, fields, arch):
             offset = params.vars["OFFSET"].value
             dec = DecodeKey(params.vars["OP"].value, params.real_field_name["KEY"])
             parent.replace_child(expr, expr.parameters[0])
-            return dec, offset, size
+            return dec, offset, size, False
         if do_inside:
            return None
+        if parser.match_expression(inst, "UpdateKeyDecode(VMStructFieldDword(?O[KEY_DECODE]), SimpleOperation(Operation($[OP]), $G[READ_PARAMETER:READ_OP]($N[OFFSET])))", params):
+            # It is in tiger. And we return the new read parameter, even it isn't going to be used, because it will be handled correclty anyway
+            size = {"ReadParameterByte": 1, "ReadParameterWord": 2, "ReadParameterDword": 4}[params.vars["READ_OP"].value]
+            offset = params.vars["OFFSET"].value
+            dec = DecodeParameter.UpdateKeyDecode("KEY_DECODE", params.vars["OP"].value)
+            parser.replace_instructions(handler, handler, i, 1, [])
+            return dec, offset, size, True
         nparams = params.copy()
         if i + 1 < len(handler.instructions) and \
                 parser.match_expression(inst, "$V[VAR] = $G[READ_PARAMETER:READ_OP]($N[OFFSET])", nparams) and \
@@ -282,7 +289,7 @@ def get_reading_decoding_info(handler, fields, arch):
             offset = nparams.vars["OFFSET"].value
             dec = DecodeParameter.UpdateKeyDecode("KEY_DECODE", nparams.vars["OP"].value)
             parser.replace_instructions(handler, handler, i+1, 1, [])
-            return dec, offset, size
+            return dec, offset, size, False
         nparams = params.copy()
         if i + 2 < len(handler.instructions) and \
                 parser.match_expression(inst, "$V[VAR] = $G[READ_PARAMETER:READ_OP]($N[OFFSET])", nparams) and \
@@ -295,7 +302,7 @@ def get_reading_decoding_info(handler, fields, arch):
             offset = nparams.vars["OFFSET"].value
             dec = DecodeParameter.UpdateKeyDecode("KEY_DECODE_POST", nparams.vars["OP"].value)
             parser.replace_instructions(handler, handler, i+2, 1, [])
-            return dec, offset, size
+            return dec, offset, size, False
         return None
 
     def replace_value_decoding(i):
@@ -351,7 +358,7 @@ def get_reading_decoding_info(handler, fields, arch):
         else:
             res = read_decode(i)
             if res is not None:
-                dec, toffset, tsize = res
+                dec, toffset, tsize, end = res
                 if current_decoding is None:
                     current_decoding = []
                     offset = toffset
@@ -361,6 +368,11 @@ def get_reading_decoding_info(handler, fields, arch):
                 else:
                     assert offset == toffset
                     assert size == tsize
+                if end:
+                    current_decoding.append(dec)
+                    decoding.append(DecodeParameter(offset, size, current_decoding))
+                    current_decoding = None
+                    continue
             elif parser.match_expression(inst, "$V[VAR] = $G[READ_PARAMETER:READ_OP]($N[OFFSET])", params) and \
                     len(params.vars["VAR"].instructions) == 1 and len(params.vars["VAR"].used_instructions) == 1:
                 if not simple_optimization(handler, handler, i):
