@@ -202,21 +202,9 @@ class IncValue(SetValueUnaryOperation):
     def __init__(self, value):
         SetValueUnaryOperation.__init__(self, value, "++")
 
-    def get_children(self):
-        return [self.lvalue]
-
-    def get_format(self):
-        return "{0}++"
-
 class DecValue(SetValueUnaryOperation):
     def __init__(self, value):
         SetValueUnaryOperation.__init__(self, value, "--")
-
-    def get_children(self):
-        return [self.lvalue]
-
-    def get_format(self):
-        return "{0}--"
 
 class Add(BinaryOperationExpression):
     def __init__(self, lvalue, rvalue):
