@@ -13,6 +13,9 @@ class Key(object):
     def get_value(self):
         return self.value
 
+    def set_value(self, value):
+        self.value = value & ((1 << self.bits) - 1)
+
     def reset(self):
         self.value = 0
 
@@ -149,6 +152,25 @@ class UpdateValue(DecodingValueOperation):
     def get_offset(self):
         return self.read.get_offset()
 
+class SetValue(DecodingValueOperation):
+    def __init__(self, value, read):
+        self.read = read
+        self.value = value
+        self.ops = None
+
+    def decode(self, state):
+        key = state.get_key(self.value)
+        key.set_value(self.read.decode(state))
+        res = key.get_value()
+        if self.ops is not None:
+            for op in self.ops:
+                res = op.decode(state, res)
+            res &= ((1 << key.bits) - 1)
+        return res
+
+    def get_offset(self):
+        return self.read.get_offset()
+
 
 class DecodeParameter(DecodingValueOperation):
     class UpdateKeyDecode(object):
@@ -171,6 +193,19 @@ class DecodeParameter(DecodingValueOperation):
             else:
                 res = op.decode(state, res) & 0xffffffff
         return res & ((1 << (self.size * 8)) - 1)
+
+    def get_offset(self):
+        return self.offset
+
+class DecodeQwordParameter(DecodingValueOperation):
+    def __init__(self, offset, low_dword, high_dword):
+        self.offset = offset
+        self.low_dword = low_dword
+        self.high_dword = high_dword
+
+    def decode(self, state):
+        res = self.low_dword.decode(state)
+        return res | (self.high_dword.decode(state) << 0x20)
 
     def get_offset(self):
         return self.offset
@@ -223,7 +258,7 @@ def get_reading_decoding_info(handler, fields, arch):
 
     parser.dont_optimize = True
 
-    parser.groups["READ_PARAMETER"] = ["ReadParameterByte", "ReadParameterWord", "ReadParameterDword"]
+    parser.groups["READ_PARAMETER"] = ["ReadParameterByte", "ReadParameterWord", "ReadParameterDword", "ReadParameterQword"]
     parser.groups["FIELDS"] = ["VMStructFieldByte", "VMStructFieldWord", "VMStructFieldDword"]
     parser.groups["SIMPLE_MATH"] = ["+", "-", "^"]
     parser.groups["UPDATE_MATH"] = ["+", "-", "^", "&", "|"]
@@ -260,14 +295,14 @@ def get_reading_decoding_info(handler, fields, arch):
         if res is not None:
             expr, parent = res
             offset = params.vars["OFFSET"].value
-            size = {"ReadParameterByte": 1, "ReadParameterWord": 2, "ReadParameterDword": 4}[params.vars["READ_OP"].value]
+            size = {"ReadParameterByte": 1, "ReadParameterWord": 2, "ReadParameterDword": 4, "ReadParameterQword": 8}[params.vars["READ_OP"].value]
             dec = DecodeNumber(params.vars["OP"].value, params.vars["NUMBER"].value)
             parent.replace_child(expr, expr.parameters[0])
             return dec, offset, size, False
         res = find_child(inst, "DecodeWithKey($G[READ_PARAMETER:READ_OP]($N[OFFSET]), SimpleOperation(Operation($[OP]), VMStructFieldDword(?O[KEY*:KEY])))", params)
         if res is not None:
             expr, parent = res
-            size = {"ReadParameterByte": 1, "ReadParameterWord": 2, "ReadParameterDword": 4}[params.vars["READ_OP"].value]
+            size = {"ReadParameterByte": 1, "ReadParameterWord": 2, "ReadParameterDword": 4, "ReadParameterQword": 8}[params.vars["READ_OP"].value]
             offset = params.vars["OFFSET"].value
             dec = DecodeKey(params.vars["OP"].value, params.real_field_name["KEY"])
             parent.replace_child(expr, expr.parameters[0])
@@ -276,7 +311,7 @@ def get_reading_decoding_info(handler, fields, arch):
            return None
         if parser.match_expression(inst, "UpdateKeyDecode(VMStructFieldDword(?O[KEY_DECODE]), SimpleOperation(Operation($[OP]), $G[READ_PARAMETER:READ_OP]($N[OFFSET])))", params):
             # It is in tiger. And we return the new read parameter, even it isn't going to be used, because it will be handled correclty anyway
-            size = {"ReadParameterByte": 1, "ReadParameterWord": 2, "ReadParameterDword": 4}[params.vars["READ_OP"].value]
+            size = {"ReadParameterByte": 1, "ReadParameterWord": 2, "ReadParameterDword": 4, "ReadParameterQword": 8}[params.vars["READ_OP"].value]
             offset = params.vars["OFFSET"].value
             dec = DecodeParameter.UpdateKeyDecode("KEY_DECODE", params.vars["OP"].value)
             parser.replace_instructions(handler, handler, i, 1, [])
@@ -285,7 +320,7 @@ def get_reading_decoding_info(handler, fields, arch):
         if i + 1 < len(handler.instructions) and \
                 parser.match_expression(inst, "$V[VAR] = $G[READ_PARAMETER:READ_OP]($N[OFFSET])", nparams) and \
                 parser.match_expression(handler.instructions[i+1], "UpdateKeyDecode(VMStructFieldDword(?O[KEY_DECODE]), SimpleOperation(Operation($[OP]), $V[VAR]))", nparams):
-            size = {"ReadParameterByte": 1, "ReadParameterWord": 2, "ReadParameterDword": 4}[nparams.vars["READ_OP"].value]
+            size = {"ReadParameterByte": 1, "ReadParameterWord": 2, "ReadParameterDword": 4, "ReadParameterQword": 8}[nparams.vars["READ_OP"].value]
             offset = nparams.vars["OFFSET"].value
             dec = DecodeParameter.UpdateKeyDecode("KEY_DECODE", nparams.vars["OP"].value)
             parser.replace_instructions(handler, handler, i+1, 1, [])
@@ -297,8 +332,11 @@ def get_reading_decoding_info(handler, fields, arch):
                 parser.match_expression(handler.instructions[i+2], "UpdateKeyDecode(VMStructFieldDword(?O[KEY_DECODE_POST]), SimpleOperation(Operation($[OP]), $V[VAR]))", nparams):
             # We are dealing with UpdateKeyDecode first because it is still correct
             # and we just simplify the expression (And we we handle UpdateValue next time)
-            size = {"ReadParameterByte": 1, "ReadParameterWord": 2, "ReadParameterDword": 4}[nparams.vars["READ_OP"].value]
-            assert size <= {"VMStructFieldByte": 1, "VMStructFieldWord": 2, "VMStructFieldDword": 4}[nparams.vars["FIELD"].value]
+            size = {"ReadParameterByte": 1, "ReadParameterWord": 2, "ReadParameterDword": 4, "ReadParameterQword": 8}[nparams.vars["READ_OP"].value]
+            if size == 8:
+                assert nparams.vars["FIELD"].value == "VMStructFieldDword"
+            else:
+                assert size <= {"VMStructFieldByte": 1, "VMStructFieldWord": 2, "VMStructFieldDword": 4}[nparams.vars["FIELD"].value]
             offset = nparams.vars["OFFSET"].value
             dec = DecodeParameter.UpdateKeyDecode("KEY_DECODE_POST", nparams.vars["OP"].value)
             parser.replace_instructions(handler, handler, i+2, 1, [])
@@ -382,26 +420,45 @@ def get_reading_decoding_info(handler, fields, arch):
                 if current_decoding is None:
                     current_decoding = []
                     offset = params.vars["OFFSET"].value
-                    size = {"ReadParameterByte": 1, "ReadParameterWord": 2, "ReadParameterDword": 4}[params.vars["READ_OP"].value]
+                    size = {"ReadParameterByte": 1, "ReadParameterWord": 2, "ReadParameterDword": 4, "ReadParameterQword": 8}[params.vars["READ_OP"].value]
                     assert size <= {"VMStructFieldByte": 1, "VMStructFieldWord": 2, "VMStructFieldDword": 4}[params.vars["FIELD"].value]
                     assert offset not in offsets
                     offsets[offset] = size
                 value = params.real_field_name["VALUE"]
                 assert value not in values
-                values[value] = UpdateValue(value, params.vars["OP"].value, DecodeParameter(offset, size, current_decoding))
-                values_replace[value] = (parser.create_macro_result("$[FIELD](?O[VALUE])", params), parser.create_macro_result("$[READ_OP]($N[OFFSET])", params))
-                current_decoding = None
-                decoding.append(values[value])
+                if size == 8:
+                    assert value == "VALUE_DWORD"
+                    values[value] = UpdateValue(value, params.vars["OP"].value, DecodeParameter(offset, 4, current_decoding))
+                    values_replace[value] = (parser.create_macro_result("$[FIELD](?O[VALUE])", params), parser.create_macro_result("($[READ_OP]($N[OFFSET]) & 0xFFFFFFFF)", params))
+                    current_decoding = [values[value]]
+                else:
+                    values[value] = UpdateValue(value, params.vars["OP"].value, DecodeParameter(offset, size, current_decoding))
+                    values_replace[value] = (parser.create_macro_result("$[FIELD](?O[VALUE])", params), parser.create_macro_result("$[READ_OP]($N[OFFSET])", params))
+                    current_decoding = None
+                    decoding.append(values[value])
                 parser.replace_instructions(handler, handler, i, 1, []) #parser.create_macro_result("UpdateValue($[FIELD](?O[VALUE]), $[READ_OP]($N[OFFSET]))", params)])
                 # i += 1
                 continue
+            elif parser.match_expression(inst, "VMStructFieldDword(?O[VALUE_DWORD_HIGH]) = (ReadParameterQword($N[OFFSET]) >> 0x20)", params):
+                    toffset = params.vars["OFFSET"].value
+                    tsize = 8
+                    assert current_decoding is not None
+                    assert type(current_decoding[0]) is UpdateValue and current_decoding[0].value == "VALUE_DWORD"
+                    assert offset == toffset
+                    assert size == tsize
+                    value = "VALUE_DWORD_HIGH"
+                    values[value] = SetValue(value, DecodeParameter(offset+4, 4, current_decoding[1:]))
+                    values_replace[value] = (parser.create_macro_result("VMStructFieldDword(?O[VALUE_DWORD_HIGH])", params), parser.create_macro_result("(ReadParameterQword($N[OFFSET]) >> 0x20)", params))
+                    decoding.append(DecodeQwordParameter(offset, values["VALUE_DWORD"], values["VALUE_DWORD_HIGH"]))
+                    current_decoding = None
+                    parser.replace_instructions(handler, handler, i, 1, [])
             elif parser.match_expression(inst, "$V[VAR] = $G[READ_PARAMETER:READ_OP]($N[OFFSET])", params) and \
                     len(params.vars["VAR"].instructions) == 1 and len(params.vars["VAR"].used_instructions) >= 2 and \
                     type(handler.instructions[i+1]) is handlers_parser.Macro and handler.instructions[i+1].name == "UpdateKey":
                 # For UpdateKey,... UpdateKeyDecode
                 # TODO: Check for UpdateKey,.. UpdateKeyDecode, because right now this flow may do troubles
                 # Checking only for UpdateKey isn't enough
-                tsize = {"ReadParameterByte": 1, "ReadParameterWord": 2, "ReadParameterDword": 4}[params.vars["READ_OP"].value]
+                tsize = {"ReadParameterByte": 1, "ReadParameterWord": 2, "ReadParameterDword": 4, "ReadParameterQword": 8}[params.vars["READ_OP"].value]
                 toffset = params.vars["OFFSET"].value
                 if current_decoding is None:
                     current_decoding = []

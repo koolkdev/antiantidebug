@@ -57,10 +57,11 @@ DEFINE_EXPRESSION_TEMPLATE
 =>
 ReadParameterDword($[X])
 
-#DEFINE_EXPRESSION_TEMPLATE[64]
-#*(QWORD*)(VMStructField@SIZE_WORD@(?O[EIP]) + $[X])
-#=>
-#ReadParameterQword($[X])
+# Only in tiger
+DEFINE_EXPRESSION_TEMPLATE[64]
+*(QWORD*)(VMStructField@SIZE_WORD@(?O[EIP]) + $[X])
+=>
+ReadParameterQword($[X])
 
 DEFINE_TEMPLATE
 VMStructField@SIZE_WORD@(?O[EIP]) += $N[SIZE]

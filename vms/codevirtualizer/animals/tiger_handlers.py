@@ -290,6 +290,13 @@ MOV = HandlerMatch(match_funcs([
     UPDATE_IP_AND_JUMP
 ]), None)
 
+MOV_QWORD = HandlerMatch(match_funcs([
+    dst_load(),
+    lines_matcher(["*(QWORD*)$V[DST_VAR] = (ReadParameterQword($P[SRC_VALUE]) & 0xFFFFFFFF)",
+                   "*(DWORD*)($V[DST_VAR] + 0x4) = (ReadParameterQword($P[SRC_VALUE]) >> 0x20)"]),
+    UPDATE_IP_AND_JUMP
+]), None)
+
 
 def match_movzx_movsx(name, op):
     def _func(parser, instructions, index, params, arch, info):
@@ -391,7 +398,7 @@ POP = HandlerMatch(match_funcs([
         lines_matcher(["$V[SP_OFFSET] = VMStructOffset(ReadParameterWord($P[SP_OFFSET]))",
                        "If(($V[VAR_DST] != $V[SP_OFFSET]))",
                        "    *({SU}*)$V[SP_OFFSET] += $H[DST_SIZE_NUM]"]),
-        lines_matcher(["$V[VAR_DST2] = $V[VAR_DST]",
+        lines_matcher(["$V[VAR_DST2] = $V[VAR_DST]", # if $V[SP_OFFSET] == $V[VAR_DST]
                        "$V[SP_OFFSET] = VMStructOffset(ReadParameterWord($P[SP_OFFSET]))",
                        "If(($V[VAR_DST2] != $V[SP_OFFSET]))",
                        "    *({SU}*)$V[SP_OFFSET] += $H[DST_SIZE_NUM]"]),
@@ -480,7 +487,7 @@ RESET_KEYS = HandlerMatch(match_funcs([lines_matcher(\
         "VMStructFieldDword($O[KEY_COND]) = 0x0",
         "VMStructFieldDword($O[UNK_DWORD_1]) = 0x0",
         "VMStructFieldDword($O[VALUE_DWORD]) = 0x0",
-        "VMStructFieldDword($O[UNK_DWORD_2]) = 0x0",
+        "VMStructFieldDword($O[VALUE_DWORD_HIGH]) = 0x0",
         "VMStructFieldWord($O[VALUE_WORD_1]) = 0x0",
         "VMStructFieldWord($O[VALUE_WORD_2]) = 0x0",
         "VMStructFieldWord($O[UNK_WORD]) = 0x0",
@@ -578,6 +585,7 @@ HANDLERS = [
     COMMON_BINARY_OP,
     MOVZX_MOVSX,
     MOV,
+    MOV_QWORD,
     SHL_SHR,
     CMP_TEST,
     RESET_KEYS,

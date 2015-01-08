@@ -181,7 +181,7 @@ class VMHandlers(object):
         self.mode = file.mode
         arch = file.get_arch()
 
-        fish = True # Otherwise tiger
+        fish = False # Otherwise tiger
         fish_black = False
 
         reader = file

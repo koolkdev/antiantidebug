@@ -6,6 +6,10 @@ OPS = {
     "+": Add,
     "-": Sub,
     "^": Xor,
+    "&": And,
+    "|": Or,
+    ">>": Shr,
+    "<<": Shl,
     "==": Equal,
     "!=": NotEqual,
     "&&": AndCond,
@@ -373,6 +377,7 @@ class HandlerParser(object):
                             match_index += 1
                             if match_index == len(match):
                                 return False
+                        # TODO: Match the layout of the expression first and than check the childs (Should be faster?)
                         if not self.match_expression(child, match[start:match_index], nparams):
                             return False
                 elif match[match_index] == "$":
