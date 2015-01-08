@@ -175,18 +175,18 @@ class VMOpcodeHandler(VMHandler):
         self.decode = None
 
 class VMHandlers(object):
-    def __init__(self, file, vm_info):
+    def __init__(self, file, vm_info, fish=False):
         #clean = cleaner.Cleaner(executable)
         fix_handlers = file.read_pointer(vm_info.init_handler.vm_struct + vm_info.struct_fields["HANDLERS"]) != vm_info.init_handler.handlers_address
         self.mode = file.mode
         arch = file.get_arch()
 
-        fish = False # Otherwise tiger
+        self.fish = fish
         fish_black = False
 
         reader = file
 
-        if fish_black :
+        if fish_black:
             reader = cleaner.Cleaner(reader)
             reader.set_option("ignore_jumps", False)
             reader.set_option("fix_inc_dec", False)
@@ -219,7 +219,7 @@ class VMHandlers(object):
             if fix_handlers:
                 handler_address = handler_address + vm_info.init_handler.base_address
             #if handler_address == 0x476221:
-            func = handlers_decompiler.Handler(instruction.Function(reader, handler_address), fish)
+            func = handlers_decompiler.Handler(instruction.Function(reader, handler_address), self.fish)
             self.handlers[i] = VMOpcodeHandler(func)
             addrs[i] = handler_address
         if PROGRESSBAR:
@@ -228,7 +228,7 @@ class VMHandlers(object):
 
         fields = dict(vm_info.struct_fields)
 
-        if fish:
+        if self.fish:
             fish_handlers_cleaner.clean_junk_field(self.handlers.values(), fields, arch)
             fish_handlers_cleaner.clean_junk_check(self.handlers.values(), fields, arch)
             if self.mode == 64:
@@ -242,7 +242,7 @@ class VMHandlers(object):
             parser.clean_handler(self.handlers[i].handler, fields)
         if PROGRESSBAR: prog.finish()
 
-        if fish:
+        if self.fish:
             target = fish_handlers.RESET_KEYS
         else:
             target = tiger_handlers.RESET_KEYS
@@ -260,11 +260,11 @@ class VMHandlers(object):
         print "SUCCESS"
 
         parser_encoding = handlers_parser.HandlerParser.get_parser(r"handlers\handlers_encoding.txt", self.mode)
-        if fish:
+        if self.fish:
             parser_encoding_specific = handlers_parser.HandlerParser.get_parser(r"handlers\handlers_encoding_fish.txt", self.mode)
         else:
             parser_encoding_specific = handlers_parser.HandlerParser.get_parser(r"handlers\handlers_encoding_tiger.txt", self.mode)
-        if fish:
+        if self.fish:
             parser_fish_encoding = handlers_parser.HandlerParser.get_parser(r"handlers\fish_encoded_value.txt", self.mode)
         else:
             parser_tiger_final = handlers_parser.HandlerParser.get_parser(r"handlers\handlers_final_tiger.txt", self.mode)
@@ -276,7 +276,7 @@ class VMHandlers(object):
             parser_encoding.clean_handler(self.handlers[i].handler, fields)
             parser_encoding_specific.clean_handler(self.handlers[i].handler, fields)
             self.handlers[i].decode = vm_encoding.get_reading_decoding_info(self.handlers[i].handler, fields, arch)
-            if fish:
+            if self.fish:
                 parser_fish_encoding.clean_handler(self.handlers[i].handler, fields)
                 fish_handlers_cleaner.fix_encoding_values(self.handlers[i], fields)
             else:
@@ -286,12 +286,7 @@ class VMHandlers(object):
             parser_final.clean_handler(self.handlers[i].handler, fields)
         if PROGRESSBAR: prog.finish()
 
-        # import pickle
-        # for i in self.handlers.keys():
-        #     self.handlers[i].decode = None
-        #     self.handlers[i].info = None
-
-        if fish:
+        if self.fish:
             handlers = fish_handlers.HANDLERS
         else:
             handlers = tiger_handlers.HANDLERS
@@ -306,6 +301,10 @@ class VMHandlers(object):
                 handler.info = handler_info
         print "SUCCESS"
 
+        if self.fish:
+            self.create_state = vm_encoding.new_fish_state
+        else:
+            self.create_state = vm_encoding.new_tiger_state
 
         # for index, handler in self.handlers.iteritems():
         #     print "---------------------------------------------------"
@@ -399,10 +398,12 @@ class VMFunction(object):
         addresses_to_explore.put((real_vm_code_address, first_handler))
         starts.append(real_vm_code_address)
 
+        # TODO: Check call IMM64
+
         while not addresses_to_explore.empty():
             next_labeled = True
             address, handler = addresses_to_explore.get()
-            state = vm_encoding.new_fish_state(address, file.read)
+            state = self.vm_info.handlers.create_state(address, file.read)
             if instructions.has_key(address):
                 instructions[address].set_info("labled", True)
                 continue
@@ -504,7 +505,7 @@ class VMFunction(object):
             self.instructions.append(instructions[address])
         self.code = None
 
-        self._clean()
+        #self._clean()
 
         print "Converting VMCode to Assembly...",
         try:

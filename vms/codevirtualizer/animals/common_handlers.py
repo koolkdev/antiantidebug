@@ -21,7 +21,7 @@ class HandlerReader(object):
         self.arch = arch
         for name, index in self.info.params.iteritems():
             self.params[name] = params[index]
-        assert len(self.params) == len(params)
+        #assert len(self.params) == len(params)
         for name, value in self.params.iteritems():
             for iname, ivalue in self.info.vars.iteritems():
                 if ivalue == value and iname.startswith(name + "_"):

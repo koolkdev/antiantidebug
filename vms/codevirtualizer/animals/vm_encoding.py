@@ -70,6 +70,19 @@ def new_fish_state(address, read_func):
         }, address, read_func)
 
 
+def new_tiger_state(address, read_func):
+    return DecodingState({
+        "KEY_DECODE": DwordKey(),
+        "KEY_COND": DwordKey(),
+        "VALUE_DWORD": DwordKey(),
+        "VALUE_DWORD_HIGH": DwordKey(),
+        "VALUE_WORD_1": WordKey(),
+        "VALUE_WORD_2": WordKey(),
+        "KEY_SPECIAL": DwordKey(),
+        "KEY_DECODE_POST": DwordKey(),
+        }, address, read_func)
+
+
 class DecodingOperation(object):
     def decode(self, state):
         pass
