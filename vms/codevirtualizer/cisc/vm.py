@@ -1,10 +1,8 @@
 import utils
-import sys
 from themida import cleaner
 from vms import vminstruction
 from vms import templates
-import instruction
-import mappedfile
+from vms import vm
 try:
     import progressbar
     PROGRESSBAR = True
@@ -15,12 +13,7 @@ import handlers_common
 import handlers_32
 import handlers_64
 
-
 import Queue
-
-import os
-import tempfile
-import subprocess
 
 class VMHandler(object):
     def __init__(self, reader):
@@ -340,25 +333,13 @@ class VMHandlers(object):
         self.realloc_offset = file.read_pointer(vm_info.init_handler.vm_struct + variables["REALLOC"])
                         
 
-class VMInfo(object):
+class VMInfo(vm.VMInfo):
     cache = {}
     def __init__(self, file, vm_address):
         print "Parsing CISC%d VM at 0x%08x" % (file.mode, vm_address)
         self.init_handler = VMInit(file, vm_address)
         self.main_handler = VMMainHandler(file, self.init_handler.main_handler_address)
         self.handlers = VMHandlers(file, self)
-
-    @classmethod
-    def get_vm_info(cls, file, address):
-        if cls.cache.has_key(address):
-            return cls.cache[address]
-        #try:
-        res = cls(file, address)
-        #except cleaner.CleanerException, e:
-        #    res = None
-            
-        cls.cache[address] = res
-        return res
 
     
 class VMFunctionSection(object):
@@ -376,7 +357,8 @@ class VMKey(vminstruction.VMKey):
     def reset(self):
         self.key = utils.uint32(0)
 
-class VMFunctionJumper(object):
+
+class VMFunctionJumper(vm.VMFunctionJumper):
     def __init__(self, file, address):
         push_inst = file.get_instruction(address)
         jmp_inst = file.get_instruction(push_inst.next)
@@ -385,15 +367,17 @@ class VMFunctionJumper(object):
         self.vm_code_address = push_inst.operands[0].value
         self.vm_address = jmp_inst.operands[0].value
 
-class VMFunction(object):
-    def __init__(self, file, jumper):
+    def get_vm_address(self):
+        return self.vm_address
+
+
+class VMFunction(vm.VMFunction):
+    def __init__(self, file, vm_info, jumper):
         self.mode = file.mode
         self.file = file
-        vm_address = jumper.vm_address
         vm_code_address = jumper.vm_code_address
 
-        self.vm_info = VMInfo.get_vm_info(file, vm_address)
-        assert self.vm_info is not None
+        self.vm_info = vm_info
         
         addresses_to_explore = Queue.Queue()
         starts = []
@@ -722,20 +706,6 @@ class VMFunction(object):
         self.code = code[:-1]
         return self.code
 
-    # TODO: Make this base class function
-    def compile_code(self, address = None, relocs = False):
-        code = self.get_code()
-        if address == None:
-            address = self.code_address
-        compiled_code = instruction.Assembler(self.mode).assemble(code, address, relocs)
-        if not compiled_code:
-            raise Exception("Failed to compile code")
-        if relocs:
-            return address, compiled_code[0], compiled_code[1]
-        return address, compiled_code        
-        
-    
-        
     def printfunc(self):
         for inst in self.instructions:
             print inst

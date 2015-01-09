@@ -11,20 +11,22 @@ except ImportError:
 
 
 class VMType(object):
-    def __init__(self, jumper_cls, vm_func_cls):
+    def __init__(self, jumper_cls, vm_info_cls, vm_func_cls):
         self.jumper_cls = jumper_cls
+        self.vm_info_cls = vm_info_cls
         self.vm_func_cls = vm_func_cls
 
     def get_vm(self, file, address):
-        jumper = self.jumper_cls(file, address)
-        return self.vm_func_cls(file, jumper)
+        return self.get_vm_from_jumper(file, self.jumper_cls(file, address))
 
+    def get_vm_from_jumper(self, file, jumper):
+        return self.vm_func_cls(file, self.vm_info_cls(file, jumper.get_vm_address()), jumper)
 
     def get_vm_code(self, file, jumper):
-        return self.vm_func_cls(file, jumper).get_code()
+        return self.get_vm_from_jumper(file, jumper).get_code()
 
     def get_compiled_vm_code(self, file, jumper):
-        return self.vm_func_cls(file, jumper).compile_code()
+        return self.get_vm_from_jumper(file, jumper).compile_code()
 
     def fix_vms(self, pe, code_section=0, vms_section=3, big_macro=True):
         code_section_start = pe.sections[code_section].VirtualAddress + pe.OPTIONAL_HEADER.ImageBase
@@ -109,5 +111,6 @@ class VMType(object):
         file.write(code_address, compiled_code)
 
 
-VMS = {"CISC": VMType(cisc_vm.VMFunctionJumper, cisc_vm.VMFunction),
-       "FISH": VMType(animals_vm.VMFunctionJumper, animals_vm.VMFunction)}
+VMS = {"CISC": VMType(cisc_vm.VMFunctionJumper, cisc_vm.VMInfo, cisc_vm.VMFunction),
+       "FISH": VMType(animals_vm.VMFunctionJumper, animals_vm.FISHVMInfo, animals_vm.VMFunction),
+       "TIGER": VMType(animals_vm.VMFunctionJumper, animals_vm.TIGERVMInfo, animals_vm.VMFunction)}
