@@ -2,47 +2,51 @@ from common_handlers import *
 import re
 
 
-def create_fish_handler_reader_class(name, params=[]):
-    def create_handler_name_from_params(reader):
-        ns = name
-        params = reader.params
-        for var in re.findall("\{([\w:]+)\}", name):
-            t, n = var.split(":")
-            if t == "S": # Size
-                nvar = ["BYTE", "WORD", "DWORD", "QWORD"][(params[n]&0xf)-1]
-                # Hack for movzx/movsx
-                if ns.startswith("MOVZX_") or ns.startswith("MOVSX_"):
-                    nvar += "_" + ["BYTE", "WORD", "DWORD", "QWORD"][(params[n.replace("DST", "SRC")]&0xf)-1]
-            elif t == "SS": # Size stack
-                if (params[n]&0xf) == 0x2:
-                    nvar = "WORD"
-                else:
-                    nvar = reader.arch.translate("{SU}")
-            elif t == "T": # Type
-                nvar = ["VAR", "MEMVAR", "IMM"][(params[n]>>4)-1]
-            elif t == "O": # Operation
-                nvar = params[n]
-                assert type(nvar) is str
+def create_string_from_params(name, params, arch):
+    ns = name
+    for var in re.findall("\{([\w:]+)\}", name):
+        t, n = var.split(":")
+        if t == "S": # Size
+            nvar = ["BYTE", "WORD", "DWORD", "QWORD"][(params[n]&0xf)-1]
+            # Hack for movzx/movsx
+            if ns.startswith("MOVZX_") or ns.startswith("MOVSX_"):
+                nvar += "_" + ["BYTE", "WORD", "DWORD", "QWORD"][(params[n.replace("DST", "SRC")]&0xf)-1]
+        elif t == "SS": # Size stack
+            if (params[n]&0xf) == 0x2:
+                nvar = "WORD"
             else:
-                raise Exception("Invalid var: %s" % var)
-            ns = ns.replace("{%s}" % var, nvar)
-        return ns
+                nvar = arch.translate("{SU}")
+        elif t == "T": # Type
+            nvar = ["VAR", "MEMVAR", "IMM"][(params[n]>>4)-1]
+        elif t == "AT": # Arg type
+            nvar = ["VAR", "VAR", "IMM"][(params[n]>>4)-1]
+        elif t == "O": # Operation
+            nvar = params[n]
+            assert type(nvar) is str
+        else:
+            raise Exception("Invalid var: %s" % var)
+        ns = ns.replace("{%s}" % var, nvar)
+    return ns
 
+
+def create_fish_handler_reader_class(name, params=[]):
     class GenericHandlerReader(HandlerReader):
         def get_name(self):
-            return create_handler_name_from_params(self)
+            return create_string_from_params(name, self.params, self.arch)
 
         def get_params(self):
             ret = []
-            for x in params:
-                ret.append(self.params[x])
+            for arg_type, arg_name in params:
+                arg_value = self.params[arg_name]
                 # Hack for 64bit numbers
                 if self.arch.native_size() == 8 and \
-                        x == "SRC_VALUE" and "SRC_LOAD_HIGH_DWORD" in self.params and self.params["SRC_LOAD_HIGH_DWORD"]:
-                    ret[-1] |= self.params["SRC_HIGH_DWORD"] << 0x20
+                        arg_name == "SRC_VALUE" and "SRC_LOAD_HIGH_DWORD" in self.params and self.params["SRC_LOAD_HIGH_DWORD"]:
+                    arg_value |= self.params["SRC_HIGH_DWORD"] << 0x20
+                ret.append((create_string_from_params(arg_type, self.params, self.arch), arg_value))
             return ret
 
     return GenericHandlerReader
+
 
 RESET_KEYS = HandlerMatch(match_funcs([lines_matcher(\
     [
@@ -305,7 +309,8 @@ COMMON_BINARY_OP = HandlerMatch(match_funcs([
                         read_two_nibbles(10, "DST_TYPE_AND_SIZE", ("DST_TYPE", "DST_SIZE"))])),
     any_order([UPDATE_FLAGS, UPDATE_RESULT]),
     UPDATE_IP_AND_JUMP
-    ]), create_fish_handler_reader_class("{O:OPERATION}_{S:DST_TYPE_AND_SIZE}_{T:DST_TYPE_AND_SIZE}_{T:SRC_TYPE_AND_SIZE}", ["DST_VALUE", "SRC_VALUE"])) # TODO Movzx movsx
+    ]), create_fish_handler_reader_class("{O:OPERATION}_{S:DST_TYPE_AND_SIZE}_{T:DST_TYPE_AND_SIZE}_{T:SRC_TYPE_AND_SIZE}",
+                                         [("{AT:DST_TYPE_AND_SIZE}", "DST_VALUE"), ("{AT:SRC_TYPE_AND_SIZE}", "SRC_VALUE")]))
 
 def unary_math_op(op_name, op, read_flag=False):
     return match_condition("If((ReadParameterByte($P[OPERATION]) == $H[OPERATION_%s]))" % (op_name,),
@@ -334,7 +339,8 @@ COMMON_UNARY_OP = HandlerMatch(match_funcs([
                ]),
     any_order([UPDATE_FLAGS, UPDATE_RESULT]),
     UPDATE_IP_AND_JUMP
-    ]), create_fish_handler_reader_class("{O:OPERATION}_{S:TYPE_AND_SIZE}_{T:TYPE_AND_SIZE}", ["VALUE"]))
+    ]), create_fish_handler_reader_class("{O:OPERATION}_{S:TYPE_AND_SIZE}_{T:TYPE_AND_SIZE}",
+                                         [("{AT:TYPE_AND_SIZE}", "VALUE")]))
 
 PUSH_POP_MAIN = lines_matcher(["If((ReadParameterByte($P[OPERATION]) == $H[OPERATION_PUSH]))",
                                "    If(($V[SIZE_VAR] == 0x2))",
@@ -368,7 +374,8 @@ PUSH_POP = HandlerMatch(match_funcs([
     lines_matcher(["$V[SP_OFFSET] = VMStructOffset(ReadParameterWord($P[SP_OFFSET]))"]),
     PUSH_POP_UPDATE_STACK,
     UPDATE_IP_AND_JUMP
-    ]), create_fish_handler_reader_class("{O:OPERATION}_{SS:TYPE_AND_SIZE}_{T:TYPE_AND_SIZE}", ["VALUE"]))
+    ]), create_fish_handler_reader_class("{O:OPERATION}_{SS:TYPE_AND_SIZE}_{T:TYPE_AND_SIZE}",
+                                         [("{AT:TYPE_AND_SIZE}", "VALUE")]))
 
 XCHG_OPERATION_0 = lines_matcher_any_order(["$V[XCHG_VAR_DST] = DecodedValue(VMStructField{SS}($U[DST_VALUE]))",
                                             "$V[XCHG_VAR_SIZE] = DecodedValueByte(VMStructFieldByte($U[DST_SIZE]))",
@@ -396,14 +403,15 @@ XCHG = HandlerMatch(match_funcs([
                         read_two_nibbles(10, "DST_TYPE_AND_SIZE", ("DST_TYPE", "DST_SIZE"))])),
     XCHG_OPERATION,
     UPDATE_IP_AND_JUMP
-    ]), create_fish_handler_reader_class("XCHG_{S:DST_TYPE_AND_SIZE}_{T:DST_TYPE_AND_SIZE}_{T:SRC_TYPE_AND_SIZE}", ["DST_VALUE", "SRC_VALUE"]))
+    ]), create_fish_handler_reader_class("XCHG_{S:DST_TYPE_AND_SIZE}_{T:DST_TYPE_AND_SIZE}_{T:SRC_TYPE_AND_SIZE}",
+                                         [("{AT:DST_TYPE_AND_SIZE}", "DST_VALUE"), ("{AT:SRC_TYPE_AND_SIZE}", "SRC_VALUE")]))
 
 
 
 CALL = HandlerMatch(match_funcs([
     lines_matcher(
         ["$V[VAR_CALL_TYPE] = ReadParameterByte($P[CALL_TYPE])",
-         "If(($V[VAR_CALL_TYPE] == $H[CALL_TYPE_IMM]))",
+         "If(($V[VAR_CALL_TYPE] == $H[CALL_TYPE_RELIMM]))",
          "    $V[VAR_STACK] = (ReadParameterWord($P[STACK_RETURN_OFFSET]) + SP)",
          "    *({SU}*)$V[VAR_STACK] = (ReadParameterDword($P[VALUE]) + VMStructField{SS}(?O[BASE_ADDRESS]))",
          "If((($V[VAR_CALL_TYPE] == $H[CALL_TYPE_VAR]) || ($V[VAR_CALL_TYPE] == $H[CALL_TYPE_MEMVAR])))",
@@ -414,13 +422,14 @@ CALL = HandlerMatch(match_funcs([
          "    *({SU}*)$V[VAR_STACK] = $V[VAR_VALUE]",
          "*({SU}*)($V[VAR_STACK] + 0x{N}) = (ReadParameterDword($P[RETURN_ADDRESS]) + VMStructField{SS}(?O[BASE_ADDRESS]))"]),
     POP_RET
-]), create_fish_handler_reader_class("CALL_{O:CALL_TYPE}_NEXT", ["VALUE", "RETURN_ADDRESS"]))
+]), create_fish_handler_reader_class("CALL_{O:CALL_TYPE}_NEXT",
+                                     [("{O:CALL_TYPE}", "VALUE"), ("RELIMM", "RETURN_ADDRESS")]))
 
 ADD_VAR_BASEADDRESS = HandlerMatch(match_funcs([
     lines_matcher(["VMStructField{SS}($N[VAR]) = EncodedValue(ReadParameterDword($P[VAR]))",
                    "VMStructField{SS}((DecodedValue(VMStructField{SS}($N[VAR])) & 0xFFFF)) += VMStructField{SS}(?O[BASE_ADDRESS])"]),
     UPDATE_IP_AND_JUMP,
-]), create_handler_reader_class("ADD_VAR_BASEADDRESS", ["VAR"]))
+]), create_handler_reader_class("ADD_VAR_BASEADDRESS", [("VAR", "VAR")]))
 
 HANDLERS = [
     RESET_KEYS,

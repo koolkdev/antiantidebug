@@ -215,7 +215,7 @@ class VMHandlers(object):
 
         self.fields = dict(vm_info.struct_fields)
 
-        print "Preprocess handlers...",
+        print "Preprocessing handlers...",
         self._preprocess_handlers()
         print "SUCCESS"
 
@@ -329,7 +329,7 @@ class FISHVMHandlers(VMHandlers):
                 handlers_decompiler.Handler(instruction.Function(self.file, address))
                 self._reader = self.file
             except:
-                self._reader = cleaner.Cleaner(file)
+                self._reader = cleaner.Cleaner(self.file)
                 self._reader.set_option("ignore_jumps", False)
                 self._reader.set_option("fix_inc_dec", False)
                 handlers_decompiler.Handler(instruction.Function(self._reader, address))
@@ -479,7 +479,7 @@ class VMFunction(vm.VMFunction):
                 h = self.vm_info.handlers.handlers[handler]
                 handler_reader = h.info.reader(h.info, h.decode.decode(state), arch)
 
-                inst = handler_reader.get_instruction()
+                inst = self._get_instruction(handler_reader.get_name(), handler_reader.get_params())
 
                 inst.address = state.address
                 inst.set_info("labled", next_labeled)
@@ -488,7 +488,6 @@ class VMFunction(vm.VMFunction):
                 if inst.name == "JMP_UNKNOWN":
                     # Jump to an unknown instruction
                     assert handler_reader.params["ADDRS_COUNT"] not in (1,2) # TODO
-                    inst.args[0] += self.vm_info.init_handler.base_address
                     i = file.get_instruction(inst.args[0])
                     jumper = VMFunctionJumper(file, i.next)
                     addresses_to_explore.put((jumper.vm_code_address + self.vm_info.init_handler.base_address, jumper.first_handler))
@@ -508,14 +507,8 @@ class VMFunction(vm.VMFunction):
                     addresses_to_explore.put((inst.args[0], inst.args[1]))
                     inst.args = inst.args[:1]
                     state.address = inst.address
-                elif inst.name.endswith("_IMM") and inst.name[:-len("_IMM")] in ("JMP", "JZ", "JNZ", "JA", "JAE", "JB", "JBE", "JG", "JGE", "JL", "JLE", "JNO", "JNP", "JNS", "JO", "JP", "JS"):
-                    inst.args[0] += self.vm_info.init_handler.base_address
-                    inst.name = inst.name[:-len("IMM")] + "RELIMM"
-                elif inst.name in ("CALL_IMM_NEXT", "CALL_VAR_NEXT", "CALL_MEMVAR_NEXT"):
-                    if inst.name == "CALL_IMM_NEXT":
-                        inst.args[0] += self.vm_info.init_handler.base_address
-                        inst.name == "CALL_RELIMM"
-                    jumper = VMFunctionJumper(file, inst.args[1] + self.vm_info.init_handler.base_address)
+                elif inst.name in ("CALL_RELIMM_NEXT", "CALL_VAR_NEXT", "CALL_MEMVAR_NEXT"):
+                    jumper = VMFunctionJumper(file, inst.args[1])
                     addresses_to_explore.put((jumper.vm_code_address + self.vm_info.init_handler.base_address, jumper.first_handler))
                     starts.append(jumper.vm_code_address + self.vm_info.init_handler.base_address)
                     inst.args = inst.args[:-1]
@@ -577,6 +570,14 @@ class VMFunction(vm.VMFunction):
             self.printfunc()
             raise
         print "SUCCESS"
+
+    def _get_instruction(self, name, args):
+        nargs = []
+        for arg_type, arg_value in args:
+            if arg_type == "RELIMM":
+                arg_value += self.vm_info.init_handler.base_address
+            nargs.append(arg_value)
+        return vminstruction.VMInstruction(name, *nargs)
 
 
     def _clean(self):

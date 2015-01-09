@@ -1,31 +1,35 @@
 from common_handlers import *
 
+def create_string_from_params(name, params):
+    ns = name
+    for var in re.findall("\{([\w:]+)\}", name):
+        t, n = var.split(":")
+        if t == "S":  # Size
+            nvar = {1: "BYTE", 2: "WORD", 4: "DWORD", 8: "QWORD"}[params[n]]
+        elif t == "T":  # Type
+            nvar = params[n]
+        elif t == "AT":  # Arg type
+            nvar = params[n]
+            if nvar == "MEMVAR":
+                nvar = "VAR"
+        elif t == "O":  # Operation
+            nvar = params[n]
+        else:
+            raise Exception("Invalid var: %s" % var)
+        ns = ns.replace("{%s}" % var, nvar)
+    return ns
+
+
 def create_tiger_handler_reader_class(name, params=[]):
-    def create_handler_name_from_params(reader):
-        ns = name
-        params = reader.info.vars
-
-        for var in re.findall("\{([\w:]+)\}", name):
-            t, n = var.split(":")
-            if t == "S":  # Size
-                nvar = {1: "BYTE", 2: "WORD", 4: "DWORD", 8: "QWORD"}[params[n]]
-            elif t == "T":  # Type
-                nvar = params[n]
-            elif t == "O":  # Operation
-                nvar = params[n]
-            else:
-                raise Exception("Invalid var: %s" % var)
-            ns = ns.replace("{%s}" % var, nvar)
-        return ns
-
     class GenericHandlerReader(HandlerReader):
         def get_name(self):
-            return create_handler_name_from_params(self)
+            return create_string_from_params(name, self.info.vars)
 
         def get_params(self):
-            return [self.params[x] for x in params]
+            return [(create_string_from_params(x, self.info.vars), self.params[y]) for x, y in params]
 
     return GenericHandlerReader
+
 
 def optional(func, param_name=None):
     def _func(parser, instructions, index, params, arch, info):
@@ -232,7 +236,8 @@ COMMON_BINARY_OP_MAIN = match_one(
      match_binary_expression("ROL", "rol"), match_binary_expression("ROR", "ror"),
      match_binary_expression("RCL", "rcl"), match_binary_expression("RCR", "rcr")])
 
-COMMON_BINARY_OP_READER = create_tiger_handler_reader_class("{O:OPERATION}_{S:DST_SIZE}_{T:DST_TYPE}_{T:SRC_TYPE}", ["DST_VALUE", "SRC_VALUE"])
+COMMON_BINARY_OP_READER = create_tiger_handler_reader_class("{O:OPERATION}_{S:DST_SIZE}_{T:DST_TYPE}_{T:SRC_TYPE}",
+                                                            [("{AT:DST_TYPE}", "DST_VALUE"), ("{AT:SRC_TYPE}", "SRC_VALUE")])
 
 COMMON_BINARY_OP = HandlerMatch(match_funcs([
     # We can't always distinguish between src and dst, so try both
@@ -324,7 +329,8 @@ MOV_QWORD = HandlerMatch(match_funcs([
     lines_matcher(["*(QWORD*)$V[DST_VAR] = (ReadParameterQword($P[SRC_VALUE]) & 0xFFFFFFFF)",
                    "*(DWORD*)($V[DST_VAR] + 0x4) = (ReadParameterQword($P[SRC_VALUE]) >> 0x20)"]),
     UPDATE_IP_AND_JUMP
-]), create_tiger_handler_reader_class("MOV_QWORD_{S:DST_TYPE}_IMM", ["DST_VALUE", "SRC_VALUE"]))
+]), create_tiger_handler_reader_class("MOV_QWORD_{T:DST_TYPE}_IMM",
+                                      [("{AT:DST_TYPE}", "DST_VALUE"), ("IMM", "SRC_VALUE")]))
 
 
 def match_movzx_movsx(name, op):
@@ -354,7 +360,8 @@ MOVZX_MOVSX = HandlerMatch(match_funcs([
     match_one([match_movzx_movsx("MOVZX", ""), match_movzx_movsx("MOVSX", "S")]),
     ZERO_HIGH_DWORD,
     UPDATE_IP_AND_JUMP
-]), create_tiger_handler_reader_class("{O:OPERATION}_{S:DST_SIZE}_{S:SRC_SIZE}_{T:DST_TYPE}_{T:SRC_TYPE}", ["DST_VALUE", "SRC_VALUE"]))
+]), create_tiger_handler_reader_class("{O:OPERATION}_{S:DST_SIZE}_{S:SRC_SIZE}_{T:DST_TYPE}_{T:SRC_TYPE}",
+                                      [("{AT:DST_TYPE}", "DST_VALUE"), ("{AT:SRC_TYPE}", "SRC_VALUE")]))
 
 
 def match_mul(parser, expr, params, arch):
@@ -400,7 +407,8 @@ COMMON_UNARY_OP = HandlerMatch(match_funcs([
     match_one([match_unary_expression("INC", "++"), match_unary_expression("DEC", "--"),
                match_unary_expression("NEG", "-"), match_unary_expression("NOT", "~")]),
     POST_OPERATIONS
-]), create_tiger_handler_reader_class("{O:OPERATION}_{S:DST_SIZE}_{T:DST_TYPE}", ["DST_VALUE"]))
+]), create_tiger_handler_reader_class("{O:OPERATION}_{S:DST_SIZE}_{T:DST_TYPE}",
+                                      [("{AT:DST_TYPE}", "DST_VALUE")]))
 
 
 
@@ -436,7 +444,8 @@ POP = HandlerMatch(match_funcs([
     only_32(lambda parser, instructions, index, params, arch, info: (params.handler_vars["DST_SIZE"] == params.handler_vars["DST_SIZE_NUM"], index)),
     only_64(lambda parser, instructions, index, params, arch, info: (0x8 == params.handler_vars["DST_SIZE_NUM"], index)),
     UPDATE_IP_AND_JUMP
-]), create_tiger_handler_reader_class("POP_{S:DST_SIZE}_{T:DST_TYPE}", ["DST_VALUE"]))
+]), create_tiger_handler_reader_class("POP_{S:DST_SIZE}_{T:DST_TYPE}",
+                                      [("{AT:DST_TYPE}", "DST_VALUE")]))
 
 def match_push(parser, instructions, index, params, arch, info):
     if index >= len(instructions):
@@ -463,7 +472,8 @@ PUSH = HandlerMatch(match_funcs([
     lines_matcher(["VMStructField{SS}(ReadParameterWord($P[SP_OFFSET])) -= $H[DST_SIZE_NUM]"]),
     lambda parser, instructions, index, params, arch, info: (params.handler_vars["DST_SIZE"] == params.handler_vars["DST_SIZE_NUM"], index),
     UPDATE_IP_AND_JUMP
-]), create_tiger_handler_reader_class("PUSH_{S:DST_SIZE}_{T:DST_TYPE}", ["DST_VALUE"]))
+]), create_tiger_handler_reader_class("PUSH_{S:DST_SIZE}_{T:DST_TYPE}",
+                                      [("{AT:DST_TYPE}", "DST_VALUE")]))
 
 def match_temp_var(parser, expr, params, arch):
     return parser.match_expression(expr, "$V[TEMP_VAR]", params)
@@ -490,7 +500,8 @@ XCHG = HandlerMatch(match_funcs([
     optional(only_64(optional(zero_high_dword("SRC"), "SRC_ZERO_HIGH_DWORD"))),
     optional(ZERO_HIGH_DWORD),
     UPDATE_IP_AND_JUMP
-]), create_tiger_handler_reader_class("XCHG_{S:DST_SIZE}_{T:DST_TYPE}_{T:SRC_TYPE}", ["DST_VALUE", "SRC_VALUE"]))
+]), create_tiger_handler_reader_class("XCHG_{S:DST_SIZE}_{T:DST_TYPE}_{T:SRC_TYPE}",
+                                      [("{AT:DST_TYPE}", "DST_VALUE"), ("{AT:SRC_TYPE}", "SRC_VALUE")]))
 
 def match_str_expr(line):
     def _func(parser, expr, params, arch):
@@ -499,7 +510,7 @@ def match_str_expr(line):
 
 def match_call_dst(parser, expr, params, arch):
     if parser.match_expression(expr, arch.translate("(ReadParameterDword($P[DST_VALUE]) + VMStructField{SS}(?O[BASE_ADDRESS]))"), params):
-        params.set_handler_var_value("DST_TYPE", "IMM")
+        params.set_handler_var_value("DST_TYPE", "RELIMM")
         return True
     else:
         return match_dst_operation()(parser, expr, params, arch)
@@ -509,7 +520,8 @@ CALL = HandlerMatch(match_funcs([
     match_set_value("CALL", match_str_expr("*({SU}*)$V[VAR_STACK]"), "", match_call_dst),
     lines_matcher(["*({SU}*)($V[VAR_STACK] + 0x{N}) = (ReadParameterDword($P[RETURN_ADDRESS]) + VMStructField{SS}(?O[BASE_ADDRESS]))"]),
     POP_RET
-]), create_tiger_handler_reader_class("CALL_{T:DST_TYPE}_NEXT", ["DST_VALUE", "RETURN_ADDRESS"]))
+]), create_tiger_handler_reader_class("CALL_{T:DST_TYPE}_NEXT",
+                                      [("AT:DST_TYPE}", "DST_VALUE"), ("RELIMM", "RETURN_ADDRESS")]))
 
 RESET_KEYS = HandlerMatch(match_funcs([lines_matcher(\
     [
@@ -578,7 +590,7 @@ FLAGS_OP = HandlerMatch(match_funcs([
 ADD_VAR_BASEADDRESS = HandlerMatch(match_funcs([
     lines_matcher(["VMStructField{SS}(ReadParameterWord($P[VAR])) += VMStructField{SS}(?O[BASE_ADDRESS])"]),
     UPDATE_IP_AND_JUMP,
-]), create_handler_reader_class("ADD_VAR_BASEADDRESS", ["VAR"]))
+]), create_handler_reader_class("ADD_VAR_BASEADDRESS", [("VAR", "VAR")]))
 
 
 # Some are really nops, but maybe some are invalid generated handlers?

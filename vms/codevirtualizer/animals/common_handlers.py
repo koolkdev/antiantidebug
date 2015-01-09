@@ -32,10 +32,13 @@ class HandlerReader(object):
         pass
 
     def get_params(self):
+        """
+        :return: List of tuples of arg type and arg value
+        """
         return []
 
     def get_instruction(self):
-        return vminstruction.VMInstruction(self.get_name(), *self.get_params())
+        return vminstruction.VMInstruction(self.get_name(), *[x[1] for x in self.get_params()])
 
     def get_next_handler(self):
         if "NEXT_HANDLER" in self.params:
@@ -65,14 +68,7 @@ def create_handler_reader_class(name, params=[]):
             return create_handler_name_from_params(self)
 
         def get_params(self):
-            ret = []
-            for x in params:
-                ret.append(self.params[x])
-                # Hack for 64bit numbers
-                if self.arch.native_size() == 8 and \
-                        x == "SRC_VALUE" and "SRC_LOAD_HIGH_DWORD" in self.params and self.params["SRC_LOAD_HIGH_DWORD"]:
-                    ret[-1] |= self.params["SRC_HIGH_DWORD"] << 0x20
-            return ret
+            return [(x, self.params[y]) for x, y in params]
 
     return GenericHandlerReader
 
@@ -332,25 +328,25 @@ RETURN = HandlerMatch(match_funcs([lines_matcher([
     ]),
     POP_RET
     ]),
-    create_handler_reader_class("RETURN", ["STACK_MOVE_OFFSET"]))
+    create_handler_reader_class("RETURN", [("IMM", "STACK_MOVE_OFFSET")]))
 
 JMP_MEMVAR = HandlerMatch(match_funcs([
     lines_matcher(["*({SU}*)(ReadParameterWord($P[STACK_RETURN_OFFSET]) + SP) = *({SU}*)VMStructField{SS}(ReadParameterWord($P[VAR]))"]),
     POP_RET,
-]), create_handler_reader_class("JMP_MEMVAR", ["VAR"]))
+]), create_handler_reader_class("JMP_MEMVAR", [("VAR", "VAR")]))
 
 JMP_VAR = HandlerMatch(match_funcs([
     lines_matcher(["*({SU}*)(ReadParameterWord($P[STACK_RETURN_OFFSET]) + SP) = VMStructField{SS}(ReadParameterWord($P[VAR]))"]),
     POP_RET,
-]), create_handler_reader_class("JMP_VAR", ["VAR"]))
+]), create_handler_reader_class("JMP_VAR", [("VAR", "VAR")]))
 
 JMP_IMM = HandlerMatch(match_funcs([
     lines_matcher(["*({SU}*)(ReadParameterWord($P[STACK_RETURN_OFFSET]) + SP) = (ReadParameterDword($P[IMM]) + VMStructField{SS}(?O[BASE_ADDRESS]))"]),
     POP_RET,
-]), create_handler_reader_class("JMP_IMM", ["IMM"]))
+]), create_handler_reader_class("JMP_RELIMM", [("RELIMM", "IMM")]))
 
 
-JMP = HandlerMatch(UPDATE_IP_AND_JUMP_PARAM, create_handler_reader_class("JMP", ["JUMP_VALUE", "JUMP_HANDLER"]))
+JMP = HandlerMatch(UPDATE_IP_AND_JUMP_PARAM, create_handler_reader_class("JMP", [("IMM", "JUMP_VALUE"), ("IMM", "JUMP_HANDLER")]))
 
 UNK_JMP_IMM = HandlerMatch(match_funcs([
     lines_matcher([
@@ -367,22 +363,22 @@ UNK_JMP_IMM = HandlerMatch(match_funcs([
         "            *({SU}*)$V[ADDRESS_ADDRESS] += VMStructField{SS}(?O[BASE_ADDRESS])",
     ]),
     JMP_IMM.match_func
-]), create_handler_reader_class("JMP_UNKNOWN", ["IMM"])) # TODO: When addrs count is 1 or 2
+]), create_handler_reader_class("JMP_UNKNOWN", [("RELIMM", "IMM")])) # TODO: When addrs count is 1 or 2
 
 MOV_VAR_UNKVAR = HandlerMatch(match_funcs([
     lines_matcher(["VMStructField{SS}(ReadParameterWord($P[VAR])) = VMStructField{SS}($O[UNK_VAR])"]),
     UPDATE_IP_AND_JUMP,
-]), create_handler_reader_class("{MOV_VAR_UNKVAR:}"))
+]), create_handler_reader_class("{MOV_VAR_UNKVAR:}"))  # Not seen used yet
 
 MOV_VAR_SP = HandlerMatch(match_funcs([
     lines_matcher(["VMStructField{SS}(ReadParameterWord($P[VAR])) = SP"]),
     UPDATE_IP_AND_JUMP,
-]), create_handler_reader_class("MOV_VAR_SP", ["VAR"]))
+]), create_handler_reader_class("MOV_VAR_SP", [("VAR", "VAR")]))
 
 MOV_SP_VAR = HandlerMatch(match_funcs([
     lines_matcher(["SP = VMStructField{SS}(ReadParameterWord($P[VAR]))"]),
     UPDATE_IP_AND_JUMP,
-]), create_handler_reader_class("MOV_SP_VAR", ["VAR"]))
+]), create_handler_reader_class("MOV_SP_VAR", [("VAR", "VAR")]))
 
 UNK_CALLS = HandlerMatch(match_funcs([lines_matcher([
     "Push(VMStructField{SS}(ReadParameterWord($P[P1])))",
@@ -402,7 +398,7 @@ ADD_SP_IMM = HandlerMatch(match_funcs([
                    "SP += $V[VAR]",
                    "VMStructField{SS}(ReadParameterWord($P[VAR])) += $V[VAR]"]),
     UPDATE_IP_AND_JUMP,
-]), create_handler_reader_class("ADD_SP_IMM", ["IMM"]))
+]), create_handler_reader_class("ADD_SP_IMM", [("IMM", "IMM")]))
 
 
 #("ja", "jae", "jb", "jbe", "jz", "jg", "jge", "jl", "jle", "jnz", "jno", "jnp", "jns", "jo", "jp" ,"js")
@@ -510,7 +506,7 @@ JCC_INSIDE = HandlerMatch(match_funcs([
     JCC,
     match_condition("If((VMStructFieldByte($O[TAKE_JUMP]) != 0x0))", [UPDATE_IP_AND_JUMP_PARAM]),
     UPDATE_IP_AND_JUMP,
-]), create_handler_reader_class("{O:CHECK_TYPE}", ["JUMP_VALUE", "JUMP_HANDLER"]))
+]), create_handler_reader_class("{O:CHECK_TYPE}", [("IMM", "JUMP_VALUE"), ("IMM", "JUMP_HANDLER")]))
 
 JCC_OUTSIDE = HandlerMatch(match_funcs([
     JCC,
@@ -518,7 +514,7 @@ JCC_OUTSIDE = HandlerMatch(match_funcs([
     lines_matcher(["SP += $H[STACK_CLEAR_SIZE]",
                    "VMStructField{SS}(ReadParameterWord($P[SP_OFFSET])) += $H[STACK_CLEAR_SIZE]"]),
     UPDATE_IP_AND_JUMP,
-]), create_handler_reader_class("{O:CHECK_TYPE}_IMM", ["IMM"]))
+]), create_handler_reader_class("{O:CHECK_TYPE}_RELIMM", [("RELIMM", "IMM")]))
 
 PUSHF = HandlerMatch(match_funcs([
     any_order([lines_matcher(["Push(VMStructField{SS}(ReadParameterWord($P[FLAGS_OFFSET])))"]),
