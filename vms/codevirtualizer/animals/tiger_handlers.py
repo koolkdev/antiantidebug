@@ -79,15 +79,15 @@ def src_load(parser, instructions, index, params, arch, info):
     parser.groups["FIELD_SIZE"] = ["VMStructFieldByte", "VMStructFieldWord", "VMStructFieldDword", "VMStructFieldQword"]
     parser.groups["READ_SIZE"] = ["ReadParameterByte", "ReadParameterWord", "ReadParameterDword"]
     nparams = params.copy()
-    if parser.match_expression(instructions[index], arch.translate("$V[SRC_VAR] = *($G[WORD_SIZE:WORD]*)VMStructField{SS}(ReadParameterWord($P[SRC_VALUE]))"), nparams):
+    if parser.match_expression(instructions[index], arch.translate("$V[SRC_VAR] = *($G[WORD_SIZE:WORD_SRC]*)VMStructField{SS}(ReadParameterWord($P[SRC_VALUE]))"), nparams):
         src_type = "MEMVAR"
-        size = 1 << parser.groups["WORD_SIZE"].index(nparams.vars["WORD"].value)
-    elif parser.match_expression(instructions[index], "$V[SRC_VAR] = $G[FIELD_SIZE:FIELD](ReadParameterWord($P[SRC_VALUE]))", nparams):
+        size = 1 << parser.groups["WORD_SIZE"].index(nparams.vars["WORD_SRC"].value)
+    elif parser.match_expression(instructions[index], "$V[SRC_VAR] = $G[FIELD_SIZE:FIELD_SRC](ReadParameterWord($P[SRC_VALUE]))", nparams):
         src_type = "VAR"
-        size = 1 << parser.groups["FIELD_SIZE"].index(nparams.vars["FIELD"].value)
-    elif parser.match_expression(instructions[index], "$V[SRC_VAR] = $G[READ_SIZE:READ]($P[SRC_VALUE])", nparams):
+        size = 1 << parser.groups["FIELD_SIZE"].index(nparams.vars["FIELD_SRC"].value)
+    elif parser.match_expression(instructions[index], "$V[SRC_VAR] = $G[READ_SIZE:READ_SRC]($P[SRC_VALUE])", nparams):
         src_type = "IMM"
-        size = 1 << parser.groups["READ_SIZE"].index(nparams.vars["READ"].value)
+        size = 1 << parser.groups["READ_SIZE"].index(nparams.vars["READ_SRC"].value)
     else:
         return False, index
     if not nparams.set_handler_var_value("SRC_TYPE", src_type):
@@ -116,19 +116,19 @@ def match_dst_operation(name="DST"):
         parser.groups["FIELD_SIZE"] = ["VMStructFieldByte", "VMStructFieldWord", "VMStructFieldDword", "VMStructFieldQword"]
         nparams = params.copy()
         if ("%s_LOADED" % name) in params.handler_vars and params.handler_vars["%s_LOADED" % name]:
-            if parser.match_expression(expr, "*($G[WORD_SIZE:WORD]*)$V[%s_VAR]" % name, nparams):
-                size = 1 << parser.groups["WORD_SIZE"].index(nparams.vars["WORD"].value)
+            if parser.match_expression(expr, "*($G[WORD_SIZE:WORD_%s]*)$V[%s_VAR]" % (name, name), nparams):
+                size = 1 << parser.groups["WORD_SIZE"].index(nparams.vars["WORD_%s" % name].value)
             else:
                 return False
             if not nparams.set_handler_var_value("%s_SIZE" % name, size):
                 return False
         else:
-            if parser.match_expression(expr, arch.translate("*($G[WORD_SIZE:WORD]*)VMStructField{SS}(ReadParameterWord($P[%s_VALUE]))" % name), nparams):
+            if parser.match_expression(expr, arch.translate("*($G[WORD_SIZE:WORD_%s]*)VMStructField{SS}(ReadParameterWord($P[%s_VALUE]))" % (name, name)), nparams):
                 dst_type = "MEMVAR"
-                size = 1 << parser.groups["WORD_SIZE"].index(nparams.vars["WORD"].value)
-            elif parser.match_expression(expr, "$G[FIELD_SIZE:FIELD](ReadParameterWord($P[%s_VALUE]))" % name, nparams):
+                size = 1 << parser.groups["WORD_SIZE"].index(nparams.vars["WORD_%s" % name].value)
+            elif parser.match_expression(expr, "$G[FIELD_SIZE:FIELD_%s](ReadParameterWord($P[%s_VALUE]))" % (name, name), nparams):
                 dst_type = "VAR"
-                size = 1 << parser.groups["FIELD_SIZE"].index(nparams.vars["FIELD"].value)
+                size = 1 << parser.groups["FIELD_SIZE"].index(nparams.vars["FIELD_%s" % name].value)
             else:
                 return False
             if not nparams.set_handler_var_value("%s_TYPE" % name, dst_type):
@@ -152,15 +152,15 @@ def match_src_operation(name="SRC"):
             if not parser.match_expression(expr, "$V[%s_VAR]" % name, nparams):
                 return False
         else:
-            if parser.match_expression(expr, arch.translate("*($G[WORD_SIZE:WORD]*)VMStructField{SS}(ReadParameterWord($P[%s_VALUE]))" % name), nparams):
+            if parser.match_expression(expr, arch.translate("*($G[WORD_SIZE:WORD_%s]*)VMStructField{SS}(ReadParameterWord($P[%s_VALUE]))" % (name, name)), nparams):
                 src_type = "MEMVAR"
-                size = 1 << parser.groups["WORD_SIZE"].index(nparams.vars["WORD"].value)
-            elif parser.match_expression(expr, "$G[FIELD_SIZE:FIELD](ReadParameterWord($P[%s_VALUE]))" % name, nparams):
+                size = 1 << parser.groups["WORD_SIZE"].index(nparams.vars["WORD_%s" % name].value)
+            elif parser.match_expression(expr, "$G[FIELD_SIZE:FIELD_%s](ReadParameterWord($P[%s_VALUE]))" % (name, name), nparams):
                 src_type = "VAR"
-                size = 1 << parser.groups["FIELD_SIZE"].index(nparams.vars["FIELD"].value)
-            elif parser.match_expression(expr, "$G[READ_SIZE:READ]($P[%s_VALUE])" % name, nparams):
+                size = 1 << parser.groups["FIELD_SIZE"].index(nparams.vars["FIELD_%s" % name].value)
+            elif parser.match_expression(expr, "$G[READ_SIZE:READ_%s]($P[%s_VALUE])" % (name, name), nparams):
                 src_type = "IMM"
-                size = 1 << parser.groups["READ_SIZE"].index(nparams.vars["READ"].value)
+                size = 1 << parser.groups["READ_SIZE"].index(nparams.vars["READ_%s" % name].value)
             else:
                 return False
             if not nparams.set_handler_var_value("%s_TYPE" % name, src_type):
@@ -339,14 +339,14 @@ def match_movzx_movsx(name, op):
             return False, index
         parser.groups["WORD_SIZE"] = ["BYTE", "WORD", "DWORD", "QWORD"]
         nparams = params.copy()
-        if not parser.match_expression(instructions[index], "$[DST] = (%s$G[WORD_SIZE:WORD])$[SRC]" % op, nparams):
+        if not parser.match_expression(instructions[index], "$[DST] = (%s$G[WORD_SIZE:WORD_OP])$[SRC]" % op, nparams):
             return False, index
         if not match_dst_operation()(parser, nparams.vars["DST"], nparams, arch):
             return False, index
         # Should not be immediate
         if not match_src_operation()(parser, nparams.vars["SRC"], nparams, arch):
             return False, index
-        size = 1 << parser.groups["WORD_SIZE"].index(nparams.vars["WORD"].value)
+        size = 1 << parser.groups["WORD_SIZE"].index(nparams.vars["WORD_OP"].value)
         if nparams.handler_vars["SRC_SIZE"] < size:
             return False, index
         nparams.handler_vars["SRC_SIZE"] = size
@@ -372,6 +372,9 @@ def match_mul(parser, expr, params, arch):
         return False
     if nparams.handler_vars["SRC_LOADED"]:
         if not parser.match_expression(nparams.vars["DST"], "$V[DST_VAL]", nparams):
+            return False
+    elif nparams.handler_vars["DST_LOADED"]:
+        if not parser.match_expression(nparams.vars["DST"], arch.translate("*({SU}*)$V[DST_VAR]"), nparams):
             return False
     else:
         if not match_dst_operation()(parser, nparams.vars["DST"], nparams, arch):
@@ -497,8 +500,25 @@ XCHG = HandlerMatch(match_funcs([
             XCHG_MAIN,
         ]),
     ]),
-    optional(only_64(optional(zero_high_dword("SRC"), "SRC_ZERO_HIGH_DWORD"))),
-    optional(ZERO_HIGH_DWORD),
+    # All the options...
+    # TODO: I don't save that info, but I am not using it anyway on the other hand
+    only_64(match_one([
+        match_funcs([
+            zero_high_dword("SRC"),
+            zero_high_dword(),
+        ]),
+        match_funcs([
+            zero_high_dword(),
+            zero_high_dword("SRC"),
+        ]),
+        match_funcs([
+            zero_high_dword("SRC"),
+        ]),
+        match_funcs([
+            zero_high_dword(),
+        ]),
+        match_funcs([])
+    ])),
     UPDATE_IP_AND_JUMP
 ]), create_tiger_handler_reader_class("XCHG_{S:DST_SIZE}_{T:DST_TYPE}_{T:SRC_TYPE}",
                                       [("{AT:DST_TYPE}", "DST_VALUE"), ("{AT:SRC_TYPE}", "SRC_VALUE")]))
@@ -593,7 +613,8 @@ ADD_VAR_BASEADDRESS = HandlerMatch(match_funcs([
 ]), create_handler_reader_class("ADD_VAR_BASEADDRESS", [("VAR", "VAR")]))
 
 
-# Some are really nops, but maybe some are invalid generated handlers?
+# Some are really nops, but maybe some are invalid generated handlers? (For example in my tests, "test" opcode
+# without a jump after it translated to this.
 NOP = HandlerMatch(UPDATE_IP_AND_JUMP, create_handler_reader_class("NOP"))
 
 UNKNOWN_SET = HandlerMatch(match_funcs([

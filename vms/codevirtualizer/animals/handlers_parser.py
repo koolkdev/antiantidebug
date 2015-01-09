@@ -29,6 +29,9 @@ class Str(Expression):
     def get_format(self):
         return str(self.value)
 
+    def equals(self, expression):
+        return Expression.equals(self, expression) and self.value == expression.value
+
 
 class Macro(Expression):
     def __init__(self, name, parameters):

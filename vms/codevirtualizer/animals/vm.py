@@ -251,9 +251,7 @@ class VMHandlers(object):
             self._process_final(handler)
             self._update_progress_bar()
 
-
         print "Detecting handlers...",
-        self._start_progress_bar()
         for handler in self.handlers.itervalues():
             if handler.info is None:
                 handler_info = fish_handlers.match_handlers(parser, handler.handler, self.fields, self.HANDLERS, arch)
@@ -261,13 +259,11 @@ class VMHandlers(object):
                     handler.handler.print_instructions()
                     raise Exception("Failed to detect handler")
                 handler.info = handler_info
-            self._update_progress_bar()
         print "SUCCESS"
 
         # for index, handler in self.handlers.iteritems():
         #     print "---------------------------------------------------"
         #     print hex(index)
-        #     print hex(addrs[index])
         #     handler.handler.print_instructions()
         # assert False
 
@@ -725,6 +721,10 @@ class TIGERVMFunction(VMFunction):
             if arg_type == "VAR":
                 arg_value = state.vars.get_real_var(arg_value)
             nargs.append((arg_type, arg_value))
+        if name == "SHUFFLE_VM_STRUCT":
+            # I am pretty sure that it does that
+            # TODO: Do it proper (read it to move vars around)
+            state.vars.reset()
         return VMFunction._get_instruction(self, name, nargs, state)
 
     def _get_clean_templates(self):

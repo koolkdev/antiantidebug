@@ -76,6 +76,9 @@ class VarsMapping(object):
         self.map[var1] = oldvar2
         self.map[var2] = oldvar1
 
+    def reset(self):
+        self.map = {}
+
 
 class FISHDecodingState(DecodingState):
     def __init__(self, address, read_func):
@@ -102,13 +105,6 @@ class TIGERDecodingState(DecodingState):
             "KEY_SPECIAL": DwordKey(),
             "KEY_DECODE_POST": DwordKey(),
             }, address, read_func)
-        self.vars = VarsMapping()
-
-    def reset(self):
-        DecodingState.reset(self)
-        # It seems like a bug
-        # Or my mistake because I ignores SHUFFLE_VM_STRUCT?
-        # But if it works this way it is find
         self.vars = VarsMapping()
 
 
@@ -200,7 +196,7 @@ class UpdateValue(DecodingValueOperation):
             for op in self.ops:
                 res = op.decode(state, res)
             res &= ((1 << key.bits) - 1)
-        return res & ((1 << (self.read.get_size() * 8)) - 1)
+        return res
 
     def get_size(self):
         return self.read.get_size()
@@ -222,7 +218,7 @@ class SetValue(DecodingValueOperation):
             for op in self.ops:
                 res = op.decode(state, res)
             res &= ((1 << key.bits) - 1)
-        return res & ((1 << (self.read.get_size() * 8)) - 1)
+        return res
 
     def get_size(self):
         return self.read.get_size()
@@ -251,7 +247,7 @@ class DecodeParameter(DecodingValueOperation):
                 op.decode(state)
             else:
                 res = op.decode(state, res) & 0xffffffff
-        return res & ((1 << (self.size * 8)) - 1)
+        return res
 
     def get_size(self):
         return self.size
@@ -266,8 +262,13 @@ class DecodeQwordParameter(DecodingValueOperation):
         self.high_dword = high_dword
 
     def decode(self, state):
+        # Note that decode may not return dword number do to recent changes
+        # But since dword is the max read size, it will return dword number
         res = self.low_dword.decode(state)
         return res | (self.high_dword.decode(state) << 0x20)
+
+    def get_size(self):
+        return 8
 
     def get_offset(self):
         return self.offset
@@ -281,7 +282,8 @@ class DecodeHandler(DecodingOperation):
         params = {}
         for decode in self.decodes:
             if isinstance(decode, DecodingValueOperation):
-                params[decode.get_offset()] = decode.decode(state)
+                # We apply the size mask here, because UpdateValue must get the value as is.
+                params[decode.get_offset()] = decode.decode(state) & ((1 << (decode.get_size() * 8)) - 1)
             else:
                 decode.decode(state)
         return params
@@ -514,6 +516,7 @@ def get_reading_decoding_info(handler, fields, arch):
                     decoding.append(DecodeQwordParameter(offset, values["VALUE_DWORD"], values["VALUE_DWORD_HIGH"]))
                     current_decoding = None
                     parser.replace_instructions(handler, handler, i, 1, [])
+                    continue
             elif parser.match_expression(inst, "$V[VAR] = $G[READ_PARAMETER:READ_OP]($N[OFFSET])", params) and \
                     len(params.vars["VAR"].instructions) == 1 and len(params.vars["VAR"].used_instructions) >= 2 and \
                     type(handler.instructions[i+1]) is handlers_parser.Macro and handler.instructions[i+1].name == "UpdateKey":
