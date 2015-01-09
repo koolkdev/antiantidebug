@@ -3,15 +3,14 @@ DEFINE_MACRO[64] SIZE QWORD
 DEFINE_MACRO[32] SIZE_L Dword
 DEFINE_MACRO[64] SIZE_L Qword
 
+# In few functions va1 is already used
+DEFINE_GROUP STACK_VARS var_1 var_2
+
 DEFINE_TEMPLATE
 $V[VAR_SRC] = VMStructOffset(ReadParameterWord($N[SRC]))
 $V[VAR_DST] = VMStructOffset(ReadParameterWord($N[DST]))
-var_1 = *(@SIZE@*)$V[VAR_SRC]
+$G[STACK_VARS:VAR] = *(@SIZE@*)$V[VAR_SRC]
 *(@SIZE@*)$V[VAR_SRC] = *(@SIZE@*)$V[VAR_DST]
-*(@SIZE@*)$V[VAR_DST] = var_1
+*(@SIZE@*)$V[VAR_DST] = $G[STACK_VARS:VAR]
 =>
-None
-
-# TODO: Ignore it for now, we will see it impact later
-
-#XchgStructFields(VMStructField@SIZE_L@(ReadParameterWord($N[DST])), VMStructField@SIZE_L@(ReadParameterWord($N[SRC])))
+XchgStructFields(VMStructField@SIZE_L@(ReadParameterWord($N[DST])), VMStructField@SIZE_L@(ReadParameterWord($N[SRC])))

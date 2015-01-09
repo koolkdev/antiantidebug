@@ -113,4 +113,4 @@ class VMType(object):
 
 VMS = {"CISC": VMType(cisc_vm.VMFunctionJumper, cisc_vm.VMInfo, cisc_vm.VMFunction),
        "FISH": VMType(animals_vm.VMFunctionJumper, animals_vm.FISHVMInfo, animals_vm.VMFunction),
-       "TIGER": VMType(animals_vm.VMFunctionJumper, animals_vm.TIGERVMInfo, animals_vm.VMFunction)}
+       "TIGER": VMType(animals_vm.VMFunctionJumper, animals_vm.TIGERVMInfo, animals_vm.TIGERVMFunction)}

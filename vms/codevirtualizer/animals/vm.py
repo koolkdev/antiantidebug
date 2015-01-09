@@ -7,6 +7,7 @@ import handlers_decompiler
 import handlers_parser
 import fish_handlers_cleaner
 import fish_handlers
+import tiger_handlers_cleaner
 import tiger_handlers
 import common_handlers
 import vm_encoding
@@ -244,24 +245,24 @@ class VMHandlers(object):
         self.parser_final = handlers_parser.HandlerParser.get_parser(r"handlers\handlers_final.txt", self.mode)
         print "Analyzing handlers... PASS 2/2"
         self._start_progress_bar()
-        for i in xrange(vm_info.init_handler.handlers_count):
-            self._process_pre_decoding(self.handlers[i])
-            self.handlers[i].decode = vm_encoding.get_reading_decoding_info(self.handlers[i].handler, self.fields, arch)
-            self._process_final(self.handlers[i])
+        for handler in self.handlers.itervalues():
+            self._process_pre_decoding(handler)
+            handler.decode = vm_encoding.get_reading_decoding_info(handler.handler, self.fields, arch)
+            self._process_final(handler)
             self._update_progress_bar()
 
 
         print "Detecting handlers...",
+        self._start_progress_bar()
         for handler in self.handlers.itervalues():
             if handler.info is None:
                 handler_info = fish_handlers.match_handlers(parser, handler.handler, self.fields, self.HANDLERS, arch)
                 if handler_info is None:
-                    print "--------------------------------"
                     handler.handler.print_instructions()
                     raise Exception("Failed to detect handler")
                 handler.info = handler_info
+            self._update_progress_bar()
         print "SUCCESS"
-
 
         # for index, handler in self.handlers.iteritems():
         #     print "---------------------------------------------------"
@@ -364,6 +365,7 @@ class TIGERVMHandlers(VMHandlers):
     def __init__(self, file, vm_info):
         self.tiger_parser_encoding = handlers_parser.HandlerParser.get_parser(r"handlers\handlers_encoding_tiger.txt", file.mode)
         self.tiger_final_parser = handlers_parser.HandlerParser.get_parser(r"handlers\handlers_final_tiger.txt", file.mode)
+        self.xchg = {}
         VMHandlers.__init__(self, file, vm_info)
 
     def _process_pre_decoding(self, handler):
@@ -371,8 +373,9 @@ class TIGERVMHandlers(VMHandlers):
         self.tiger_parser_encoding.clean_handler(handler.handler, self.fields)
 
     def _process_final(self, handler):
-        self.tiger_final_parser.clean_handler(handler.handler, self.fields)
         VMHandlers._process_final(self, handler)
+        self.tiger_final_parser.clean_handler(handler.handler, self.fields)
+        self.xchg[handler] = tiger_handlers_cleaner.get_vars_xchg(handler.handler, self.file.get_arch())
 
     def create_state(self, address, read):
         return vm_encoding.new_tiger_state(address, read)
@@ -477,9 +480,12 @@ class VMFunction(vm.VMFunction):
                     break
 
                 h = self.vm_info.handlers.handlers[handler]
-                handler_reader = h.info.reader(h.info, h.decode.decode(state), arch)
+                params = h.decode.decode(state)
+                self._do_handler(h, params, state)
+                handler_reader = h.info.reader(h.info, params, arch)
 
-                inst = self._get_instruction(handler_reader.get_name(), handler_reader.get_params())
+                inst = self._get_instruction(handler_reader.get_name(), handler_reader.get_params(), state)
+                self._do_handler_end(h, params, state)
 
                 inst.address = state.address
                 inst.set_info("labled", next_labeled)
@@ -540,7 +546,7 @@ class VMFunction(vm.VMFunction):
             regs = list(self.vm_info.init_handler.regs[::-1])
             for reg in regs:
                 if reg == "flags":
-                    reader.get_cond(lambda x: x.name == "POPF")
+                    self.vm_info.regs_fields["FLAGS"] = reader.get_cond(lambda x: x.name == "POPF").args[0]
                 else:
                     reg = reg.upper()
                     if not reg[1].isdigit():
@@ -571,7 +577,13 @@ class VMFunction(vm.VMFunction):
             raise
         print "SUCCESS"
 
-    def _get_instruction(self, name, args):
+    def _do_handler(self, handler, params, state):
+        pass
+
+    def _do_handler_end(self, handler, params, state):
+        pass
+
+    def _get_instruction(self, name, args, state):
         nargs = []
         for arg_type, arg_value in args:
             if arg_type == "RELIMM":
@@ -579,15 +591,17 @@ class VMFunction(vm.VMFunction):
             nargs.append(arg_value)
         return vminstruction.VMInstruction(name, *nargs)
 
+    def _get_clean_templates(self):
+        return ["animals_00_regs.txt", "animals_01_vm.txt", "animals_02_misc.txt", "animals_03_vars.txt", "animals_04_memvars.txt", "animals_05_fix_pop.txt", "animals_06_rep.txt"]
 
+    # TODO: Base class
     def _clean(self):
-        TEMPLATES = ["fish_00_regs.txt", "fish_01_vm.txt", "fish_02_misc.txt", "fish_03_vars.txt", "fish_04_memvars.txt", "fish_05_fix_pop.txt", "fish_06_rep.txt"]
         print "Processing VMFunction (%d instructions)..." % len(self.instructions)
 
         vars = dict(self.vm_info.regs_fields)
-        vars["IS_REG"] = lambda x: x in self.vm_info.regs_fields.values()
+        vars["IS_REG"] = lambda x: x in self.vm_info.regs_fields.values() and self.vm_info.regs_fields["FLAGS"] != x
 
-        for template in TEMPLATES:
+        for template in self._get_clean_templates():
             print ("Applying %s," % template),
             templates.Templates.get_template(r"codevirtualizer\animals\%s" % template, self.mode).clean(self.instructions, vars)
             print "OK."
@@ -694,3 +708,24 @@ class VMFunction(vm.VMFunction):
     def printfunc(self):
         for inst in self.instructions:
             print inst
+
+
+class TIGERVMFunction(VMFunction):
+    def _do_handler(self, handler, params, state):
+        for src, dst in self.vm_info.handlers.xchg[handler][0]:
+            state.vars.xchg_vars(params[src], params[dst])
+
+    def _do_handler_end(self, handler, params, state):
+        for src, dst in self.vm_info.handlers.xchg[handler][1]:
+            state.vars.xchg_vars(params[src], params[dst])
+
+    def _get_instruction(self, name, args, state):
+        nargs = []
+        for arg_type, arg_value in args:
+            if arg_type == "VAR":
+                arg_value = state.vars.get_real_var(arg_value)
+            nargs.append((arg_type, arg_value))
+        return VMFunction._get_instruction(self, name, nargs, state)
+
+    def _get_clean_templates(self):
+        return ["tiger_00_clean.txt"] + VMFunction._get_clean_templates(self)

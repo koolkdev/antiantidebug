@@ -520,13 +520,13 @@ PUSHF = HandlerMatch(match_funcs([
     any_order([lines_matcher(["Push(VMStructField{SS}(ReadParameterWord($P[FLAGS_OFFSET])))"]),
                lines_matcher(["VMStructField{SS}(ReadParameterWord($P[SP_OFFSET])) -= 0x{N}"])]),
     UPDATE_IP_AND_JUMP,
-]), create_handler_reader_class("PUSHF"))
+]), create_handler_reader_class("PUSHF", [("VAR", "FLAGS_OFFSET")]))
 
 POPF = HandlerMatch(match_funcs([
     any_order([lines_matcher(["VMStructField{SS}(ReadParameterWord($P[FLAGS_OFFSET])) = Pop()"]),
                lines_matcher(["VMStructField{SS}(ReadParameterWord($P[SP_OFFSET])) += 0x{N}"])]),
     UPDATE_IP_AND_JUMP,
-]), create_handler_reader_class("POPF"))
+]), create_handler_reader_class("POPF", [("VAR", "FLAGS_OFFSET")]))
 
 
 def enable_flag(flag, update_flag=True):

@@ -27,7 +27,7 @@ class DwordKey(Key):
 
 class WordKey(Key):
     def __init__(self):
-        Key.__init__(self, 8)
+        Key.__init__(self, 16)
 
 
 class ByteKey(Key):
@@ -58,29 +58,66 @@ class DecodingState(object):
             self.address += x
 
 
+class VarsMapping(object):
+    def __init__(self):
+        self.map = {}
+
+    def get_real_var(self, var):
+        # For reghigh
+        if var in self.map:
+            return self.map[var]
+        if var - 1 in self.map:
+            return self.map[var - 1] + 1
+        return var
+
+    def xchg_vars(self, var1, var2):
+        oldvar1 = self.map.get(var1, var1)
+        oldvar2 = self.map.get(var2, var2)
+        self.map[var1] = oldvar2
+        self.map[var2] = oldvar1
+
+
+class FISHDecodingState(DecodingState):
+    def __init__(self, address, read_func):
+        DecodingState.__init__(self, {
+            "KEY_DECODE": DwordKey(),
+            "KEY_COND": DwordKey(),
+            "KEY_REGULAR_1": DwordKey(),
+            "KEY_REGULAR_2": DwordKey(),
+            "KEY_UNUSED": DwordKey(),
+            "KEY_SPECIAL": DwordKey(),
+            "VALUE_BYTE": ByteKey(),
+            }, address, read_func)
+
+
+class TIGERDecodingState(DecodingState):
+    def __init__(self, address, read_func):
+        DecodingState.__init__(self, {
+            "KEY_DECODE": DwordKey(),
+            "KEY_COND": DwordKey(),
+            "VALUE_DWORD": DwordKey(),
+            "VALUE_DWORD_HIGH": DwordKey(),
+            "VALUE_WORD_1": WordKey(),
+            "VALUE_WORD_2": WordKey(),
+            "KEY_SPECIAL": DwordKey(),
+            "KEY_DECODE_POST": DwordKey(),
+            }, address, read_func)
+        self.vars = VarsMapping()
+
+    def reset(self):
+        DecodingState.reset(self)
+        # It seems like a bug
+        # Or my mistake because I ignores SHUFFLE_VM_STRUCT?
+        # But if it works this way it is find
+        self.vars = VarsMapping()
+
+
 def new_fish_state(address, read_func):
-    return DecodingState({
-        "KEY_DECODE": DwordKey(),
-        "KEY_COND": DwordKey(),
-        "KEY_REGULAR_1": DwordKey(),
-        "KEY_REGULAR_2": DwordKey(),
-        "KEY_UNUSED": DwordKey(),
-        "KEY_SPECIAL": DwordKey(),
-        "VALUE_BYTE": ByteKey(),
-        }, address, read_func)
+    return FISHDecodingState(address, read_func)
 
 
 def new_tiger_state(address, read_func):
-    return DecodingState({
-        "KEY_DECODE": DwordKey(),
-        "KEY_COND": DwordKey(),
-        "VALUE_DWORD": DwordKey(),
-        "VALUE_DWORD_HIGH": DwordKey(),
-        "VALUE_WORD_1": WordKey(),
-        "VALUE_WORD_2": WordKey(),
-        "KEY_SPECIAL": DwordKey(),
-        "KEY_DECODE_POST": DwordKey(),
-        }, address, read_func)
+    return TIGERDecodingState(address, read_func)
 
 
 class DecodingOperation(object):
@@ -89,6 +126,9 @@ class DecodingOperation(object):
 
 
 class DecodingValueOperation(DecodingOperation):
+    def get_size(self):
+        pass
+
     def get_offset(self):
         pass
 
@@ -160,7 +200,10 @@ class UpdateValue(DecodingValueOperation):
             for op in self.ops:
                 res = op.decode(state, res)
             res &= ((1 << key.bits) - 1)
-        return res
+        return res & ((1 << (self.read.get_size() * 8)) - 1)
+
+    def get_size(self):
+        return self.read.get_size()
 
     def get_offset(self):
         return self.read.get_offset()
@@ -179,7 +222,10 @@ class SetValue(DecodingValueOperation):
             for op in self.ops:
                 res = op.decode(state, res)
             res &= ((1 << key.bits) - 1)
-        return res
+        return res & ((1 << (self.read.get_size() * 8)) - 1)
+
+    def get_size(self):
+        return self.read.get_size()
 
     def get_offset(self):
         return self.read.get_offset()
@@ -206,6 +252,9 @@ class DecodeParameter(DecodingValueOperation):
             else:
                 res = op.decode(state, res) & 0xffffffff
         return res & ((1 << (self.size * 8)) - 1)
+
+    def get_size(self):
+        return self.size
 
     def get_offset(self):
         return self.offset

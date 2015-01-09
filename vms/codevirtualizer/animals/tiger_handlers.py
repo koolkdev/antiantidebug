@@ -521,7 +521,7 @@ CALL = HandlerMatch(match_funcs([
     lines_matcher(["*({SU}*)($V[VAR_STACK] + 0x{N}) = (ReadParameterDword($P[RETURN_ADDRESS]) + VMStructField{SS}(?O[BASE_ADDRESS]))"]),
     POP_RET
 ]), create_tiger_handler_reader_class("CALL_{T:DST_TYPE}_NEXT",
-                                      [("AT:DST_TYPE}", "DST_VALUE"), ("RELIMM", "RETURN_ADDRESS")]))
+                                      [("{AT:DST_TYPE}", "DST_VALUE"), ("RELIMM", "RETURN_ADDRESS")]))
 
 RESET_KEYS = HandlerMatch(match_funcs([lines_matcher(\
     [
