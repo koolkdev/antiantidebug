@@ -26,6 +26,7 @@ class VMType(object):
     def get_compiled_vm_code(self, file, jumper):
         return self.get_vm_from_jumper(file, jumper).compile_code()
 
+    # TODO: Add option to remove vm section
     def fix_vms(self, pe, code_section=0, vms_section=3, big_macro=True):
         code_section_start = pe.sections[code_section].VirtualAddress + pe.OPTIONAL_HEADER.ImageBase
         code_section_end = code_section_start + pe.sections[code_section].SizeOfRawData
@@ -100,6 +101,7 @@ class VMType(object):
             real_end_address = inst.address
 
             if real_end_address != end_address:
+                # TODO: Replace all jumps to end_address to real_end_address, not just the last, or don't replace at all
                 compiled_code = compiled_code[:-1] + chr((ord(compiled_code[-1])+real_end_address-end_address)&0xff)
                 assert macro_size == real_end_address - end_address
                 end_address = real_end_address

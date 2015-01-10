@@ -561,6 +561,7 @@ class State(object):
         if len(self.stack) != len(other.stack):
             # Hack for flags
             if self.has_flags and self.fish:
+                # TODO: Find a better way to handle all this situation
                 assert len(self.stack) + 1 == len(other.stack)
                 assert len(self.stack) == 0 or len(self.stack) == 1
                 # I think that I don't want this becuse I don't want to make the condition visible
@@ -570,9 +571,25 @@ class State(object):
                 #self.handler.make_visible(other.stack[-1])
                 assert isinstance(other.stack[-1], FlagsOf) or isinstance(other.stack[-1], Variable)
                 #other.stack_variables[-1].name = 1
+                vars_to_fix = []
                 for i in other.stack_variables[-1].instructions:
                     if isinstance(i, SetValue) and isinstance(i.lvalue, Variable) and i.lvalue.name == "2":
                         i.lvalue.name = "1"
+                        vars_to_fix.append(i.lvalue)
+
+                i = 0
+                while i < len(vars_to_fix):
+                    for inst in vars_to_fix[i].used_instructions:
+                        if vars_to_fix[i] not in inst.get_all_children():
+                            for c in inst.get_all_children():
+                                if isinstance(inst, SetValue) and inst.lvalue == c:
+                                    continue
+                                if isinstance(c, Variable) and c.name == "2":
+                                    c.name = "1"
+                                    vars_to_fix.append(c)
+                                    break
+                    i += 1
+
                 if len(self.stack) == 0:
                     self.stack.append(other.stack_variables[0])
                     self.stack_variables.append(other.stack_variables[0])
@@ -757,7 +774,7 @@ class Handler(object):
             instructions.append(op)
 
         def set_value(lvalue, value):
-            if isinstance(lvalue, ValueOf) or type(lvalue) is SP:
+            if isinstance(lvalue, ValueOf) or type(lvalue) is SP or type(lvalue) is Flags:
                 instructions.append(value)
                 self.make_visible(value)
 

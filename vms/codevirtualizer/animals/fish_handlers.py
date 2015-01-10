@@ -201,15 +201,18 @@ def load_high_dword(name):
 RESET_ZERO_HIGH_DWORD_BOOL = lines_matcher(["VMStructFieldByte($O[ZERO_HIGH_DWORD_BOOL]) = 0x0"])
 
 def binary_math_op(op_name, op, read_flag=False):
+    main_lines = ["If(($V[%s_SIZE_VAR] == 0x@LOGSIZE@))" % (op_name, )]
+    if read_flag:
+        main_lines += ["    flags = var_1"]
+    main_lines += ["    $V[%s_VAR_DST] = ($V[%s_VAR_DST] %s $V[%s_VAR_SRC])" % (op_name, op_name, op, op_name),
+                   "    var_1 = Flags(($V[%s_VAR_DST] %s $V[%s_VAR_SRC]))" % (op_name, op, op_name)]
     return match_condition("If((ReadParameterByte($P[OPERATION]) == $H[OPERATION_%s]))" % (op_name,),
                            [lines_matcher(["$V[%s_VAR_DST] = DecodedValue(VMStructField{SS}($U[DST_VALUE]))" % (op_name,),
                                            "$V[%s_VAR_SRC] = DecodedValue(VMStructField{SS}($U[SRC_VALUE]))" % (op_name,),
                                            "$V[%s_VAR_SIZE] = DecodedValueByte(VMStructFieldByte($U[DST_SIZE]))" % (op_name,),
                                            ])] +
                            (read_flag and [lines_matcher(["var_1 = VMStructField{SS}(ReadParameterWord($P[FLAGS_OFFSET]))"])] or []) +
-                            duplicate_by_size(["If(($V[%s_SIZE_VAR] == 0x@LOGSIZE@))" % (op_name, ),
-                                               "    $V[%s_VAR_DST] = ($V[%s_VAR_DST] %s $V[%s_VAR_SRC])" % (op_name, op_name, op, op_name),
-                                               "    var_1 = Flags(($V[%s_VAR_DST] %s $V[%s_VAR_SRC]))" % (op_name, op, op_name)]) +
+                           duplicate_by_size(main_lines) +
                            [lines_matcher(["VMStructField{SS}($U[RESULT]) = EncodedValue($V[%s_VAR_DST])" % (op_name,)])])
 
 def binary_compare_op(op_name, op, read_flag=False):
@@ -313,14 +316,17 @@ COMMON_BINARY_OP = HandlerMatch(match_funcs([
                                          [("{AT:DST_TYPE_AND_SIZE}", "DST_VALUE"), ("{AT:SRC_TYPE_AND_SIZE}", "SRC_VALUE")]))
 
 def unary_math_op(op_name, op, read_flag=False):
+    main_lines = ["If(($V[%s_SIZE_VAR] == 0x@LOGSIZE@))" % (op_name, )]
+    if read_flag:
+        main_lines += ["    flags = var_1"]
+    main_lines += ["    $V[%s_VAR_VALUE] = (%s$V[%s_VAR_VALUE])" % (op_name, op, op_name),
+                   "    var_1 = Flags((%s$V[%s_VAR_VALUE]))" % (op, op_name)]
     return match_condition("If((ReadParameterByte($P[OPERATION]) == $H[OPERATION_%s]))" % (op_name,),
                            [lines_matcher(["$V[%s_VAR_VALUE] = DecodedValue(VMStructField{SS}($U[DST_VALUE]))" % (op_name,),
                                            "$V[%s_VAR_SIZE] = DecodedValueByte(VMStructFieldByte($U[DST_SIZE]))" % (op_name,),
                                            ])] +
                            (read_flag and [lines_matcher(["var_1 = VMStructField{SS}(ReadParameterWord($P[FLAGS_OFFSET]))"])] or []) +
-                            duplicate_by_size(["If(($V[%s_SIZE_VAR] == 0x@LOGSIZE@))" % (op_name, ),
-                                               "    $V[%s_VAR_VALUE] = (%s$V[%s_VAR_VALUE])" % (op_name, op, op_name),
-                                               "    var_1 = Flags((%s$V[%s_VAR_VALUE]))" % (op, op_name)]) +
+                           duplicate_by_size(main_lines) +
                            [lines_matcher(["VMStructField{SS}($U[RESULT]) = EncodedValue($V[%s_VAR_VALUE])" % (op_name,)])])
 
 def unary_math_not():

@@ -329,6 +329,7 @@ class FISHVMHandlers(VMHandlers):
                 handlers_decompiler.Handler(instruction.Function(self.file, address))
                 self._reader = self.file
             except:
+                # TODO: Detect it in a better way.. (number of instructions/handlers?)
                 self._reader = cleaner.Cleaner(self.file)
                 self._reader.set_option("ignore_jumps", False)
                 self._reader.set_option("fix_inc_dec", False)
@@ -356,7 +357,6 @@ class FISHVMHandlers(VMHandlers):
 
     def create_state(self, address, read):
         return vm_encoding.new_fish_state(address, read)
-
 
 class TIGERVMHandlers(VMHandlers):
     RESET_KEYS = tiger_handlers.RESET_KEYS

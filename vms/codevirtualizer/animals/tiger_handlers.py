@@ -229,13 +229,18 @@ POST_OPERATIONS = match_funcs([
     UPDATE_IP_AND_JUMP
 ])
 
-# TODO: Decompilation bug! set flags is missing before ROL/ROR/RCL/RCR (Probably because the fish flag)
+LOAD_FLAGS = lines_matcher(["flags = VMStructField{SS}(ReadParameterWord($P[FLAGS_OFFSET]))"])
+
+
+def with_flags(func):
+    return match_funcs([LOAD_FLAGS, func])
+
 COMMON_BINARY_OP_MAIN = match_one(
     [match_binary_expression("ADD", "+"), match_binary_expression("SUB", "-"),
      match_binary_expression("XOR", "^"), match_binary_expression("AND", "&"),
      match_binary_expression("OR", "|"),
-     match_binary_expression("ROL", "rol"), match_binary_expression("ROR", "ror"),
-     match_binary_expression("RCL", "rcl"), match_binary_expression("RCR", "rcr")])
+     with_flags(match_binary_expression("ROL", "rol")), with_flags(match_binary_expression("ROR", "ror")),
+     with_flags(match_binary_expression("RCL", "rcl")), with_flags(match_binary_expression("RCR", "rcr"))])
 
 COMMON_BINARY_OP_READER = create_tiger_handler_reader_class("{O:OPERATION}_{S:DST_SIZE}_{T:DST_TYPE}_{T:SRC_TYPE}",
                                                             [("{AT:DST_TYPE}", "DST_VALUE"), ("{AT:SRC_TYPE}", "SRC_VALUE")])
@@ -408,6 +413,7 @@ def match_unary_expression(name, op):
 
 COMMON_UNARY_OP = HandlerMatch(match_funcs([
     optional(dst_load(), "DST_LOADED"),
+    optional(LOAD_FLAGS, "LOAD_FLAGS"), # It may be only with inc or dec
     match_one([match_unary_expression("INC", "++"), match_unary_expression("DEC", "--"),
                match_unary_expression("NEG", "-"), match_unary_expression("NOT", "~")]),
     POST_OPERATIONS

@@ -308,10 +308,21 @@ STOS = HandlerMatch(match_funcs([
     UPDATE_IP_AND_JUMP
     ]), create_string_op_handler_reader("STOS"))
 
-POP_RET = match_funcs([
+_POP_REGS = match_funcs([
     lines_matcher(["VMStructFieldDword(?O[LOCK]) = 0x0"]),
     only_64(lines_matcher(["{R:%s} = Pop()" % reg for reg in ["r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15"]])),
     lines_matcher(["{R:%s} = Pop()" % reg for reg in ["di", "si", "bp", "bx", "dx", "cx" ,"ax"]]),
+    lines_matcher(["flags = Pop()"])
+])
+
+POP_RET = match_funcs([
+    _POP_REGS,
+    lines_matcher(["Return(0)"]),
+])
+
+POP_RET_EX = match_funcs([
+    _POP_REGS,
+    lines_matcher(["flags = Pop()"]),
     lines_matcher(["Return(0)"]),
 ])
 
@@ -328,7 +339,7 @@ RETURN = HandlerMatch(match_funcs([lines_matcher([
         "$V[VAR] = (SP + $H[STACK_RETURN_OFFSET])",
         "*({SU}*)($V[VAR] + 0x{N}) = *({SU}*)$V[VAR]",
     ]),
-    POP_RET
+    POP_RET_EX
     ]),
     create_handler_reader_class("RETURN", [("IMM", "STACK_MOVE_OFFSET")]))
 
