@@ -20,7 +20,7 @@ class VMType(object):
         return self.get_vm_from_jumper(file, self.jumper_cls(file, address))
 
     def get_vm_from_jumper(self, file, jumper):
-        return self.vm_func_cls(file, self.vm_info_cls(file, jumper.get_vm_address()), jumper)
+        return self.vm_func_cls(file, self.vm_info_cls.get_vm_info(file, jumper.get_vm_address()), jumper)
 
     def get_vm_code(self, file, jumper):
         return self.get_vm_from_jumper(file, jumper).get_code()
@@ -81,11 +81,12 @@ class VMType(object):
         code = vm.get_code()
         print code
         last_line = code.splitlines()[-1]
-        assert last_line.startswith("jmp ")
-        end_address = int(last_line.split()[1].replace("?", ""), 16)
+        assert last_line.startswith("jmp ") or last_line.startswith("ret")
         code_address, compiled_code, relocations_info = vm.compile_code(address + macro_size, relocs=True)
 
-        if not big_macro:
+        if last_line.startswith("jmp ?") or last_line.startswith("jmp 0x"):
+            # We can't find the real end if our function ends with ret or jump to anything else
+            end_address = int(last_line.split()[1].replace("?", ""), 16)
             inst = file.get_instruction(end_address)
             # In 32 bit
             while inst.opcode == "mov" and str(inst.operands[0]) == str(inst.operands[1]):
@@ -102,11 +103,12 @@ class VMType(object):
 
             if real_end_address != end_address:
                 compiled_code = compiled_code[:-1] + chr((ord(compiled_code[-1])+real_end_address-end_address)&0xff)
+                assert macro_size == real_end_address - end_address
                 end_address = real_end_address
 
-        assert end_address - code_address > len(compiled_code)
-        if end_address - code_address - macro_size != len(compiled_code) - 2:
-            print "Warning: Code size is different %d" % (end_address - code_address - macro_size - (len(compiled_code) - 2))
+            assert end_address - code_address > len(compiled_code)
+            if end_address - code_address - macro_size != len(compiled_code) - 2:
+                print "Warning: Code size is different %d" % (end_address - code_address - macro_size - (len(compiled_code) - 2))
         file.write(address, "\xeb" + chr(macro_size - 2))
         file.write(code_address, compiled_code)
 

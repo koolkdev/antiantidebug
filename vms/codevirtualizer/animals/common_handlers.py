@@ -3,6 +3,8 @@ import vms.vminstruction as vminstruction
 import handlers_parser
 import re
 
+# TODO: Organize those files (common/fish/tiger_handlers.py). They are a mess right now
+
 HandlerMatch = namedtuple("HandlerMatch", ["match_func", "reader"])
 
 
@@ -368,7 +370,7 @@ UNK_JMP_IMM = HandlerMatch(match_funcs([
 MOV_VAR_UNKVAR = HandlerMatch(match_funcs([
     lines_matcher(["VMStructField{SS}(ReadParameterWord($P[VAR])) = VMStructField{SS}($O[UNK_VAR])"]),
     UPDATE_IP_AND_JUMP,
-]), create_handler_reader_class("{MOV_VAR_UNKVAR:}"))  # Not seen used yet
+]), create_handler_reader_class("MOV_VAR_UNKVAR", [("VAR", "VAR")]))
 
 MOV_VAR_SP = HandlerMatch(match_funcs([
     lines_matcher(["VMStructField{SS}(ReadParameterWord($P[VAR])) = SP"]),

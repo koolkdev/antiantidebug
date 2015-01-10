@@ -562,10 +562,11 @@ class VMFunction(vm.VMFunction):
         section.end = True
 
         code = ""
-        code_base = code
         section_counter = 0
         next_section = 0
         registers = None
+
+        integrity_used = False
 
         for address in sorted(sections.keys()):
             if next_section:
@@ -579,10 +580,11 @@ class VMFunction(vm.VMFunction):
                 registers = {}
 
                 if section_counter == 1:
-                    index = max(max(code.rfind("add esp, 0x"), code.rfind("pop esp")), code.rfind("mov esp, dword [esp]"))
-                    # Deal with anti-debugging
-                    if index != -1:
-                        code = code_base + code[code.find("\n", index+1)+1:]
+                    if integrity_used:
+                        # TODO: Find the end in a proper way...
+                        index = max(max(code.rfind("add esp, 0x"), code.rfind("pop esp")), code.rfind("mov esp, dword [esp]"))
+                        if index != -1:
+                            code = code[code.find("\n", index+1)+1:]
                 section_counter += 1
 
                 regs = list(self.vm_info.init_handler.regs)
@@ -664,7 +666,9 @@ class VMFunction(vm.VMFunction):
                     # It is just a nop
                     inst = vminstruction.VMInstruction("NOP")
                 elif inst.name == ("MOV_%s_REG_ENCODE" % native_size_word):
-                    # TODO: Clear the anti-dumps code only if this register appears, and it should appear only in the first section
+                    # This vm instruction only used in anti-dump/integrity-test
+                    assert section_counter == 0
+                    integrity_used = True
                     if self.mode == 32:
                         inst = vminstruction.VMInstruction("MOV_%s_REG_IMM" % native_size_word, inst.args[0], long(self.vm_info.init_handler.encode))
                     else:
@@ -691,10 +695,11 @@ class VMFunction(vm.VMFunction):
 
 
         if section_counter == 1:
-            index = max(max(code.rfind("add esp, 0x"), code.rfind("pop esp")), code.rfind("mov esp, dword [esp]"))
-            # Deal with anti-debugging
-            if index != -1:
-                code = code_base + code[code.find("\n", index+1)+1:]
+            if integrity_used:
+                # TODO: Find the end in a proper way...
+                index = max(max(code.rfind("add esp, 0x"), code.rfind("pop esp")), code.rfind("mov esp, dword [esp]"))
+                if index != -1:
+                    code = code[code.find("\n", index+1)+1:]
 
         if self.mode == 32:
             code = code.replace("push eax\npush ecx\npush edx\npush ebx\npush ebx\npush ebp\npush esi\npush edi", "pushad")

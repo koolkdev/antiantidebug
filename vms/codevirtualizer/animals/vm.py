@@ -205,6 +205,7 @@ class VMHandlers(object):
             self._update_progress_bar()
         print "Reading handlers... SUCCESS"
 
+        # TODO: Multithreaded
 
         print "Decompiling handlers..."
         self._start_progress_bar()
@@ -449,6 +450,8 @@ class VMFunction(vm.VMFunction):
         instructions = {}
         instructions_list = []
 
+        self.integrity_used = False
+
         # Start address is the address of push address2/jmp and end address is the address of vmcode
         real_vm_code_address = vm_code_address + self.vm_info.init_handler.base_address
         self.code_address = real_vm_code_address
@@ -519,6 +522,12 @@ class VMFunction(vm.VMFunction):
                     inst.args.append(self.vm_info.init_handler.base_address)
                 elif inst.name == "RESET_KEYS":
                     state.reset()
+                elif inst.name == "MOV_VAR_UNKVAR":
+                    # This vm instruction only used in anti-dump/integrity-test
+                    # TODO: Check that in first section
+                    self.integrity_used = True
+                    inst.name = "MOV_%s_VAR_IMM" % file.get_arch().translate("{SU}")
+                    inst.args.append(file.read_pointer(self.vm_info.init_handler.vm_struct + self.vm_info.handlers.fields["UNK_VAR"]))
 
 
                 handler = handler_reader.get_next_handler()
@@ -654,10 +663,11 @@ class VMFunction(vm.VMFunction):
 
                 if section_counter == 1:
                     code = cleaner.clean_animals_vm_code(code, self.file.get_arch())
-                #     index = max(max(code.rfind("add esp, 0x"), code.rfind("pop esp")), code.rfind("mov esp, dword [esp]"))
-                #     # Deal with anti-debugging
-                #     if index != -1:
-                #         code = code_base + code[code.find("\n", index+1)+1:]
+                    if self.integrity_used:
+                        # TODO: Find the end in a proper way...
+                        index = max(max(code.rfind("add esp, 0x"), code.rfind("pop esp")), code.rfind("mov esp, dword [esp]"))
+                        if index != -1:
+                            code = code[code.find("\n", index+1)+1:]
                 section_counter += 1
 
                 reader.get_cond(lambda x: x.name == "START_VM")
@@ -692,10 +702,11 @@ class VMFunction(vm.VMFunction):
 
         if section_counter == 1:
             code = cleaner.clean_animals_vm_code(code, self.file.get_arch())
-        #     index = max(max(code.rfind("add esp, 0x"), code.rfind("pop esp")), code.rfind("mov esp, dword [esp]"))
-        #     # Deal with anti-debugging
-        #     if index != -1:
-        #         code = code_base + code[code.find("\n", index+1)+1:]
+            if self.integrity_used:
+                # TODO: Find the end in a proper way...
+                index = max(max(code.rfind("add esp, 0x"), code.rfind("pop esp")), code.rfind("mov esp, dword [esp]"))
+                if index != -1:
+                    code = code[code.find("\n", index+1)+1:]
 
         self.code = code[:-1]
         return self.code

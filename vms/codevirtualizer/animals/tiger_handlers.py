@@ -229,6 +229,7 @@ POST_OPERATIONS = match_funcs([
     UPDATE_IP_AND_JUMP
 ])
 
+# TODO: Decompilation bug! set flags is missing before ROL/ROR/RCL/RCR (Probably because the fish flag)
 COMMON_BINARY_OP_MAIN = match_one(
     [match_binary_expression("ADD", "+"), match_binary_expression("SUB", "-"),
      match_binary_expression("XOR", "^"), match_binary_expression("AND", "&"),

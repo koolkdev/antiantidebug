@@ -258,11 +258,12 @@ class Templates(object):
             matched_templates = []
             current_tables = [self.line_to_templates]
             j = 0
-            while current_tables and i + j < len(insts):
+            while current_tables:
                 new_tables = []
                 for table in current_tables:
-                    if insts[i + j].name in table[1]:
-                        new_tables.append(table[1][insts[i + j].name])
+                    if i + j < len(insts):
+                        if insts[i + j].name in table[1]:
+                            new_tables.append(table[1][insts[i + j].name])
                     matched_templates.extend(table[2])
                 current_tables = new_tables
                 j += 1
