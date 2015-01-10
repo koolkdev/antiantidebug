@@ -53,7 +53,8 @@ class Debugger(object):
     def __init__(self):
         self.hwbps = []
         self.hooks = {}
-    
+        self.mapped_file = None
+
     def start(self, filepath):
         self.filepath = filepath
         self.breakpoint_tunnel = AsyncOperation()
@@ -64,6 +65,7 @@ class Debugger(object):
         res = self.breakpoint_tunnel.wait()
         while self.debug.lastEvent.get_thread().get_pc() != self.create_process_event.get_start_address():
             res = self.go()
+        self.mapped_file = DebuggerMappedFile(self)
         return res
 
     def thread_task(self):
@@ -180,7 +182,7 @@ class Debugger(object):
             print "0x%08X: %s" % (inst.address, str(inst))
 
     def get_as_mapped_file(self):
-        return DebuggerMappedFile(self)
+        return self.mapped_file
 
 
 class DebuggerMappedFile(mappedfile.MappedFile):

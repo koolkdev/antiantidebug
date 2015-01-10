@@ -244,12 +244,75 @@ def get_common_block(block1, block2, blocks=None, loop_p=[]):
     #if loop:
     #    raise Exception("loop") # TODO: support loops
     return None
-        
-CONDITIONAL_JUMPS = "jz jnz".split(" ")  # TODO more
+
+
+class Loop(BaseException):
+    def __init__(self, id):
+        self.id = id
+
+def get_common_block2(block1, block2, blocks=None, loop_p=[]):
+    blocks_visited = []
+    blocks_visited2 = []
+    if blocks is None:
+        blocks = block1.blocks_cache
+    loop_p_1 = list(loop_p)
+    loop_p_2 = list(loop_p)
+    while block1 is not None or block2 is not None:
+        if block1 is not None:
+            if blocks_visited2.count(block1) > 0:
+                return block1
+            if blocks_visited.count(block1) > 0:
+                break
+            blocks_visited.append(block1)
+            add = block1.address
+            if loop_p_1.count(add):
+                raise Loop(0)
+            loop_p_1.append(add)
+            if blocks.has_key(add):
+                block1 = blocks[add]
+            else:
+                if block1.next_cond is not None:
+                    try:
+                        block1 = get_common_block2(block1.next, block1.next_cond, blocks, loop_p_1)
+                    except Loop, e:
+                        if e.id == 0:
+                            block1 = block1.next_cond
+                        elif e.id == 1:
+                            block1 = block1.next
+                else:
+                    block1 = block1.next
+                blocks[add] = block1
+        if block2 is not None:
+            if blocks_visited.count(block2) > 0:
+                return block2
+            if blocks_visited2.count(block2) > 0:
+                break
+            blocks_visited2.append(block2)
+            add = block2.address
+            if loop_p_2.count(add):
+                raise Loop(1)
+            loop_p_2.append(add)
+            if blocks.has_key(add):
+                block2 = blocks[add]
+            else:
+                if block2.next_cond is not None:
+                    try:
+                        block2 = get_common_block2(block2.next, block2.next_cond, blocks, loop_p_2)
+                    except Loop, e:
+                        if e.id == 0:
+                            block2 = block2.next_cond
+                        elif e.id == 1:
+                            block2 = block2.next
+                else:
+                    block2 = block2.next
+                blocks[add] = block2
+    return None
+
+CONDITIONAL_JUMPS = ("ja", "jae", "jb", "jbe", "jz", "jg", "jge", "jl", "jle", "jnz", "jno", "jnp", "jns", "jo", "jp" ,"js")
 
 
 class Function(object):
-    def __init__(self, file, address):
+    def __init__(self, file, address, stop_condition=None, filter=None):
         self.blocks_cache = {}
         instructions_blocks = {}
         self.blocks = {}
@@ -327,7 +390,16 @@ class Function(object):
                         block.next = instructions_blocks[address]
                         instructions_blocks[address].froms.append(block)
                     break
+                if filter is not None:
+                    naddress = filter(address)
+                    while naddress != address:
+                        address = naddress
+                        naddress = filter(address)
                 inst = file.get_instruction(address)
+                if stop_condition is not None and stop_condition(inst):
+                    # It is here, because the stop condition may be a jump
+                    block.instructions.append(inst)
+                    break
                 if inst.opcode == "jmp" and inst.operands[0].is_immediate():
                     # Ignore jmps
                     address = inst.operands[0].value
@@ -358,4 +430,15 @@ class Function(object):
                         # We assume that f.next != f.next_cond
                         # Because we doesn't even handle this case in the main function
                         block.next.froms.append(f)
+
+    def get_end_block(self):
+        block = self.start_block
+        while block.next is not None:
+            if block.next_cond is not None:
+                block = get_common_block2(block.next, block.next_cond)
+                if block is None:
+                    return None
+            else:
+                block = block.next
+        return block
 
