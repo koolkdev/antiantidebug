@@ -835,6 +835,7 @@ class Handler(object):
                                             (str(block.next.instructions[1]) == state.mode.translate("dec ecx") or \
                                              str(block.next.instructions[1]) == state.mode.translate("sub ecx, 0x1") or \
                                              str(block.next.instructions[1]) == state.mode.translate("add ecx, 0xffffffff")):
+                                # This is actually rep movsd
                                 instructions.append(MemCopy(state.get_register("di"),
                                                             state.get_register("si"),
                                                             state.get_register("cx")))
@@ -978,13 +979,22 @@ class Handler(object):
                         value = SetValue(lvalue, value)
                         set_value(lvalue, value)
                 elif inst.opcode == "ret":
-                    instructions.append(Return(inst.operands[0].value))
+                    if inst.operands[0] is not None:
+                        val = inst.operands[0].value
+                    else:
+                        val = 0
+                    instructions.append(Return(val))
                 elif inst.opcode == "call":
                     return state, instructions
                 elif inst.opcode == "std":
                     instructions.append(Std())
+                elif inst.opcode == state.mode.translate("movs{SB}") and inst.prefix == "rep":
+                    instructions.append(MemCopy(state.get_register("di"),
+                                                state.get_register("si"),
+                                                state.get_register("cx")))
+                    self.make_visible(instructions[-1])
                 else:
-                    #print inst
+                    print inst
                     assert False
         return state, instructions
 

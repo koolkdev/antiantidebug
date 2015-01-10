@@ -2,7 +2,9 @@ from themida import cleaner
 from vms import vminstruction
 from vms import templates
 from vms import vm
+from vms import vmtools
 
+import mappedfile
 import handlers_decompiler
 import handlers_parser
 import fish_handlers_cleaner
@@ -377,6 +379,19 @@ class TIGERVMHandlers(VMHandlers):
     def create_state(self, address, read):
         return vm_encoding.new_tiger_state(address, read)
 
+
+class SHARKVMHandlers(FISHVMHandlers):
+    def _read_handler_function(self, address):
+        naddress, bytes = vmtools.VMS["TIGER"].get_vm(self.file, address).compile_code()
+        return instruction.Function(mappedfile.BytesMappedFile(bytes, naddress, self.file.mode), naddress)
+
+
+class PUMAVMHandlers(TIGERVMHandlers):
+    def _read_handler_function(self, address):
+        naddress, bytes = vmtools.VMS["FISH"].get_vm(self.file, address).compile_code()
+        return instruction.Function(mappedfile.BytesMappedFile(bytes, naddress, self.file.mode), naddress)
+
+
 class VMInfo(vm.VMInfo):
     def __init__(self, file, vm_address, name, vm_handlers_cls):
         print "Parsing %s%d VM at 0x%08x" % (name, file.mode, vm_address)
@@ -391,10 +406,24 @@ class FISHVMInfo(VMInfo):
     def __init__(self, file, vm_address):
         VMInfo.__init__(self, file, vm_address, "FISH", FISHVMHandlers)
 
+
 class TIGERVMInfo(VMInfo):
     cache = {}
     def __init__(self, file, vm_address):
         VMInfo.__init__(self, file, vm_address, "TIGER", TIGERVMHandlers)
+
+
+class SHARKVMInfo(VMInfo):
+    cache = {}
+    def __init__(self, file, vm_address):
+        VMInfo.__init__(self, file, vm_address, "SHARK", SHARKVMHandlers)
+
+
+class PUMAVMInfo(VMInfo):
+    cache = {}
+    def __init__(self, file, vm_address):
+        VMInfo.__init__(self, file, vm_address, "PUMA", PUMAVMHandlers)
+
 
 class VMFunctionSection(object):
     def __init__(self, address):

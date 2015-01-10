@@ -1,5 +1,3 @@
-import codevirtualizer.animals.vm as animals_vm
-import codevirtualizer.cisc.vm as cisc_vm
 import mappedfile
 import sys
 
@@ -112,7 +110,4 @@ class VMType(object):
         file.write(address, "\xeb" + chr(macro_size - 2))
         file.write(code_address, compiled_code)
 
-
-VMS = {"CISC": VMType(cisc_vm.VMFunctionJumper, cisc_vm.VMInfo, cisc_vm.VMFunction),
-       "FISH": VMType(animals_vm.VMFunctionJumper, animals_vm.FISHVMInfo, animals_vm.VMFunction),
-       "TIGER": VMType(animals_vm.VMFunctionJumper, animals_vm.TIGERVMInfo, animals_vm.TIGERVMFunction)}
+VMS = {}
