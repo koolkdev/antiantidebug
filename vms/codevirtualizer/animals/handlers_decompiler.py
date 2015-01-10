@@ -994,7 +994,7 @@ class Handler(object):
                                                 state.get_register("cx")))
                     self.make_visible(instructions[-1])
                 else:
-                    print inst
+                    #print inst
                     assert False
         return state, instructions
 

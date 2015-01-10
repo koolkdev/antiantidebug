@@ -332,6 +332,7 @@ class FISHVMHandlers(VMHandlers):
                 self._reader = cleaner.Cleaner(self.file)
                 self._reader.set_option("ignore_jumps", False)
                 self._reader.set_option("fix_inc_dec", False)
+                self._reader.set_option("fixPush_allowConstants", True)
                 handlers_decompiler.Handler(instruction.Function(self._reader, address))
         return instruction.Function(self._reader, address)
 
