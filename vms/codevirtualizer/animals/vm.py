@@ -382,13 +382,17 @@ class TIGERVMHandlers(VMHandlers):
 
 class SHARKVMHandlers(FISHVMHandlers):
     def _read_handler_function(self, address):
-        naddress, bytes = vmtools.VMS["TIGER"].get_vm(self.file, address).compile_code()
+        inst = self.file.get_instruction(address)
+        assert inst.opcode == "jmp" and inst.operands[0].is_immediate()
+        naddress, bytes = vmtools.VMS["TIGER"].get_vm(self.file, inst.operands[0].value).compile_code()
         return instruction.Function(mappedfile.BytesMappedFile(bytes, naddress, self.file.mode), naddress)
 
 
 class PUMAVMHandlers(TIGERVMHandlers):
     def _read_handler_function(self, address):
-        naddress, bytes = vmtools.VMS["FISH"].get_vm(self.file, address).compile_code()
+        inst = self.file.get_instruction(address)
+        assert inst.opcode == "jmp" and inst.operands[0].is_immediate()
+        naddress, bytes = vmtools.VMS["FISH"].get_vm(self.file, inst.operands[0].value).compile_code()
         return instruction.Function(mappedfile.BytesMappedFile(bytes, naddress, self.file.mode), naddress)
 
 
@@ -626,7 +630,7 @@ class VMFunction(vm.VMFunction):
         return vminstruction.VMInstruction(name, *nargs)
 
     def _get_clean_templates(self):
-        return ["animals_00_regs.txt", "animals_01_vm.txt", "animals_02_misc.txt", "animals_03_vars.txt", "animals_04_memvars.txt", "animals_05_fix_pop.txt", "animals_06_rep.txt"]
+        return ["animals_00_nums.txt", "animals_00_regs.txt", "animals_01_vm.txt", "animals_02_misc.txt", "animals_03_vars.txt", "animals_04_memvars.txt", "animals_05_fix_pop.txt", "animals_06_rep.txt"]
 
     # TODO: Base class
     def _clean(self):
