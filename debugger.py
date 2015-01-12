@@ -49,11 +49,16 @@ class MyEventHandler(EventHandler):
         
     breakpoint = single_step
 
+DEBUGGERS = []
 class Debugger(object):
     def __init__(self):
         self.hwbps = []
         self.hooks = {}
         self.mapped_file = None
+        self.run = True
+
+        # Temp hack
+        self.new_section = None
 
     def start(self, filepath):
         self.filepath = filepath
@@ -70,6 +75,7 @@ class Debugger(object):
 
     def thread_task(self):
         self.debug = Debug(MyEventHandler(self))
+        DEBUGGERS.append(self)
         self.process = self.debug.execl(self.filepath)
         self.mode = self.process.get_bits()
         try:
@@ -128,11 +134,13 @@ class Debugger(object):
 
     #def hook(self, library, function, pre = None, post = None):
     #    self.hooks[library + "!" + function] = 
-    #def unhook(self, library, function):        
-    
+    #def unhook(self, library, function):
+
+    def get_base_address(self):
+        return self.create_process_event.get_module_base()
 
     def dump(self, to_file=None):
-        base = self.create_process_event.get_module_base()
+        base = self.get_base_address()
         pe = pefile.PE(data=self.process.read(base, 0x1000))
         pe.OPTIONAL_HEADER.AddressOfEntryPoint = self.thread.get_pc() - base
         sections = ""
@@ -144,7 +152,25 @@ class Debugger(object):
             section.PointerToRawData = pos
             section.SizeOfRawData = len(data)
             pos += len(data)
-        file_data = list(pe.__data__)
+        # Temp hack
+        if self.new_section is not None:
+            data = self.new_section.rstrip('\0')
+            data += '\0' * ((-len(data)) % 0x200)
+            sections += data
+            section = pefile.SectionStructure(pe.__IMAGE_SECTION_HEADER_format__, pe=pe)
+            section.set_file_offset(pe.sections[-1].get_file_offset()+section.sizeof())
+            section.__unpack__('\0' * section.sizeof())
+            pe.__structures__.append(section)
+            section.VirtualAddress = pe.sections[-1].VirtualAddress + pe.sections[-1].Misc
+            section.PointerToRawData = pos
+            section.SizeOfRawData = len(data)
+            section.Misc = len(self.new_section)
+            section.Characteristics = 0xC0000040
+            pos += len(data)
+            pe.FILE_HEADER.NumberOfSections += 1
+            pe.sections.append(section)
+
+        file_data = list(pe.write())
         for structure in pe.__structures__:
             struct_data = list(structure.__pack__())
             offset = structure.get_file_offset()
@@ -195,3 +221,11 @@ class DebuggerMappedFile(mappedfile.MappedFile):
 
     def write(self, address, data):
         self.debugger.process.write(address, data)
+
+def kill_all():
+    for debugger in DEBUGGERS:
+        debugger.debug.kill_all(True)
+    #import os
+    #os.exit(0)
+import atexit
+atexit.register(kill_all)

@@ -390,12 +390,14 @@ class Function(object):
                         block.next = instructions_blocks[address]
                         instructions_blocks[address].froms.append(block)
                     break
+                real_address = address
                 if filter is not None:
                     naddress = filter(address)
                     while naddress != address:
                         address = naddress
                         naddress = filter(address)
                 inst = file.get_instruction(address)
+                inst.address = real_address
                 if stop_condition is not None and stop_condition(inst):
                     # It is here, because the stop condition may be a jump
                     block.instructions.append(inst)

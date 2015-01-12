@@ -1,6 +1,8 @@
 import debugger
 import instruction
 import cleaner
+import struct
+import pefile
 from vms import vmtools
 
 def get_call_value(inst):
@@ -244,15 +246,13 @@ def clean_code_until(d, address, condition):
     return get_next(inst)
 
 
-def clean_code(d, address, filter):
+def get_clean_code(d, address, filter):
     cc = cleaner.Cleaner(d.get_as_mapped_file())
-    #cc.set_option("ignore_calls", True)
-    #print hex(func.get_end_block().instructions[-1].address)
-    #cc.set_option("end_address", get_next(func.get_end_block().instructions[-1]))
-    #cc.set_option("ignore_jumps", False)
-    #address = d.thread.get_pc()
-    code = ""
+    cc.set_option("ignore_calls", True)
     func = instruction.Function(cc, address, filter=filter)
+    return func
+
+def get_all_blocks(func):
     blocks = [func.start_block]
     i = 0
     while i < len(blocks):
@@ -261,7 +261,41 @@ def clean_code(d, address, filter):
         if blocks[i].next_cond is not None and blocks[i].next_cond not in blocks:
             blocks.append(blocks[i].next_cond)
         i += 1
-    print hex(address)
+    return blocks
+
+def find_jmp_eax(d, func):
+    arch = d.get_as_mapped_file().get_arch()
+    blocks = get_all_blocks(func)
+    found = False
+    address = None
+    value = None
+    for block in blocks:
+        if block.next is None and str(block.instructions[-1]) == arch.translate("jmp {R:ax}"):
+            assert not found
+            found = True
+            address = block.instructions[-1].address
+            if block.instructions[-2].opcode == "mov":
+                assert block.instructions[-2].operands[0].is_reg(block.instructions[-1].operands[0].reg) and block.instructions[-2].operands[1].is_immediate()
+                value = block.instructions[-2].operands[1].value
+            else:
+                assert block.instructions[-2].opcode == "add" and block.instructions[-2].operands[0].is_reg(block.instructions[-1].operands[0].reg) and block.instructions[-2].operands[1].is_reg(arch.reg_native("bp"))
+                assert block.instructions[-2].operands[0].is_reg(block.instructions[-1].operands[0].reg) and block.instructions[-2].operands[1].is_immediate()
+                reg = arch.reg_native("bp")
+                reg_value = debugger.thread.get_register(reg[0].upper() + reg[1:])
+                value = block.instructions[-2].operands[1].value + reg_value
+    assert found
+    return address, value
+
+
+
+def write_function(d, func, write_to, as_at):
+    #print hex(func.get_end_block().instructions[-1].address)
+    #cc.set_option("end_address", get_next(func.get_end_block().instructions[-1]))
+    #cc.set_option("ignore_jumps", False)
+    #address = d.thread.get_pc()
+    blocks = get_all_blocks(func)
+    code = ""
+    """
     for block in blocks:
         code = "\n".join([str(x) for x in block.instructions])
         code_length = len(instruction.Assembler(d.get_as_mapped_file().mode).assemble(code, block.address))
@@ -272,6 +306,48 @@ def clean_code(d, address, filter):
         print hex(block.address)
         print code
         d.get_as_mapped_file().write(block.address, instruction.Assembler(d.get_as_mapped_file().mode).assemble(code, block.address))
+    """
+    asm = instruction.Assembler(d.get_as_mapped_file().mode)
+    fix_jumps = []
+    block_at = {}
+    as_at -= write_to
+    for block in blocks:
+        block_at[block.address] = write_to + as_at
+        lines = [str(x) for x in block.instructions]
+        jmps = None
+        save = 0
+        if block.next is not None:
+            cond = None
+            save = 1
+            if block.next_cond is not None:
+                jmp_type, dst = lines[-1].split(" ")
+                lines = lines[:-1]
+                assert jmp_type.startswith("j")
+                assert int(dst, 16) == block.next_cond.address
+                cond = jmp_type, block.next_cond.address
+                save = 2
+            jmps = (cond, block.next.address)
+        if lines:
+            code = "\n".join(lines)
+            code = fix_code(d, code)
+            print hex(block.address-d.get_base_address())
+            print code
+            comp = asm.assemble(code, write_to + as_at)
+            d.get_as_mapped_file().write(write_to, comp)
+            write_to += len(comp)
+        if jmps is not None:
+            fix_jumps.append((write_to, jmps))
+            write_to += save * 6
+    for at, (cond, target) in fix_jumps:
+        if cond is not None:
+            comp = asm.assemble("%s 0x%x" % (cond[0], block_at[cond[1]]), at + as_at)
+            d.get_as_mapped_file().write(at, comp)
+            at += len(comp)
+        comp = asm.assemble("jmp 0x%x" % block_at[target], at + as_at)
+        d.get_as_mapped_file().write(at, comp)
+        at += len(comp)
+
+    return write_to
 
 viseted_decoding = {}
 def skip_code_decoding(d, address):
@@ -312,25 +388,71 @@ def skip_code_decoding(d, address):
     elif next.opcode== "mov" and next.operands[1].is_immediate():
         zero_reg = False
         size = next.operands[1].value * 4
-    last_inst = None
-    inst = reader.get()
-    while inst.opcode != "jnz":
-        last_inst = inst
-        inst = reader.get()
+
+    first_inst = reader.get_cond(lambda x: x.opcode == "mov" and x.operands[0].is_reg() and x.operands[1].is_memory())
+    r = arch.reg_dword(first_inst.operands[0].reg)
+    op1 = reader.get_cond(lambda x: x.opcode in ("add", "sub", "xor") and x.operands[0].is_reg(r) and x.operands[1].is_immediate())
+    op2 = reader.get_cond(lambda x: x.opcode in ("add", "sub", "xor") and x.operands[0].is_reg(r) and x.operands[1].is_immediate())
+    op3 = reader.get_cond(lambda x: x.opcode in ("add", "sub", "xor") and x.operands[0].is_reg(r) and x.operands[1].is_immediate())
+    reader.get_cond(lambda x: x.opcode == "mov" and x.operands[0].is_memory() and x.operands[1].is_reg(r))
+
+    if zero_reg:
+        search_reg = arch.reg_native(next.operands[0].reg)
+    else:
+        search_reg = mov_inst.operands[0].reg
+    try:
+        reader.get_cond(lambda x: x.opcode == "sub" and x.operands[0].is_reg(search_reg) and x.operands[1].is_immediate(4))
+    except:
+        num1op = reader.get_cond(lambda x: x.opcode in ("add", "sub", "dec", "inc") and x.operands[0].is_reg(search_reg))
+        num2op = reader.get_cond(lambda x: x.opcode in ("add", "sub", "dec", "inc") and x.operands[0].is_reg(search_reg))
+        num = 0
+        for op in (num1op, num2op):
+            if op.opcode == "add":
+                num += op.operands[1].value
+            elif op.opcode == "sub":
+                num += -op.operands[1].value
+            elif op.opcode == "inc":
+                num += 1
+            elif op.opcode == "dec":
+                num += -1
+        assert num == -4
+    last_inst = reader.get()
     if zero_reg:
         assert last_inst.opcode == "cmp" and last_inst.operands[0].is_reg(arch.reg_dword(next.operands[0].reg)) and last_inst.operands[1].is_immediate()
         size = (1<<32) - last_inst.operands[1].value
     else:
         assert last_inst.opcode == "dec" and last_inst.operands[0].is_reg(arch.reg_native(next.operands[0].reg))
+    reader.get_cond(lambda x: x.opcode == "jnz")
     # print hex(size)
     print hex(end_address)
     print hex(end_address-size)
 
-    ctx = d.thread.get_context()
-    d.thread.set_pc(address)
-    d.go(end_address-size, True)
-    d.thread.set_context(ctx)
+    f = d.get_as_mapped_file()
+    # Do the op
+    data = f.read(end_address-size, size)
+    ndata = ""
+    addr = end_address-size
+    for i in xrange(0, size, 4):
+        num = struct.unpack("<L", data[i:i+4])[0]
+        for op in (op1, op2, op3):
+            if op.opcode == "add":
+                num += op.operands[1].value
+            elif op.opcode == "sub":
+                num -= op.operands[1].value
+            elif op.opcode == "xor":
+                num ^= op.operands[1].value
+            num &= 0xffffffff
+        ndata += struct.pack("<L", num)
+        addr += 4
+    f.write(end_address-size, ndata)
+
+
+    # ctx = d.thread.get_context()
+    # d.thread.set_pc(address)
+    # d.go(end_address-size, True)
+    # d.thread.set_context(ctx)
     viseted_decoding[address] = end_address - size
+
     #d.get_as_mapped_file().write(address, instruction.Assembler(arch.native_size()*8).assemble("jmp 0x%x" % viseted_decoding[address], address))
     return viseted_decoding[address]
     # reader = cc.get_reader(end_address-size)
@@ -365,14 +487,35 @@ def follow(binary):
     #     print "Got to there"
     #     d.step()
 
-    #skip_code_decoding(d)
-    #skip_code_decoding(d)
+    #d.thread.set_pc(skip_code_decoding(d, d.thread.get_pc()))
+    #d.thread.set_pc(skip_code_decoding(d, d.thread.get_pc()))
 
+    #return d
     print "----------------"
     def filter(address):
         return skip_code_decoding(d, address)
-    clean_code(d, d.thread.get_pc(), filter)
 
+    pe = pefile.PE(data=d.process.read(d.get_base_address(), 0x1000))
+    end = d.get_base_address() + pe.sections[-1].VirtualAddress + pe.sections[-1].Misc
+    write_to = d.process.malloc(0x30000)
+    end -= write_to
+    org = write_to
+
+
+    func = get_clean_code(d, d.thread.get_pc(), filter)
+    print find_jmp_eax(d, func)
+    write_to = write_function(d, func, write_to, write_to + end)
+
+
+    # write_to = clean_code(d, d.get_base_address()+0x905C, filter, write_to, write_to + end)
+    # write_to = clean_code(d, d.get_base_address()+0xd8a2, filter, write_to, write_to + end)
+    #d.thread.set_pc(write_to)
+    #while True:
+    #    print hex(d.thread.get_pc())
+    #    print d.step()
+    #d.go()
+
+    d.new_section = d.process.read(org, 0x30000)
     return d
 
     """
