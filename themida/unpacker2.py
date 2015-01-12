@@ -207,14 +207,19 @@ def fix_code(debugger, code):
         code = code[:start] + "?0x%x" % (eval(part, {reg:reg_value}) & ((1<<(arch.native_size()*8))-1)) + code[end:]
     return code
 
-def get_vm(debugger):
-    vm = vmtools.VMS["FISH"].get_vm(debugger.get_as_mapped_file(), debugger.thread.get_pc())
+def get_vm(debugger, addr, write_at, as_at):
+    vm = vmtools.VMS["FISH"].get_vm(debugger.get_as_mapped_file(), addr)
     vm.code = fix_code(debugger, vm.code)
+    print vm.code, hex(write_at)
     address, compiled_code = vm.compile_code()
     debugger.process.write(address, compiled_code)
     debugger.thread.set_pc(address)
     assert compiled_code[-2:] == "\xFF\xE0" # jmp eax/rax
-    return vm.get_code(), address + len(compiled_code) - 2
+    debugger.go(address + len(compiled_code) - 2)
+
+    address, compiled_code = vm.compile_code(as_at)
+    debugger.process.write(write_at, compiled_code)
+    return write_at + len(compiled_code)
 
 
 def clean_code_until(d, address, condition):
@@ -279,10 +284,10 @@ def find_jmp_eax(d, func):
                 value = block.instructions[-2].operands[1].value
             else:
                 assert block.instructions[-2].opcode == "add" and block.instructions[-2].operands[0].is_reg(block.instructions[-1].operands[0].reg) and block.instructions[-2].operands[1].is_reg(arch.reg_native("bp"))
-                assert block.instructions[-2].operands[0].is_reg(block.instructions[-1].operands[0].reg) and block.instructions[-2].operands[1].is_immediate()
+                assert block.instructions[-3].opcode == "mov" and block.instructions[-3].operands[0].is_reg(block.instructions[-1].operands[0].reg) and block.instructions[-3].operands[1].is_immediate()
                 reg = arch.reg_native("bp")
-                reg_value = debugger.thread.get_register(reg[0].upper() + reg[1:])
-                value = block.instructions[-2].operands[1].value + reg_value
+                reg_value = d.thread.get_register(reg[0].upper() + reg[1:])
+                value = block.instructions[-3].operands[1].value + reg_value
     assert found
     return address, value
 
@@ -302,7 +307,7 @@ def write_function(d, func, write_to, as_at):
         if block.next is not None:
             if block.next.address - (block.address + code_length) >= 2:
                 code += "\njmp 0x%x" % block.next.address
-        code = fix_code(d, code)
+        code = fix_code(d, code)g"
         print hex(block.address)
         print code
         d.get_as_mapped_file().write(block.address, instruction.Assembler(d.get_as_mapped_file().mode).assemble(code, block.address))
@@ -330,8 +335,8 @@ def write_function(d, func, write_to, as_at):
         if lines:
             code = "\n".join(lines)
             code = fix_code(d, code)
-            print hex(block.address-d.get_base_address())
-            print code
+            # print hex(block.address-d.get_base_address())
+            # print code
             comp = asm.assemble(code, write_to + as_at)
             d.get_as_mapped_file().write(write_to, comp)
             write_to += len(comp)
@@ -348,9 +353,47 @@ def write_function(d, func, write_to, as_at):
         at += len(comp)
 
     return write_to
+#
+# def skip_fake_calls(d, address):
+#     inst = d.get_instruction(address)
+#     if d.get_instruction(inst.next).operands[0].value == inst.next + 5:
+#         # mov     ecx, 37D0h
+#         # call    $+5
+#         # pop     eax
+#         # add     eax, 0Eh
+#         # mov     [eax], ecx
+#         # jmp     loc_13550EE
+#         # mov     eax, ebx ; skipped
+#         # jmp     [..]
+#         return address
+#     elif inst.operands[0].value == inst.address + 8:
+#
+
+# call    sub_436033
+# db  20h
+# pop     edi
+# retn
+# #
+# pop     edi
+# mov     [esp+4], edi
+# add     dword ptr [esp+4], 15h
+# inc     edi
+# push    edi
+# retn
+
 
 viseted_decoding = {}
+changed_mems = []
 def skip_code_decoding(d, address):
+    inst = d.get_instruction(address)
+    if inst.opcode == "call" and inst.operands[0].is_immediate():
+        if inst.operands[0].value > inst.address + 50:
+            return inst.next, inst
+        ninst = d.get_instruction(inst.operands[0].value)
+        while ninst.opcode not in ("call", "push", "pop"):
+            ninst = d.get_instruction(ninst.next)
+        if ninst.opcode != "pop":
+            return inst.next, inst
     if address in viseted_decoding:
         return viseted_decoding[address]
     cc = cleaner.Cleaner(d.get_as_mapped_file())
@@ -358,6 +401,8 @@ def skip_code_decoding(d, address):
     reader = cc.get_reader(address)
     arch = d.get_as_mapped_file().get_arch()
     try:
+        print hex(address)
+        print d.get_instruction(address)
         end_address = reader.get_cond(lambda x: x.opcode == "mov" and x.operands[0].is_reg("eax") and x.operands[1].is_immediate()).operands[1].value
         reader.get_cond(lambda x: str(x) == arch.translate("push {R:ax}"))
         # The second oeprand is the address of add {R:...}, [rsp]
@@ -430,6 +475,7 @@ def skip_code_decoding(d, address):
     f = d.get_as_mapped_file()
     # Do the op
     data = f.read(end_address-size, size)
+    changed_mems.append((end_address-size, data))
     ndata = ""
     addr = end_address-size
     for i in xrange(0, size, 4):
@@ -461,8 +507,13 @@ def skip_code_decoding(d, address):
     #     print hex(inst.address)
     #     print inst
 
+def restore_mems(d):
+    global changed_mems
+    for address, mem in changed_mems[::-1]:
+        d.process.write(address, mem)
+    changed_mems = []
 
-def follow(binary):
+def follow(binary, vm="FISH"):
     d = debugger.Debugger()
     d.start(binary)
     step_00_go_to_first_decryptor_func(d)
@@ -501,10 +552,15 @@ def follow(binary):
     end -= write_to
     org = write_to
 
-
-    func = get_clean_code(d, d.thread.get_pc(), filter)
-    print find_jmp_eax(d, func)
-    write_to = write_function(d, func, write_to, write_to + end)
+    for i in xrange(2):
+        func = get_clean_code(d, d.thread.get_pc(), filter)
+        jmp_eax_address, jmp_value = find_jmp_eax(d, func)
+        write_to = write_function(d, func, write_to, write_to + end)
+        restore_mems(d)
+        print d.go(jmp_eax_address, True)
+        write_to = get_vm(d, jmp_value, write_to, write_to + end)
+        #print d.go(write_to-2)
+        d.step()
 
 
     # write_to = clean_code(d, d.get_base_address()+0x905C, filter, write_to, write_to + end)

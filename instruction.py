@@ -394,6 +394,9 @@ class Function(object):
                 if filter is not None:
                     naddress = filter(address)
                     while naddress != address:
+                        if type(naddress) is tuple:  # Temp hack
+                            naddress, inst = naddress
+                            block.instructions.append(inst)
                         address = naddress
                         naddress = filter(address)
                 inst = file.get_instruction(address)
