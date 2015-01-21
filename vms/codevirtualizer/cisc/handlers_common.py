@@ -169,15 +169,30 @@ mov {S} [{R:di}+<DIRECTION_FLAG>], 0x0
 and dword [{R:di}+<FLAGS>], 0xfffffbff
 """,
 
+"CLD_OLD":
+"""
+and dword [{R:di}+<FLAGS>], 0xfffffbff
+""",
+
 "STD":
 """
 mov {S} [{R:di}+<DIRECTION_FLAG>], 0x1
 or dword [{R:di}+<FLAGS>], 0x400
 """,
 
+"STD_OLD":
+"""
+or dword [{R:di}+<FLAGS>], 0x400
+""",
+
 "STI":
 """
 or dword [{R:di}+<FLAGS>], 0x200
+""",
+
+"CLI":  # Only in old versions?
+"""
+and dword [{R:di}+<FLAGS>], 0xfffffdff
 """,
 
 "SET_RETURN_POP_SIZE":

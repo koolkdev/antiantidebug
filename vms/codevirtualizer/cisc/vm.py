@@ -46,28 +46,41 @@ class VMInit(VMHandler):
             registers = 15
             ptr = utils.uint64
 
+        self.old_version = False
         self.regs = []
         if file.mode == 32:
+            try:
+                # Support old version
+                reader.get_cond(lambda x: x.opcode == "pushad")
+                self.regs += ["eax", "ecx", "edx", "ebx", "esp", "ebp", "esi", "edi"]
+                self.old_version = True
+            except cleaner.CleanerException:
+                pass
             reader.get_cond(lambda x: x.opcode == "pushfd")
             self.regs.append("flags")
-        self.regs += [reader.get_cond(lambda x: x.opcode == "push" and x.operands[0].is_reg()).operands[0].reg for i in xrange(registers)]
+        if not self.old_version:
+            self.regs += [reader.get_cond(lambda x: x.opcode == "push" and x.operands[0].is_reg()).operands[0].reg for i in xrange(registers)]
         if file.mode == 64:
             reader.get_cond(lambda x: x.opcode == "pushfq")
             self.regs.append("flags")
 
         reader.get_cond(lambda x: x.opcode == "cld")
         if file.mode == 32:
-            reader.get_cond(lambda x: x.opcode == "mov" and x.operands[0].is_reg("eax") and x.operands[1].is_reg("eax"))
+            try:
+                reader.get_cond(lambda x: x.opcode == "mov" and x.operands[0].is_reg("eax") and x.operands[1].is_reg("eax"))
+            except cleaner.CleanerException:
+                assert self.old_version  # Some old versions are with this mov and some aren't
 
         self.encode = ptr(reader.get_cond(lambda x: x.opcode == "call" and x.operands[0].value == x.address + 5).operands[0].value)
         reader.get_cond(lambda x: x.opcode == "pop" and x.operands[0].is_reg(mode.reg_native("di")))
 
         if file.mode == 32:
             self.encode -= reader.get_cond(lambda x: x.opcode == "sub" and x.operands[0].is_reg("edi") and x.operands[1].is_immediate()).operands[1].value
-            reader.get_cond(lambda x: x.opcode == "and" and x.operands[0].is_reg("edi") and x.operands[1].is_immediate(0xFFFFF000))
-            self.encode &= 0xFFFFF000
-            reader.get_cond(lambda x: x.opcode == "add" and x.operands[0].is_reg("edi") and x.operands[1].is_immediate(0x14))
-            self.encode += 0x14
+            if not self.old_version:
+                reader.get_cond(lambda x: x.opcode == "and" and x.operands[0].is_reg("edi") and x.operands[1].is_immediate(0xFFFFF000))
+                self.encode &= 0xFFFFF000
+                reader.get_cond(lambda x: x.opcode == "add" and x.operands[0].is_reg("edi") and x.operands[1].is_immediate(0x14))
+                self.encode += 0x14
             reader.get_cond(lambda x: x.opcode == "mov" and x.operands[0].is_reg("eax") and x.operands[1].is_reg("edi"))
             self.vm_struct = long(self.encode + reader.get_cond(lambda x: x.opcode == "add" and x.operands[0].is_reg("edi") and x.operands[1].is_immediate()).operands[1].value)
         else:
@@ -100,6 +113,8 @@ class VMInit(VMHandler):
             reader.get_cond(lambda x: x.opcode == "jmp" and x.operands[0].is_immediate())
 
         add_address = reader.address
+        if self.old_version:
+            reader.address = reader.get_cond(lambda x: x.opcode == "jmp" and x.operands[0].is_immediate()).operands[0].value
         self.handlers_in_vm_struct = reader.get_cond(lambda x: x.opcode == "add" and x.operands[1].is_reg(mode.reg_native("ax")) and x.operands[0].is_memory() and x.operands[0].base == mode.reg_native("di") and x.operands[0].index == mode.reg_native("cx") and x.operands[0].scale == mode.pointer_size()).operands[0].offset + mode.pointer_size()
         reader.get_cond(lambda x: x.opcode == "dec" and x.operands[0].is_reg("ecx"))
 
@@ -121,6 +136,13 @@ class VMInit(VMHandler):
             self.encode_address_high_dword = reader.get_cond(lambda x: x.opcode == "mov" and x.operands[0].is_reg("rdx") and x.operands[1].is_immediate()).operands[1].value
         else:
             self.encode_address_high_dword = 0
+
+        if self.old_version:
+            # Some unknown code in old versions
+            # cmp dword ptr [edi+0x44], 0
+            # jz ..
+            reader.get_cond(lambda x: x.opcode == "cmp" and x.operands[0].is_memory() and x.operands[0].base == "edi" and x.operands[0].offset == 0x44 and x.operands[1].is_immediate(0))
+            reader.address = reader.get_cond(lambda x: x.opcode == "jz").operands[0].value
 
         # mov esi, [esp+0x24]/[rsp+80h]
         reader.get_cond(lambda x: x.opcode == "mov" and x.operands[0].is_reg("esi") and x.operands[1].is_memory() and x.operands[1].base == mode.reg_native("sp") and x.operands[1].offset == (registers + 1) * mode.pointer_size())
@@ -310,7 +332,7 @@ class VMHandlers(object):
                 # So it is math operation, let's find it
                 if handler.read is not None:
                     for inst in handler.insts:
-                        print hex(inst.address)
+                        #print hex(inst.address)
                         print inst
                     raise Exception("Undetected handler")
                 # Detect math operation
@@ -596,13 +618,17 @@ class VMFunction(vm.VMFunction):
                 pop_reg = "POP_%s_REG" % native_size_word
                 # Check reg
                 if self.mode == 32:
+                    if self.vm_info.init_handler.old_version:
+                        reader.get_cond(lambda x: x.name == pop_reg and x.args[0] == 0x7) # POPF
+                        assert regs.pop() == "flags"
                     for i in xrange(4):
                         registers[reader.get_cond(lambda x: x.name == pop_reg).args[0]] = regs.pop()
                     reader.get_cond(lambda x: x.name == "SET_CHECK_CX_REG")  # TODO: Verify that it is ecx?
                     for i in xrange(4):
                         registers[reader.get_cond(lambda x: x.name == pop_reg).args[0]] = regs.pop()
-                    reader.get_cond(lambda x: x.name == pop_reg and x.args[0] == 0x7) # POPF
-                    assert regs.pop() == "flags"
+                    if not self.vm_info.init_handler.old_version:
+                        reader.get_cond(lambda x: x.name == pop_reg and x.args[0] == 0x7) # POPF
+                        assert regs.pop() == "flags"
                 else:
                     reader.get_cond(lambda x: x.name == pop_reg and x.args[0] == 0x7) # POPF
                     assert regs.pop() == "flags"
