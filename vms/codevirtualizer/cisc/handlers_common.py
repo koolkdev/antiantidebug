@@ -232,20 +232,20 @@ push {R:dx}
 mov {R:dx}, {R:ax}
 """,
 
-"PUSHUNKNOWN":
+"PUSH_JUNK":
 """
-push {S} [{R:di}+<UNKNOWN>]
+push {S} [{R:di}+<JUNK>]
 """,
 
-"POPUNKNOWN":
+"POP_JUNK":
 """
-pop {S} [{R:di}+<UNKNOWN>]
+pop {S} [{R:di}+<JUNK>]
 """,
 
-"POP2UNKNOWN":
+"POP2_JUNK":
 """
 mov {R:ax}, {S} [{R:sp}+0x{N}]
-mov {S} [{R:di}+<UNKNOWN>], {R:ax}
+mov {S} [{R:di}+<JUNK>], {R:ax}
 pop {R:ax}
 add {R:sp}, 0x{N}
 push {R:ax}

@@ -648,7 +648,7 @@ mov ebx, ebx
 and dword [{R:di}+<FLAGS>], 0xfe
 """,
 
-"JMP_REG":  # Appears in old versions
+"HIGH_MINUS_1_MAIN_HANDLER":  # Appears in old versions, TODO: support this (also in x64?)
 """
 add edi, 0x3fc
 movzx eax, al
