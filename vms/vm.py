@@ -29,10 +29,12 @@ class VMFunction(object):
     def get_code(self):
         return ""
 
-    def compile_code(self, address=None, relocs=False):
+    def compile_code(self, address=None, relocs=False, code_proc=None):
         code = self.get_code()
         if address is None:
             address = self.code_address
+        if code_proc is not None:
+            code = "\n".join([code_proc(line) for line in code.splitlines()])
         compiled_code = instruction.Assembler(self.mode).assemble(code, address, relocs)
         if not compiled_code:
             raise Exception("Failed to compile code")

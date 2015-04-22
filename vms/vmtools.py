@@ -79,36 +79,52 @@ class VMType(object):
         vm = self.get_vm(file, jmp_address)
         code = vm.get_code()
         print code
-        last_line = code.splitlines()[-1]
-        assert last_line.startswith("jmp ") or last_line.startswith("ret")
-        code_address, compiled_code, relocations_info = vm.compile_code(address + macro_size, relocs=True)
+        # Try to find the real end.
+        # we can't find the real end if our function ends with ret or jump to anything else
+        # and there isn't any jump during it
+        end_address = 0
+        for line in code.splitlines():
+            line_parts = line.split(" ")
+            if len(line_parts) == 2 and line_parts[0] in ("jmp", "ja", "jae", "jb", "jbe", "jz", "jg", "jge", "jl", "jle", "jnz", "jno", "jnp", "jns", "jo", "jp" ,"js") and \
+                    (line_parts[1].startswith("?") or line_parts[1].startswith("0x")):
+                j_address = int(line_parts[1].replace("?", ""), 16)
+                if j_address > address and (end_address == 0 or j_address < end_address):
+                    end_address = j_address
 
-        if last_line.startswith("jmp ?") or last_line.startswith("jmp 0x"):
-            # We can't find the real end if our function ends with ret or jump to anything else
-            end_address = int(last_line.split()[1].replace("?", ""), 16)
+        # Last line must be jmp or ret
+        assert line.startswith("jmp ") or line.startswith("ret")
+
+        code_proc = None
+        if end_address != 0:
             inst = file.get_instruction(end_address)
             # In 32 bit
-            while inst.opcode == "mov" and str(inst.operands[0]) == str(inst.operands[1]):
-                inst = file.get_instruction(inst.next)
+            if file.mode == 32:
+                while inst.opcode == "mov" and str(inst.operands[0]) == str(inst.operands[1]):
+                    inst = file.get_instruction(inst.next)
 
             # In 64 bit
-            inst = file.get_instruction(inst.address)
-            inst2 = file.get_instruction(inst.next)
-            while inst.opcode == "push" and inst2.opcode == "pop" and str(inst.operands[0]) == str(inst2.operands[0]):
-                inst = file.get_instruction(inst2.next)
+            if file.mode == 64:
+                inst = file.get_instruction(inst.address)
                 inst2 = file.get_instruction(inst.next)
+                while inst.opcode == "push" and inst2.opcode == "pop" and str(inst.operands[0]) == str(inst2.operands[0]):
+                    inst = file.get_instruction(inst2.next)
+                    inst2 = file.get_instruction(inst.next)
 
             real_end_address = inst.address
 
             if real_end_address != end_address:
-                # TODO: Replace all jumps to end_address to real_end_address, not just the last, or don't replace at all
-                compiled_code = compiled_code[:-1] + chr((ord(compiled_code[-1])+real_end_address-end_address)&0xff)
+                to_replace = "0x%x" % end_address
+                replace_with = "0x%x" % real_end_address
+                code_proc = lambda x: x.replace(to_replace, replace_with)
                 assert macro_size == real_end_address - end_address
                 end_address = real_end_address
 
+        code_address, compiled_code, relocations_info = vm.compile_code(address + macro_size, relocs=True, code_proc=code_proc)
+        if end_address != 0:
             assert end_address - code_address > len(compiled_code)
             if end_address - code_address - macro_size != len(compiled_code) - 2:
                 print "Warning: Code size is different %d" % (end_address - code_address - macro_size - (len(compiled_code) - 2))
+
         file.write(address, "\xeb" + chr(macro_size - 2))
         file.write(code_address, compiled_code)
 

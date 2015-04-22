@@ -139,9 +139,9 @@ class VMInit(VMHandler):
 
         if self.old_version:
             # Some unknown code in old versions
-            # cmp dword ptr [edi+0x44], 0
+            # cmp dword ptr [edi+..], 0
             # jz ..
-            reader.get_cond(lambda x: x.opcode == "cmp" and x.operands[0].is_memory() and x.operands[0].base == "edi" and x.operands[0].offset == 0x44 and x.operands[1].is_immediate(0))
+            reader.get_cond(lambda x: x.opcode == "cmp" and x.operands[0].is_memory() and x.operands[0].base == "edi" and x.operands[0].offset > 0 and x.operands[1].is_immediate(0))
             reader.address = reader.get_cond(lambda x: x.opcode == "jz").operands[0].value
 
         # mov esi, [esp+0x24]/[rsp+80h]
