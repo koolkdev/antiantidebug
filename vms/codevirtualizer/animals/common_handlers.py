@@ -190,6 +190,9 @@ UPDATE_IP_AND_JUMP_PARAM = lines_matcher(\
     ])
 
 
+def update_flags_cond(op):
+    return match_condition("If((ReadParameterByte($P[UPDATE_FLAGS]) != 0x0))", [op])
+
 def string_op(lines):
     def _func(parser, instructions, index, params, arch, info):
         parser.groups["SIZES"] = ["BYTE", "WORD", "DWORD"]

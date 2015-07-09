@@ -220,12 +220,17 @@ def update_flags(parser, instructions, index, params, arch, info):
         return False, index
     return True, index+1
 
+def new_update_flags(parser, instructions, index, params, arch, info):
+    lines = ["If((ReadParameterByte($P[UPDATE_FLAGS]) != 0x0))",
+             "    VMStructField{SS}(ReadParameterWord($P[FLAGS_OFFSET])) = Flags(%s)" % params.handler_vars["MAIN_LINE"]]
+    return match_lines(parser, instructions, index, params, lines, arch)
+
 
 ZERO_HIGH_DWORD = only_64(optional(zero_high_dword(), "ZERO_HIGH_DWORD"))
 
 POST_OPERATIONS = match_funcs([
     ZERO_HIGH_DWORD,
-    optional(update_flags, "UPDATE_FLAGS"),
+    optional(match_one([update_flags, new_update_flags]), "UPDATE_FLAGS"),
     UPDATE_IP_AND_JUMP
 ])
 
@@ -263,7 +268,7 @@ COMMON_BINARY_OP = HandlerMatch(match_funcs([
 ]), COMMON_BINARY_OP_READER)
 
 
-def update_flags_cond(parser, instructions, index, params, arch, info):
+def update_flags_cond_shl_shr(parser, instructions, index, params, arch, info):
     if index >= len(instructions):
         return False, index
     if not parser.match_expression(instructions[index], arch.translate("var_1 = Flags(%s)" % params.handler_vars["MAIN_LINE"]), params):
@@ -273,10 +278,10 @@ def update_flags_cond(parser, instructions, index, params, arch, info):
 SHL_SHR_MAIN = match_funcs([
     only_32(match_condition("If((($V[SRC_VAR] & 0x1F) != 0x0))", [
                                match_one([match_binary_expression("SHL", "<<"), match_binary_expression("SHR", ">>")]),
-                               optional(update_flags_cond, "UPDATE_FLAGS")])),
+                               optional(update_flags_cond_shl_shr, "UPDATE_FLAGS")])),
     only_64(match_condition("If((($V[SRC_VAR] & 0x3F) != 0x0))", [
                                match_one([match_binary_expression("SHL", "<<"), match_binary_expression("SHR", ">>")]),
-                               optional(update_flags_cond, "UPDATE_FLAGS")])),
+                               optional(update_flags_cond_shl_shr, "UPDATE_FLAGS")])),
     ])
 
 SHL_SHR = HandlerMatch(match_funcs([
@@ -297,7 +302,10 @@ SHL_SHR = HandlerMatch(match_funcs([
         lines_matcher(["var_1 = VMStructField{SS}(ReadParameterWord($P[FLAGS_OFFSET]))"])
     ]), "UPDATE_FLAGS"),
     ZERO_HIGH_DWORD,
-    optional(lines_matcher(["VMStructField{SS}(ReadParameterWord($P[FLAGS_OFFSET])) = var_1"]), "UPDATE_FLAGS"),
+    optional(match_one([
+        lines_matcher(["VMStructField{SS}(ReadParameterWord($P[FLAGS_OFFSET])) = var_1"]),
+        update_flags_cond(lines_matcher(["VMStructField{SS}(ReadParameterWord($P[FLAGS_OFFSET])) = var_1"]))]),
+        "UPDATE_FLAGS"),
     UPDATE_IP_AND_JUMP
 ]), COMMON_BINARY_OP_READER)
 
@@ -307,7 +315,9 @@ def match_comp(name, op):
             return False, index
         nparams = params.copy()
         if not parser.match_expression(instructions[index], arch.translate("VMStructField{SS}(ReadParameterWord($P[FLAGS_OFFSET])) = Flags(%s($[DST], $[SRC]))" % op), nparams):
-            return False, index
+            if not match_lines(parser, instructions, index, nparams, ["If((ReadParameterByte($P[UPDATE_FLAGS]) != 0x0))",
+                                                                     "    VMStructField{SS}(ReadParameterWord($P[FLAGS_OFFSET])) = Flags(%s($[DST], $[SRC]))" % op], arch)[0]:
+                return False, index
         if not match_dst_operation()(parser, nparams.vars["DST"], nparams, arch):
             return False, index
         # Should not be immediate
@@ -576,7 +586,7 @@ SCAS_1 = match_funcs([
     SCAS_MAIN,
     READ_DI,
     UPDATE_DI3,
-    optional(SCAS_UPDATE_FLAGS, "UPDATE_FLAGS"),
+    optional(match_one([update_flags_cond(SCAS_UPDATE_FLAGS), SCAS_UPDATE_FLAGS]), "UPDATE_FLAGS"),
     UPDATE_IP_AND_JUMP
 ])
 
@@ -585,7 +595,7 @@ SCAS_2 = match_funcs([
     optional(SCAS_UPDATE_FLAGS_1, "UPDATE_FLAGS"),
     READ_DI,
     UPDATE_DI3,
-    optional(SCAS_UPDATE_FLAGS_2, "UPDATE_FLAGS"),
+    optional(match_one([update_flags_cond(SCAS_UPDATE_FLAGS_2), SCAS_UPDATE_FLAGS_2]), "UPDATE_FLAGS"),
     UPDATE_IP_AND_JUMP
 ])
 
@@ -594,7 +604,7 @@ SCAS = HandlerMatch(match_one([SCAS_1, SCAS_2]), create_string_op_handler_reader
 CMPS = HandlerMatch(match_funcs([
     match_one([match_funcs([READ_SI, READ_DI]), match_funcs([READ_DI, READ_SI])]),
     UPDATE_SI_DI(False),
-    optional(match_one([CMPS_UPDATE_FLAGS_1, CMPS_UPDATE_FLAGS_2]), "UPDATE_FLAGS"),
+    optional(match_one([update_flags_cond(CMPS_UPDATE_FLAGS_1), update_flags_cond(CMPS_UPDATE_FLAGS_2), CMPS_UPDATE_FLAGS_1, CMPS_UPDATE_FLAGS_2]), "UPDATE_FLAGS"),
     UPDATE_IP_AND_JUMP
     ]), create_string_op_handler_reader("CMPS"))
 

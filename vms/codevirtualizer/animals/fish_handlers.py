@@ -69,9 +69,6 @@ MOVS = HandlerMatch(match_funcs([
     UPDATE_IP_AND_JUMP
     ]), create_string_op_handler_reader("MOVS"))
 
-def update_flags_cond(op):
-    return match_condition("If((ReadParameterByte($P[UPDATE_FLAGS]) != 0x0))", [op])
-
 SCAS_1 = match_funcs([
     SCAS_MAIN,
     READ_DI,
