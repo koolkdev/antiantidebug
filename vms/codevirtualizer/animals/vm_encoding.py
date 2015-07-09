@@ -173,7 +173,31 @@ class UpdateKeyCond(DecodingOperation):
 
     def decode(self, state):
         if state.get_key("KEY_COND").get_value() & 1:
-            state.get_key("KEY_COND").do_operation(state, self.op)
+            if self.op is not None:
+                state.get_key("KEY_COND").do_operation(state, self.op)
+
+
+class UpdateKeyCond2(DecodingOperation):
+    def __init__(self, op1, op2):
+        self.op1 = op1
+        self.op2 = op2
+
+    def decode(self, state):
+        if state.get_key("KEY_DECODE").get_value() & 2:
+            if self.op1 is not None:
+                state.get_key("KEY_DECODE").do_operation(state, self.op1)
+            if self.op2 is not None:
+                state.get_key("KEY_COND").do_operation(state, self.op2)
+
+
+class XchgKeys(DecodingOperation):
+    def __init__(self):
+        pass
+
+    def decode(self, state):
+        key1 = state.get_key("KEY_DECODE").get_value()
+        state.get_key("KEY_DECODE").set_value(state.get_key("KEY_COND").get_value())
+        state.get_key("KEY_COND").set_value(key1)
 
 
 class UpdateKeyKey(UpdateKey):
@@ -342,6 +366,8 @@ def get_reading_decoding_info(handler, fields, arch):
     current_decoding = None
     offset = None
     size = None
+    current_xchg_var = None
+    current_xchg_middle = False
 
     offsets = {}
 
@@ -445,10 +471,56 @@ def get_reading_decoding_info(handler, fields, arch):
             parser.replace_instructions(handler, handler, i, 1, [])
             if current_decoding is not None:
                 i -= 1
-        elif parser.match_expression(inst, "UpdateKeyCond(SimpleOperation(Operation($[X]), $[Y]))", params):
-            dec = UpdateKeyCond(DecodeNumber(params.vars["X"].value, params.vars["Y"].value))
+        elif parser.match_expression(inst, "UpdateKeyCond($[OPT])", params):
+            if type(params.vars["OPT"]) is not handlers_parser.NoneExpression:
+                assert parser.match_expression(params.vars["OPT"], "SimpleOperation(Operation($[OP]), $[NUM])", params)
+                op = DecodeNumber(params.vars["OP"].value, params.vars["NUM"].value)
+            else:
+                op = None
+            dec = UpdateKeyCond(op)
             assert current_decoding is None
             parser.replace_instructions(handler, handler, i, 1, [])
+        elif parser.match_expression(inst, "UpdateKeyCond2($[OPT1], $[OPT2])", params):
+            if type(params.vars["OPT1"]) is not handlers_parser.NoneExpression:
+                assert parser.match_expression(params.vars["OPT1"], "SimpleOperation(Operation($[OP1]), $[NUM1])", params)
+                op1 = DecodeNumber(params.vars["OP1"].value, params.vars["NUM1"].value)
+            else:
+                op1 = None
+            if type(params.vars["OPT2"]) is not handlers_parser.NoneExpression:
+                assert parser.match_expression(params.vars["OPT2"], "SimpleOperation(Operation($[OP2]), $[NUM2])", params)
+                op2 = DecodeNumber(params.vars["OP2"].value, params.vars["NUM2"].value)
+            else:
+                op2 = None
+            dec = UpdateKeyCond2(op1, op2)
+            assert current_decoding is None
+            parser.replace_instructions(handler, handler, i, 1, [])
+        elif parser.match_expression(inst, "XchgKeys()", params):
+            dec = XchgKeys()
+            assert current_decoding is None
+            parser.replace_instructions(handler, handler, i, 1, [])
+        elif parser.match_expression(inst, "XchgKeys1($V[VAR])", params):
+            # TODO: Can one of the keys change during xchg? because there may be other key updates between the xchg
+            # TODO: add checks to verify it
+            assert len(params.vars["VAR"].instructions) == 0 and len(params.vars["VAR"].used_instructions) == 1
+            assert current_decoding is None
+            assert current_xchg_var is None
+            current_xchg_var = params.vars["VAR"].used_instructions[0]
+            parser.replace_instructions(handler, handler, i, 1, [])
+            continue
+        elif parser.match_expression(inst, "XchgKeys2()", params):
+            dec = XchgKeys()
+            assert current_decoding is None
+            assert current_xchg_var is not None
+            current_xchg_middle = True
+            parser.replace_instructions(handler, handler, i, 1, [])
+        elif parser.match_expression(inst, "XchgKeys3($V[VAR])", params):
+            assert current_xchg_var == inst
+            assert current_xchg_middle
+            assert current_decoding is None
+            current_xchg_var = None
+            current_xchg_middle = False
+            parser.replace_instructions(handler, handler, i, 1, [])
+            continue
         elif parser.match_expression(inst, "UpdateKeySpecial(Operation($[X]))", params):
             dec = UpdateKeyKey("KEY_SPECIAL", "KEY_DECODE", params.vars["X"].value)
             assert current_decoding is None
@@ -504,19 +576,19 @@ def get_reading_decoding_info(handler, fields, arch):
                 # i += 1
                 continue
             elif parser.match_expression(inst, "VMStructFieldDword(?O[VALUE_DWORD_HIGH]) = (ReadParameterQword($N[OFFSET]) >> 0x20)", params):
-                    toffset = params.vars["OFFSET"].value
-                    tsize = 8
-                    assert current_decoding is not None
-                    assert type(current_decoding[0]) is UpdateValue and current_decoding[0].value == "VALUE_DWORD"
-                    assert offset == toffset
-                    assert size == tsize
-                    value = "VALUE_DWORD_HIGH"
-                    values[value] = SetValue(value, DecodeParameter(offset+4, 4, current_decoding[1:]))
-                    values_replace[value] = (parser.create_macro_result("VMStructFieldDword(?O[VALUE_DWORD_HIGH])", params), parser.create_macro_result("(ReadParameterQword($N[OFFSET]) >> 0x20)", params))
-                    decoding.append(DecodeQwordParameter(offset, values["VALUE_DWORD"], values["VALUE_DWORD_HIGH"]))
-                    current_decoding = None
-                    parser.replace_instructions(handler, handler, i, 1, [])
-                    continue
+                toffset = params.vars["OFFSET"].value
+                tsize = 8
+                assert current_decoding is not None
+                assert type(current_decoding[0]) is UpdateValue and current_decoding[0].value == "VALUE_DWORD"
+                assert offset == toffset
+                assert size == tsize
+                value = "VALUE_DWORD_HIGH"
+                values[value] = SetValue(value, DecodeParameter(offset+4, 4, current_decoding[1:]))
+                values_replace[value] = (parser.create_macro_result("VMStructFieldDword(?O[VALUE_DWORD_HIGH])", params), parser.create_macro_result("(ReadParameterQword($N[OFFSET]) >> 0x20)", params))
+                decoding.append(DecodeQwordParameter(offset, values["VALUE_DWORD"], values["VALUE_DWORD_HIGH"]))
+                current_decoding = None
+                parser.replace_instructions(handler, handler, i, 1, [])
+                continue
             elif parser.match_expression(inst, "$V[VAR] = $G[READ_PARAMETER:READ_OP]($N[OFFSET])", params) and \
                     len(params.vars["VAR"].instructions) == 1 and len(params.vars["VAR"].used_instructions) >= 2 and \
                     type(handler.instructions[i+1]) is handlers_parser.Macro and handler.instructions[i+1].name == "UpdateKey":
@@ -553,6 +625,7 @@ def get_reading_decoding_info(handler, fields, arch):
         else:
             decoding.append(dec)
 
+    assert current_xchg_var is None
     if current_decoding:
         decoding.append(DecodeParameter(offset, size, current_decoding))
 
