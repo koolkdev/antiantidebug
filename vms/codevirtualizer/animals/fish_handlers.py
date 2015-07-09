@@ -361,7 +361,7 @@ PUSH_POP_MAIN = lines_matcher(["If((ReadParameterByte($P[OPERATION]) == $H[OPERA
                                "        *({SU}*)$V[VALUE] = Pop()"])
 
 # BUG: Pop word doesn't seem to work...
-PUSH_POP_UPDATE_STACK = lines_matcher(["If((ReadParameterByte($P[OPERATION]) == $H[OPERATION_PUSH]))",
+PUSH_POP_UPDATE_STACK_OLD = lines_matcher(["If((ReadParameterByte($P[OPERATION]) == $H[OPERATION_PUSH]))",
                                        "    If((LOW_NIBBLE(DecodedValueByte(VMStructFieldByte($U[VALUE_SIZE]))) == 0x2))",
                                        "        *({SU}*)$V[SP_OFFSET] -= 0x2",
                                        "    Else",
@@ -370,6 +370,20 @@ PUSH_POP_UPDATE_STACK = lines_matcher(["If((ReadParameterByte($P[OPERATION]) == 
                                        "    If((DecodedValue(VMStructField{SS}($U[VALUE_ADDRESS])) != $V[SP_OFFSET]))",
                                        "        *({SU}*)$V[SP_OFFSET] += 0x{N}"])
 
+# Fixed in newer versions
+PUSH_POP_UPDATE_STACK = lines_matcher(["If((ReadParameterByte($P[OPERATION]) == $H[OPERATION_PUSH]))",
+                                       "    If(($V[SIZE_VAR2] == 0x2))",
+                                       "        *({SU}*)$V[SP_OFFSET] -= 0x2",
+                                       "    Else",
+                                       "        *({SU}*)$V[SP_OFFSET] -= 0x{N}",
+                                       "If((ReadParameterByte($P[OPERATION]) == $H[OPERATION_POP]))",
+                                       "    If((DecodedValue(VMStructField{SS}($U[VALUE_ADDRESS])) != $V[SP_OFFSET]))",
+                                       "        If(($V[SIZE_VAR2] == 0x2))",
+                                       "            *({SU}*)$V[SP_OFFSET] += 0x2",
+                                       "        Else",
+                                       "            *({SU}*)$V[SP_OFFSET] += 0x{N}",
+                                       ])
+
 PUSH_POP = HandlerMatch(match_funcs([
     any_order([read_encoded_param(2, "VALUE", "VALUE_VALUE"),
                read_two_nibbles(3, "TYPE_AND_SIZE", ("VALUE_TYPE", "VALUE_SIZE"))]),
@@ -377,8 +391,14 @@ PUSH_POP = HandlerMatch(match_funcs([
     lines_matcher(["$V[VALUE] = DecodedValue(VMStructField{SS}($U[VALUE_VALUE]))"]),
     lines_matcher(["$V[SIZE_VAR] = LOW_NIBBLE(DecodedValueByte(VMStructFieldByte($U[VALUE_SIZE])))"]),
     PUSH_POP_MAIN,
-    lines_matcher(["$V[SP_OFFSET] = VMStructOffset(ReadParameterWord($P[SP_OFFSET]))"]),
-    PUSH_POP_UPDATE_STACK,
+    match_one([match_funcs([
+        any_order([lines_matcher(["$V[SP_OFFSET] = VMStructOffset(ReadParameterWord($P[SP_OFFSET]))"]),
+                   lines_matcher(["$V[SIZE_VAR2] = LOW_NIBBLE(DecodedValueByte(VMStructFieldByte($U[VALUE_SIZE])))"])]),
+        PUSH_POP_UPDATE_STACK,
+        ]),
+        match_funcs([lines_matcher(["$V[SP_OFFSET] = VMStructOffset(ReadParameterWord($P[SP_OFFSET]))"]),
+                     PUSH_POP_UPDATE_STACK_OLD]),
+        ]),
     UPDATE_IP_AND_JUMP
     ]), create_fish_handler_reader_class("{O:OPERATION}_{SS:TYPE_AND_SIZE}_{T:TYPE_AND_SIZE}",
                                          [("{AT:TYPE_AND_SIZE}", "VALUE")]))
