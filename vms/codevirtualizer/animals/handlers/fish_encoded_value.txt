@@ -45,44 +45,61 @@ VMStructFieldByte($O[ENCODED_BYTE_B2]) = EncodedValueByte(LOW_NIBBLE($[VAR]), Si
 DEFINE_TEMPLATE
 @NATIVE_FIELD@($O[ENCODED_VALUE_1]) = ((ReadParameterDword($N[OFFSET]) $G[SIMPLE_MATH:OP1] $N[NUMBER1]) $G[SIMPLE_MATH:OP2] @NATIVE_FIELD@(?O[JUNK]))
 =>
-@NATIVE_FIELD@($O[ENCODED_VALUE_1]) = EncodedValue(ReadParameterDword($N[OFFSET]), SimpleOperation(Operation($[OP1]), $[NUMBER1]), SimpleOperation(Operation($[OP2]), @NATIVE_FIELD@(?O[JUNK])))
+@NATIVE_FIELD@($O[ENCODED_VALUE_1]) = EncodedValue(ReadParameterDword($N[OFFSET]), SimpleOperation(Operation($[OP1]), $[NUMBER1]), SimpleOperation(Operation($[OP2]), @NATIVE_FIELD@(?O[JUNK])), None)
 
 #DEFINE_TEMPLATE
 #@NATIVE_FIELD@($O[ENCODED_VALUE_1]) = ((ReadParameterDword($N[OFFSET]) $G[SIMPLE_MATH:OP1] @NATIVE_FIELD@(?O[JUNK])) $G[SIMPLE_MATH:OP2] $N[NUMBER2])
 #=>
-#@NATIVE_FIELD@($O[ENCODED_VALUE_1]) = EncodedValue(ReadParameterDword($N[OFFSET]), SimpleOperation(Operation($[OP1]), @NATIVE_FIELD@(?O[JUNK])), SimpleOperation(Operation($[OP2]), $[NUMBER2]))
+#@NATIVE_FIELD@($O[ENCODED_VALUE_1]) = EncodedValue(ReadParameterDword($N[OFFSET]), SimpleOperation(Operation($[OP1]), @NATIVE_FIELD@(?O[JUNK])), SimpleOperation(Operation($[OP2]), $[NUMBER2]), None)
+
+# In newer versions
+DEFINE_TEMPLATE
+@NATIVE_FIELD@($O[ENCODED_VALUE_1]) = (((ReadParameterDword($N[OFFSET]) $G[SIMPLE_MATH:OP1] $N[NUMBER1]) $G[SIMPLE_MATH:OP2] @NATIVE_FIELD@(?O[ENCODED_VALUE_4])) $G[SIMPLE_MATH:OP3] @NATIVE_FIELD@(?O[JUNK]))
+=>
+@NATIVE_FIELD@($O[ENCODED_VALUE_1]) = EncodedValue(ReadParameterDword($N[OFFSET]), SimpleOperation(Operation($[OP1]), $[NUMBER1]), SimpleOperation(Operation($[OP2]), @NATIVE_FIELD@(?O[ENCODED_VALUE_4])), SimpleOperation(Operation($[OP3]), @NATIVE_FIELD@(?O[JUNK])))
 
 #DEFINE_TEMPLATE
 #@NATIVE_FIELD@($O[ENCODED_VALUE_2]) = ((ReadParameterDword($N[OFFSET]) $G[SIMPLE_MATH:OP1] $N[NUMBER1]) $G[SIMPLE_MATH:OP2] @NATIVE_FIELD@(?O[JUNK]))
 #=>
-#@NATIVE_FIELD@($O[ENCODED_VALUE_2]) = EncodedValue(ReadParameterDword($N[OFFSET]), SimpleOperation(Operation($[OP1]), $[NUMBER1]), SimpleOperation(Operation($[OP2]), @NATIVE_FIELD@(?O[JUNK])))
+#@NATIVE_FIELD@($O[ENCODED_VALUE_2]) = EncodedValue(ReadParameterDword($N[OFFSET]), SimpleOperation(Operation($[OP1]), $[NUMBER1]), SimpleOperation(Operation($[OP2]), @NATIVE_FIELD@(?O[JUNK])), None)
 
 DEFINE_TEMPLATE
 @NATIVE_FIELD@($O[ENCODED_VALUE_2]) = ((ReadParameterDword($N[OFFSET]) $G[SIMPLE_MATH:OP1] @NATIVE_FIELD@(?O[JUNK])) $G[SIMPLE_MATH:OP2] $N[NUMBER2])
 =>
-@NATIVE_FIELD@($O[ENCODED_VALUE_2]) = EncodedValue(ReadParameterDword($N[OFFSET]), SimpleOperation(Operation($[OP1]), @NATIVE_FIELD@(?O[JUNK])), SimpleOperation(Operation($[OP2]), $[NUMBER2]))
+@NATIVE_FIELD@($O[ENCODED_VALUE_2]) = EncodedValue(ReadParameterDword($N[OFFSET]), SimpleOperation(Operation($[OP1]), @NATIVE_FIELD@(?O[JUNK])), SimpleOperation(Operation($[OP2]), $[NUMBER2]), None)
 
 DEFINE_TEMPLATE
 @NATIVE_FIELD@($O[ENCODED_VALUE_2]) = (ReadParameterDword($N[OFFSET]) $G[SIMPLE_MATH:OP1] @NATIVE_FIELD@(?O[JUNK]))
 =>
-@NATIVE_FIELD@($O[ENCODED_VALUE_2]) = EncodedValue(ReadParameterDword($N[OFFSET]), SimpleOperation(Operation($[OP1]), @NATIVE_FIELD@(?O[JUNK])), None)
+@NATIVE_FIELD@($O[ENCODED_VALUE_2]) = EncodedValue(ReadParameterDword($N[OFFSET]), SimpleOperation(Operation($[OP1]), @NATIVE_FIELD@(?O[JUNK])), None, None)
+
+# In newer versions
+DEFINE_TEMPLATE
+@NATIVE_FIELD@($O[ENCODED_VALUE_2]) = ((ReadParameterDword($N[OFFSET]) $G[SIMPLE_MATH:OP1] @NATIVE_FIELD@(?O[JUNK])) $G[SIMPLE_MATH:OP2] @NATIVE_FIELD@($O[ENCODED_VALUE_3]))
+=>
+@NATIVE_FIELD@($O[ENCODED_VALUE_2]) = EncodedValue(ReadParameterDword($N[OFFSET]), SimpleOperation(Operation($[OP1]), @NATIVE_FIELD@(?O[JUNK])), SimpleOperation(Operation($[OP2]), @NATIVE_FIELD@($O[ENCODED_VALUE_3])), None)
+
+DEFINE_TEMPLATE
+@NATIVE_FIELD@($O[ENCODED_VALUE_2]) = (((ReadParameterDword($N[OFFSET]) $G[SIMPLE_MATH:OP1] @NATIVE_FIELD@(?O[JUNK])) $G[SIMPLE_MATH:OP2] @NATIVE_FIELD@($O[ENCODED_VALUE_3])) $G[SIMPLE_MATH:OP3] $N[NUMBER3])
+=>
+@NATIVE_FIELD@($O[ENCODED_VALUE_2]) = EncodedValue(ReadParameterDword($N[OFFSET]), SimpleOperation(Operation($[OP1]), @NATIVE_FIELD@(?O[JUNK])), SimpleOperation(Operation($[OP2]), @NATIVE_FIELD@($O[ENCODED_VALUE_3])), SimpleOperation(Operation($[OP3]), $[NUMBER3]))
 
 DEFINE_TEMPLATE
 @NATIVE_FIELD@($O[ENCODED_VALUE_3]) = ($V[VAR] $G[SIMPLE_MATH:OP] $N[NUMBER])
 =>
-@NATIVE_FIELD@($O[ENCODED_VALUE_3]) = EncodedValue($[VAR], SimpleOperation(Operation($[OP]), $N[NUMBER]), None)
+@NATIVE_FIELD@($O[ENCODED_VALUE_3]) = EncodedValue($[VAR], SimpleOperation(Operation($[OP]), $N[NUMBER]), None, None)
 
 DEFINE_TEMPLATE
 @NATIVE_FIELD@(?O[ENCODED_VALUE_3]) = ($[VAR] $G[SIMPLE_MATH:OP] $N[NUMBER])
 =>
-@NATIVE_FIELD@(?O[ENCODED_VALUE_3]) = EncodedValue($[VAR], SimpleOperation(Operation($[OP]), $N[NUMBER]), None)
+@NATIVE_FIELD@(?O[ENCODED_VALUE_3]) = EncodedValue($[VAR], SimpleOperation(Operation($[OP]), $N[NUMBER]), None, None)
 
 DEFINE_TEMPLATE
 @NATIVE_FIELD@($O[ENCODED_VALUE_4]) = ($V[VAR] $G[SIMPLE_MATH:OP] $N[NUMBER])
 =>
-@NATIVE_FIELD@($O[ENCODED_VALUE_4]) = EncodedValue($[VAR], SimpleOperation(Operation($[OP]), $N[NUMBER]), None)
+@NATIVE_FIELD@($O[ENCODED_VALUE_4]) = EncodedValue($[VAR], SimpleOperation(Operation($[OP]), $N[NUMBER]), None, None)
 
 DEFINE_TEMPLATE
 @NATIVE_FIELD@($O[ENCODED_VALUE_5]) = ($V[VAR] $G[SIMPLE_MATH:OP] $N[NUMBER])
 =>
-@NATIVE_FIELD@($O[ENCODED_VALUE_5]) = EncodedValue($[VAR], SimpleOperation(Operation($[OP]), $N[NUMBER]), None)
+@NATIVE_FIELD@($O[ENCODED_VALUE_5]) = EncodedValue($[VAR], SimpleOperation(Operation($[OP]), $N[NUMBER]), None, None)

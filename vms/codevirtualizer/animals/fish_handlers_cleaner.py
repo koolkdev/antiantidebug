@@ -58,9 +58,13 @@ def clean_junk_check(handlers, fields, arch):
              "    $V[VAR] = Flags(Compare($[V1], $[V2]))",
              arch.translate("    *({SU}*)({R:bp} + $O[ENCODED_VALUE_3]) = ((~((*({SU}*)({R:bp} + $O[ENCODED_VALUE_1]) $G[SIMPLE_MATH:OP3] *({SU}*)({R:bp} + ?O[JUNK])) $G[SIMPLE_MATH:OP1] $N[NUMBER1])) $G[SIMPLE_MATH:OP2] $N[NUMBER2])")]
 
+    lines2 = ["If(($[X] == 0x0))",
+             "    $V[VAR] = Flags(Compare($[V1], $[V2]))",
+             arch.translate("    *({SU}*)({R:bp} + $O[ENCODED_VALUE_3]) = ((~(((*({SU}*)({R:bp} + $O[ENCODED_VALUE_1]) $G[SIMPLE_MATH:OP3] *({SU}*)({R:bp} + ?O[JUNK])) $G[SIMPLE_MATH:OP4] *({SU}*)({R:bp} + $O[ENCODED_VALUE_4])) $G[SIMPLE_MATH:OP1] $N[NUMBER1])) $G[SIMPLE_MATH:OP2] $N[NUMBER2])")]
+
     def fix_func(handler, instructions_container, index, params):
         nparams = params.copy()
-        if parser.match_instructions(instructions_container.instructions, index, lines, 0, nparams)[0]:
+        if parser.match_instructions(instructions_container.instructions, index, lines, 0, nparams)[0] or parser.match_instructions(instructions_container.instructions, index, lines2, 0, nparams)[0]:
             params.update_global(nparams)
             parser.replace_instructions(handler, instructions_container.instructions[index], 0, 1, [parser.create_macro_result("$[VAR] = RandomFlags()", nparams)])
             return True
@@ -82,10 +86,20 @@ def fix_encoding_values(handler, fields):
         nparams = params.copy()
         parser.replace_macros_in_expression(handler, to_replace, instructions_container.instructions[index], params)
         parser.replace_instructions_templates(handler, lines_to_replace, instructions_container, index, params)
-        if parser.match_instructions(instructions_container.instructions, index, ["$[X1] = EncodedValue($[X2], SimpleOperation(Operation($[OP1]), $[VAR1]), $[OP2T])"], 0, nparams)[0]:
+        if parser.match_instructions(instructions_container.instructions, index, ["$[X1] = EncodedValue($[X2], SimpleOperation(Operation($[OP1]), $[VAR1]), $[OP2T], $[OP3T])"], 0, nparams)[0]:
             current_expression = nparams.vars["X1"]
             encoding_expression = handlers_parser.Str("$[X]")
+            # TODO more generic code
             if type(nparams.vars["OP2T"]) is not handlers_parser.NoneExpression:
+                if type(nparams.vars["OP3T"]) is not handlers_parser.NoneExpression:
+                    assert parser.match_expression(nparams.vars["OP3T"], "SimpleOperation(Operation($[OP3]), $[VAR3])", nparams)
+                    if str(nparams.vars["OP3"]) == "+":
+                        neg_op = handlers_parser.Sub
+                    elif str(nparams.vars["OP3"]) == "-":
+                        neg_op = handlers_parser.Add
+                    elif str(nparams.vars["OP3"]) == "^":
+                        neg_op = handlers_parser.Xor
+                    current_expression = neg_op(current_expression, nparams.vars["VAR3"])
                 assert parser.match_expression(nparams.vars["OP2T"], "SimpleOperation(Operation($[OP2]), $[VAR2])", nparams)
                 if str(nparams.vars["OP2"]) == "+":
                     neg_op = handlers_parser.Sub
@@ -104,6 +118,8 @@ def fix_encoding_values(handler, fields):
             encoding_expression = handlers_parser.OPS[str(nparams.vars["OP1"])](encoding_expression, nparams.vars["VAR1"])
             if type(nparams.vars["OP2T"]) is not handlers_parser.NoneExpression:
                 encoding_expression = handlers_parser.OPS[str(nparams.vars["OP2"])](encoding_expression, nparams.vars["VAR2"])
+                if type(nparams.vars["OP3T"]) is not handlers_parser.NoneExpression:
+                    encoding_expression = handlers_parser.OPS[str(nparams.vars["OP3"])](encoding_expression, nparams.vars["VAR3"])
             encoding_expression = handlers_parser.SetValue(nparams.vars["X1"], encoding_expression)
             encoding_expression_result = handlers_parser.SetValue(nparams.vars["X1"], handlers_parser.Macro("EncodedValue", [handlers_parser.Str("$[X]")]))
             parser.replace_instructions(handler, instructions_container, index, 1, [parser.create_macro_result("$[X1] = EncodedValue($[X2])", nparams)])
