@@ -417,6 +417,65 @@ ADD_SP_IMM = HandlerMatch(match_funcs([
 ]), create_handler_reader_class("ADD_SP_IMM", [("IMM", "IMM")]))
 
 
+# I have to do this because we can't know the output of the optimization for sure
+# (Because it can happen in stages if there is a junk in the middle that we will be deleted later, we can't merge them
+# later)
+# TODO: There are some more cases that it can happen (all the $V[FLAGS] = ($V[FLAGS] & Y)) cases, fix it for them also
+# (But I am lazy, I will probably do it only after I will encounter it)
+
+def MATCH_GET_FLAGS_BITS(line):
+    def _func(parser, instructions, index, params, arch, info):
+        if line == 1:
+            dst_var = "FLAGS2"
+            _and = 0x800
+            shr = 0xB
+        elif line == 2:
+            dst_var = "FLAGS"
+            _and = 0x80
+            shr = 0x7
+        else:
+            assert False
+        if parser.match_expression(instructions[index], "$V[%s] = (($V[FLAGS] & 0x%X) >> 0x%X)" % (dst_var, _and, shr), params):
+            params.handler_vars["FLAG%d" % line] = 0
+        elif parser.match_expression(instructions[index], "$V[%s] = ($V[FLAGS] & 0x%X)" % (dst_var, _and), params):
+            params.handler_vars["FLAG%d" % line] = 1
+        elif parser.match_expression(instructions[index], "$V[%s]" % dst_var, params):
+            params.handler_vars["FLAG%d" % line] = 2
+        else:
+            return False, index
+        return True, index + 1
+    return _func
+
+# I have to do this shit because of optimization. If there are junk opcodes, we get may get a different output
+def COMPARE_FLAGS(sign):
+    def _func(parser, instructions, index, params, arch, info):
+        def build_flag(line):
+            if line == 1:
+                dst_var = "FLAGS2"
+                _and = 0x800
+                shr = 0xB
+            elif line == 2:
+                dst_var = "FLAGS"
+                _and = 0x80
+                shr = 0x7
+            else:
+                assert False
+            flag = "$V[%s]" % dst_var
+            if params.handler_vars["FLAG%d" % line] >= 2:
+                flag = "(%s & 0x%X)" % (flag, _and)
+            if params.handler_vars["FLAG%d" % line] >= 1:
+                flag = "(%s >> 0x%X)" % (flag, shr)
+            return flag
+        return match_condition("If((%s %s %s))" % (build_flag(2), sign, build_flag(1)), [lines_matcher(["VMStructFieldByte($O[TAKE_JUMP]) = 0x1"])])(parser, instructions, index, params, arch, info)
+    return _func
+
+def FLAGS_BITS_COMPARE(sign):
+    return match_funcs([
+        MATCH_GET_FLAGS_BITS(1),
+        MATCH_GET_FLAGS_BITS(2),
+        COMPARE_FLAGS(sign)
+    ])
+
 #("ja", "jae", "jb", "jbe", "jz", "jg", "jge", "jl", "jle", "jnz", "jno", "jnp", "jns", "jo", "jp" ,"js")
 
 JZ = lines_matcher(["If((($V[CHECK_TYPE] == $H[CHECK_TYPE_JZ]) || ($V[CHECK_TYPE] == $H[CHECK_TYPE_JLE])))",
@@ -454,32 +513,22 @@ JBE = lines_matcher(["If(($V[CHECK_TYPE] == $H[CHECK_TYPE_JBE]))",
                      "    If(($V[FLAGS2] & 0x1))",
                      "        VMStructFieldByte($O[TAKE_JUMP]) = 0x1"])
 
-JG = lines_matcher(["If(($V[CHECK_TYPE] == $H[CHECK_TYPE_JG]))",
-                    "    If((!($V[FLAGS] & 0x40)))",
-                    "        $V[FLAGS2] = (($V[FLAGS] & 0x800) >> 0xB)",
-                    "        $V[FLAGS] = (($V[FLAGS] & 0x80) >> 0x7)",
-                    "        If(($V[FLAGS] == $V[FLAGS2]))",
-                    "            VMStructFieldByte($O[TAKE_JUMP]) = 0x1"])
+JG = match_condition("If(($V[CHECK_TYPE] == $H[CHECK_TYPE_JG]))",
+                        [match_condition("If((!($V[FLAGS] & 0x40)))",
+                            [FLAGS_BITS_COMPARE("==")])])
 
-JGE = lines_matcher(["If(($V[CHECK_TYPE] == $H[CHECK_TYPE_JGE]))",
-                     "    $V[FLAGS2] = (($V[FLAGS] & 0x800) >> 0xB)",
-                     "    $V[FLAGS] = (($V[FLAGS] & 0x80) >> 0x7)",
-                     "    If(($V[FLAGS] == $V[FLAGS2]))",
-                     "        VMStructFieldByte($O[TAKE_JUMP]) = 0x1"])
+JGE = match_condition("If(($V[CHECK_TYPE] == $H[CHECK_TYPE_JGE]))",
+                            [FLAGS_BITS_COMPARE("==")])
 
-JL = lines_matcher(["If(($V[CHECK_TYPE] == $H[CHECK_TYPE_JL]))",
-                    "    $V[FLAGS2] = (($V[FLAGS] & 0x800) >> 0xB)",
-                    "    $V[FLAGS] = (($V[FLAGS] & 0x80) >> 0x7)",
-                    "    If(($V[FLAGS] != $V[FLAGS2]))",
-                    "        VMStructFieldByte($O[TAKE_JUMP]) = 0x1"])
+JL = match_condition("If(($V[CHECK_TYPE] == $H[CHECK_TYPE_JL]))",
+                            [FLAGS_BITS_COMPARE("!=")])
 
-JLE = lines_matcher(["If(($V[CHECK_TYPE] == $H[CHECK_TYPE_JLE]))",
-                     "    If(($V[FLAGS] & 0x40))",
-                     "        VMStructFieldByte($O[TAKE_JUMP]) = 0x1",
-                     "    $V[FLAGS2] = (($V[FLAGS] & 0x800) >> 0xB)",
-                     "    $V[FLAGS] = (($V[FLAGS] & 0x80) >> 0x7)",
-                     "    If(($V[FLAGS] != $V[FLAGS2]))",
-                     "        VMStructFieldByte($O[TAKE_JUMP]) = 0x1"])
+JLE = match_condition("If(($V[CHECK_TYPE] == $H[CHECK_TYPE_JLE]))",
+                        [
+                            match_condition("If(($V[FLAGS] & 0x40))",
+                                [lines_matcher(["VMStructFieldByte($O[TAKE_JUMP]) = 0x1"])]),
+                            FLAGS_BITS_COMPARE("!=")
+                        ])
 
 JNO = lines_matcher(["If(($V[CHECK_TYPE] == $H[CHECK_TYPE_JNO]))",
                      "    $V[FLAGS] = ($V[FLAGS] & 0x800)",
