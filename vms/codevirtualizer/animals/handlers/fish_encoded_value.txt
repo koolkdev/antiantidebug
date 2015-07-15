@@ -54,9 +54,9 @@ DEFINE_TEMPLATE
 
 # In newer versions
 DEFINE_TEMPLATE
-@NATIVE_FIELD@($O[ENCODED_VALUE_1]) = (((ReadParameterDword($N[OFFSET]) $G[SIMPLE_MATH:OP1] $N[NUMBER1]) $G[SIMPLE_MATH:OP2] @NATIVE_FIELD@(?O[ENCODED_VALUE_4])) $G[SIMPLE_MATH:OP3] @NATIVE_FIELD@(?O[JUNK]))
+@NATIVE_FIELD@($O[ENCODED_VALUE_1]) = (((ReadParameterDword($N[OFFSET]) $G[SIMPLE_MATH:OP1] $N[NUMBER1]) $G[SIMPLE_MATH:OP2] @NATIVE_FIELD@($O[ENCODED_VALUE_4])) $G[SIMPLE_MATH:OP3] @NATIVE_FIELD@(?O[JUNK]))
 =>
-@NATIVE_FIELD@($O[ENCODED_VALUE_1]) = EncodedValue(ReadParameterDword($N[OFFSET]), SimpleOperation(Operation($[OP1]), $[NUMBER1]), SimpleOperation(Operation($[OP2]), @NATIVE_FIELD@(?O[ENCODED_VALUE_4])), SimpleOperation(Operation($[OP3]), @NATIVE_FIELD@(?O[JUNK])))
+@NATIVE_FIELD@($O[ENCODED_VALUE_1]) = EncodedValue(ReadParameterDword($N[OFFSET]), SimpleOperation(Operation($[OP1]), $[NUMBER1]), SimpleOperation(Operation($[OP2]), @NATIVE_FIELD@($O[ENCODED_VALUE_4])), SimpleOperation(Operation($[OP3]), @NATIVE_FIELD@(?O[JUNK])))
 
 #DEFINE_TEMPLATE
 #@NATIVE_FIELD@($O[ENCODED_VALUE_2]) = ((ReadParameterDword($N[OFFSET]) $G[SIMPLE_MATH:OP1] $N[NUMBER1]) $G[SIMPLE_MATH:OP2] @NATIVE_FIELD@(?O[JUNK]))
