@@ -1,5 +1,6 @@
 import mappedfile
 import sys
+from codevirtualizer import compressed_vm
 
 try:
     import progressbar
@@ -16,6 +17,11 @@ class VMType(object):
 
     def get_vm(self, file, address):
         return self.get_vm_from_jumper(file, self.jumper_cls(file, address))
+
+    # Some functions are oreans specific TODO: Inherent form this class for oreans VMs
+
+    def get_compressed_vm(self, file, address):
+        return self.get_vm(file, compressed_vm.CompressedVMJumper(file, address).get_vm_address())
 
     def get_vm_from_jumper(self, file, jumper):
         return self.vm_func_cls(file, self.vm_info_cls.get_vm_info(file, jumper.get_vm_address()), jumper)
