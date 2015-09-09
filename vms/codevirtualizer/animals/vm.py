@@ -837,6 +837,10 @@ class VMFunction(vm.VMFunction):
             print inst
 
 
+class FISHVMFunction(VMFunction):
+    pass
+
+
 class TIGERVMFunction(VMFunction):
     def _do_handler(self, handler, params, state):
         for src, dst in self.vm_info.handlers.xchg[handler][0]:
