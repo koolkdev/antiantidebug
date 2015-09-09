@@ -456,6 +456,14 @@ class PUMAVMHandlers(TIGERVMHandlers):
         return instruction.Function(mappedfile.BytesMappedFile(bytes, naddress, self.file.mode), naddress)
 
 
+class EAGLEVMHandlers(FISHVMHandlers):
+    def _read_handler_function(self, address):
+        inst = self.file.get_instruction(address)
+        assert inst.opcode == "jmp" and inst.operands[0].is_immediate()
+        naddress, bytes = vmtools.VMS["DOLPHIN"].get_vm(self.file, inst.operands[0].value).compile_code()
+        return instruction.Function(mappedfile.BytesMappedFile(bytes, naddress, self.file.mode), naddress)
+
+
 class VMInfo(vm.VMInfo):
     def __init__(self, file, vm_address, name, vm_handlers_cls):
         print "Parsing %s%d VM at 0x%08x" % (name, file.mode, vm_address)
@@ -493,6 +501,12 @@ class PUMAVMInfo(VMInfo):
     cache = {}
     def __init__(self, file, vm_address):
         VMInfo.__init__(self, file, vm_address, "PUMA", PUMAVMHandlers)
+
+
+class EAGLEVMInfo(VMInfo):
+    cache = {}
+    def __init__(self, file, vm_address):
+        VMInfo.__init__(self, file, vm_address, "EAGLE", EAGLEVMHandlers)
 
 
 class VMFunctionSection(object):
