@@ -55,12 +55,16 @@ class Macro(Expression):
 
 
 class Params(object):
-    def __init__(self, fields):
+    def __init__(self, fields, global_vars=None):
         self.fields = dict(fields)
         self.real_field_name = dict()
         self.parameters = {}
         self.vars = {}
         self.handler_vars = {}
+        if global_vars is not None:
+            self.global_vars = dict(global_vars)
+        else:
+            self.global_vars = dict()
         self.unique = {}
 
     def copy(self):
@@ -69,6 +73,7 @@ class Params(object):
         nparams.real_field_name = dict(self.real_field_name)
         nparams.vars = dict(self.vars)
         nparams.handler_vars = dict(self.handler_vars)
+        nparams.global_vars = dict(self.global_vars)
         nparams.unique = dict(self.unique)
         return nparams
 
@@ -78,12 +83,14 @@ class Params(object):
         self.parameters.update(other.parameters)
         self.vars.update(other.vars)
         self.handler_vars.update(other.handler_vars)
+        self.global_vars.update(other.global_vars)
         self.unique.update(other.unique)
 
     def update_global(self, other):
         self.fields.update(other.fields)
         self.parameters.update(other.parameters)
         self.handler_vars.update(other.handler_vars)
+        self.global_vars.update(other.global_vars)
 
     def _set_dict_value(self, dict, key, value, comp = lambda x,y: x == y):
         if dict.has_key(key):
@@ -116,6 +123,9 @@ class Params(object):
 
     def set_handler_var_value(self, name, value):
         return self._set_dict_value(self.handler_vars, name, value, comp = lambda x,y: x == y)
+
+    def set_global_var_value(self, name, value):
+        return self._set_dict_value(self.global_vars, name, value, comp = lambda x,y: x == y)
 
     def set_unique_value(self, name, value):
         if value in self.unique.values():
@@ -158,6 +168,7 @@ def is_constant(string):
 # ?O - offset that is already set
 # P - handler parameter
 # H - handler vars
+# R - global vars
 
 class HandlerParser(object):
     cache = {}
@@ -334,6 +345,10 @@ class HandlerParser(object):
                 if not isinstance(expression, Immediate):
                     return False
                 return params.set_handler_var_value(name, expression.value)
+            elif var_type == "R":
+                if not isinstance(expression, Immediate):
+                    return False
+                return params.set_global_var_value(name, expression.value)
             elif var_type == "U":
                 if not isinstance(expression, Immediate):
                     return False

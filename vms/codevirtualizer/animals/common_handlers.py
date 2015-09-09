@@ -17,10 +17,12 @@ class HandlerInfo(object):
 
 
 class HandlerReader(object):
-    def __init__(self, info, params, arch):
+    def __init__(self, info, params, arch, state, global_vars):
         self.info = info
         self.params = {}
         self.arch = arch
+        self.state = state
+        self.global_vars = global_vars
         for name, index in self.info.params.iteritems():
             self.params[name] = params[index]
         #assert len(self.params) == len(params)
@@ -29,6 +31,7 @@ class HandlerReader(object):
                 if ivalue == value and iname.startswith(name + "_"):
                     self.params[name] = iname[len(name) + 1:]
                     break
+        self.update_state()
 
     def get_name(self):
         pass
@@ -38,6 +41,9 @@ class HandlerReader(object):
         :return: List of tuples of arg type and arg value
         """
         return []
+
+    def update_state(self):
+        pass
 
     def get_instruction(self):
         return vminstruction.VMInstruction(self.get_name(), *[x[1] for x in self.get_params()])
@@ -654,11 +660,11 @@ COMMON_HANDLERS = [
 ]
 
 
-def match_handlers(parser, handler, fields, handlers, arch):
+def match_handlers(parser, handler, fields, handlers, arch, global_vars=None):
     instructions = handler.get_instructions()
     for h in handlers:
         index = 0
-        params = handlers_parser.Params(fields)
+        params = handlers_parser.Params(fields, global_vars)
         info = HandlerInfo()
         match, index = h.match_func(parser, instructions, index, params, arch, info)
         if not match or index != len(instructions):
@@ -668,5 +674,7 @@ def match_handlers(parser, handler, fields, handlers, arch):
         info.reader = h.reader
 
         fields.update(params.fields)
+        if global_vars is not None:
+            global_vars.update(params.global_vars)
         return info
     return None

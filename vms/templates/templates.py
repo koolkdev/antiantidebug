@@ -245,7 +245,7 @@ class Templates(object):
         variables.update(nvariables)
         return True
 
-    def clean(self, insts, vars={}):
+    def clean(self, insts, vars={}, update_instructions=None):
         # TODO clean insts as i should clean (get_clean_instruction), so I won't need the outer loop
         value_mask = (1 << self.mode) - 1
         if self.run_once:
@@ -362,7 +362,11 @@ class Templates(object):
                         if new_insts[ri].name == "NOP":
                             insts.pop(releated[ri]-diff)
                             diff += 1
-                        else:
+                        elif new_insts[ri].name != "SAME":
+                            if update_instructions is not None:
+                                new_insts[ri].address = insts[ni].address
+                                new_insts[ri].info = insts[ni].info
+                                update_instructions[new_insts[ri].address] = new_insts[ri]
                             ni = releated[ri]-diff
                             insts[ni] = new_insts[ri]
                     if not self.run_once:

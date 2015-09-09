@@ -81,6 +81,42 @@ If(((VMStructFieldDword(?O[KEY_DECODE]) & 0x2) != 0x0))
 =>
 UpdateKeyCond2($[X], $[Y])
 
+# For Dolphin
+DEFINE_TEMPLATE
+If(((VMStructFieldDword(?O[KEY_COND]) & 0x2) != 0x0))
+    UpdateKey(VMStructFieldDword(?O[KEY_COND]), $[X])
+=>
+UpdateKeyCond3($[X], None)
+
+DEFINE_TEMPLATE
+If(((VMStructFieldDword(?O[KEY_COND]) & 0x2) != 0x0))
+    UpdateKey(VMStructFieldDword(?O[KEY_COND]), $[X])
+    UpdateKey(VMStructFieldDword(?O[KEY_COND]), $[Y])
+=>
+UpdateKeyCond3($[X], $[Y])
+
+DEFINE_TEMPLATE
+VMStructFieldDword(?O[KEY_DECODE]) $G[UPDATE_MATH:OP]= (VMStructFieldDword(?O[KEY_COND]) $G[UPDATE_MATH:OP2] $N[NUMBER])
+=>
+UpdateKeyDecodeCond(Operation($[OP]), SimpleOperation(Operation($[OP2]), $N[NUMBER]))
+
+DEFINE_TEMPLATE
+VMStructFieldDword(?O[KEY_DECODE]) $G[UPDATE_MATH:OP]= VMStructFieldDword(?O[KEY_COND])
+=>
+UpdateKeyDecodeCond(Operation($[OP]), None)
+
+DEFINE_TEMPLATE
+VMStructFieldDword(?O[KEY_COND]) $G[UPDATE_MATH:OP]= (VMStructFieldDword(?O[KEY_DECODE]) $G[UPDATE_MATH:OP2] $N[NUMBER])
+=>
+UpdateKeyDecodeCond2(Operation($[OP]), SimpleOperation(Operation($[OP2]), $N[NUMBER]))
+
+DEFINE_TEMPLATE
+VMStructFieldDword(?O[KEY_COND]) $G[UPDATE_MATH:OP]= VMStructFieldDword(?O[KEY_DECODE])
+=>
+UpdateKeyDecodeCond2(Operation($[OP]), None)
+
+# For Dolphin end
+
 DEFINE_TEMPLATE
 $V[VAR] = VMStructFieldDword(?O[KEY_DECODE])
 =>

@@ -11,6 +11,8 @@ import fish_handlers_cleaner
 import fish_handlers
 import tiger_handlers_cleaner
 import tiger_handlers
+import dolphin_handlers_cleaner
+import dolphin_handlers
 import common_handlers
 import vm_encoding
 
@@ -110,6 +112,18 @@ class VMInit(VMHandler):
 
         # mov ebx, X
         vm_info.struct_fields["EIP"] = reader.get_cond(lambda x: x.opcode == "mov" and x.operands[0].is_reg("ebx") and x.operands[1].is_immediate()).operands[1].value
+        if file.mode == 64:
+            try:
+                # Saving RBP in new versions....
+                # mov rax, [esp+0x50]
+                reader.get_cond(lambda x: x.opcode == "mov" and x.operands[0].is_reg(mode.reg_native("ax")) and x.operands[1].is_memory() and x.operands[1].base == mode.reg_native("sp") and x.operands[1].index is None and x.operands[1].offset == 0x50 and x.operands[1].scale == 0)
+            except cleaner.CleanerException:
+                pass
+            else:
+                # mov [rbp+rbx], rax
+                reader.get_cond(lambda x: x.opcode == "mov" and x.operands[1].is_reg(mode.reg_native("ax")) and x.operands[0].is_memory() and ((x.operands[0].base == mode.reg_native("bp") and x.operands[0].index == mode.reg_native("bx")) or (x.operands[0].index == mode.reg_native("bp") and x.operands[0].base == mode.reg_native("bx"))) and x.operands[0].offset == 0 and x.operands[0].scale == 0)
+                # mov ebx, X
+                vm_info.struct_fields["EIP"] = reader.get_cond(lambda x: x.opcode == "mov" and x.operands[0].is_reg("ebx") and x.operands[1].is_immediate()).operands[1].value
         # mov eax, [esp+0x28]
         reader.get_cond(lambda x: x.opcode == "mov" and x.operands[0].is_reg(mode.reg_native("ax")) and x.operands[1].is_memory() and x.operands[1].base == mode.reg_native("sp") and x.operands[1].index is None and x.operands[1].offset == ((len(self.regs) + 1) * mode.native_size()) and x.operands[1].scale == 0)
         # add eax, ecx
@@ -191,6 +205,7 @@ class VMHandlers(object):
 
         self.handlers = {}
         self.handlers_count = vm_info.init_handler.handlers_count
+        self.global_vars = {}
         funcs = []
 
         if PROGRESSBAR:
@@ -231,7 +246,6 @@ class VMHandlers(object):
             parser.clean_handler(self.handlers[i].handler, self.fields)
             self._update_progress_bar()
 
-
         parser = handlers_parser.HandlerParser.get_default_parser()
         print "Looking for RESET_KEYS...",
         found = False
@@ -255,13 +269,20 @@ class VMHandlers(object):
             self._update_progress_bar()
 
         print "Detecting handlers...",
-        for handler in self.handlers.itervalues():
-            if handler.info is None:
-                handler_info = fish_handlers.match_handlers(parser, handler.handler, self.fields, self.HANDLERS, arch)
-                if handler_info is None:
+        handlers_to_detect = [handler for handler in self.handlers.itervalues() if handler.info is None]
+        while handlers_to_detect:
+            undetected_handlers = []
+            for handler in handlers_to_detect:
+                handler.info = common_handlers.match_handlers(parser, handler.handler, self.fields, self.HANDLERS, arch, self.global_vars)
+                if handler.info is None:
+                    undetected_handlers.append(handler)
+            if len(handlers_to_detect) == len(undetected_handlers):
+                for handler in handlers_to_detect:
+                    print "---------------------------------------------------"
                     handler.handler.print_instructions()
-                    raise Exception("Failed to detect handler")
-                handler.info = handler_info
+                    # handler.info = common_handlers.match_handlers(parser, handler.handler, self.fields, self.HANDLERS, arch, self.global_vars)
+                raise Exception("Failed to detect handlers")
+            handlers_to_detect = undetected_handlers
         print "SUCCESS"
 
         # for index, handler in self.handlers.iteritems():
@@ -309,16 +330,10 @@ class VMHandlers(object):
         pass
 
 
-class FISHVMHandlers(VMHandlers):
-    RESET_KEYS = fish_handlers.RESET_KEYS
-    HANDLERS = fish_handlers.HANDLERS
-
+class ObfuscatedVMHandlers(VMHandlers):
     def __init__(self, file, vm_info):
         self.first = True
-        self.fish_parser_encoding = handlers_parser.HandlerParser.get_parser(r"handlers\handlers_encoding_fish.txt", file.mode)
-        self.fish_encoding_parser = handlers_parser.HandlerParser.get_parser(r"handlers\fish_encoded_value.txt", file.mode)
         VMHandlers.__init__(self, file, vm_info)
-
 
     def _read_handler_function(self, address):
         if self.first:
@@ -336,6 +351,16 @@ class FISHVMHandlers(VMHandlers):
                 self._reader.set_option("fixPush_allowConstants", True)
                 handlers_decompiler.Handler(instruction.Function(self._reader, address))
         return instruction.Function(self._reader, address)
+
+
+class FISHVMHandlers(ObfuscatedVMHandlers):
+    RESET_KEYS = fish_handlers.RESET_KEYS
+    HANDLERS = fish_handlers.HANDLERS
+
+    def __init__(self, file, vm_info):
+        self.fish_parser_encoding = handlers_parser.HandlerParser.get_parser(r"handlers\handlers_encoding_fish.txt", file.mode)
+        self.fish_encoding_parser = handlers_parser.HandlerParser.get_parser(r"handlers\fish_encoded_value.txt", file.mode)
+        ObfuscatedVMHandlers.__init__(self, file, vm_info)
 
     def _decompile_handler(self, func):
         return handlers_decompiler.Handler(func, True)
@@ -358,6 +383,7 @@ class FISHVMHandlers(VMHandlers):
     def create_state(self, address, read):
         return vm_encoding.new_fish_state(address, read)
 
+
 class TIGERVMHandlers(VMHandlers):
     RESET_KEYS = tiger_handlers.RESET_KEYS
     HANDLERS = tiger_handlers.HANDLERS
@@ -379,6 +405,39 @@ class TIGERVMHandlers(VMHandlers):
 
     def create_state(self, address, read):
         return vm_encoding.new_tiger_state(address, read)
+
+
+class DOLPHINVMHandlers(ObfuscatedVMHandlers):
+    RESET_KEYS = dolphin_handlers.RESET_KEYS
+    HANDLERS = dolphin_handlers.HANDLERS
+
+    def __init__(self, file, vm_info):
+        self.dolphin_parser_encoding = handlers_parser.HandlerParser.get_parser(r"handlers\handlers_encoding_dolphin.txt", file.mode)
+        #self.fish_encoding_parser = handlers_parser.HandlerParser.get_parser(r"handlers\fish_encoded_value.txt", file.mode)
+        ObfuscatedVMHandlers.__init__(self, file, vm_info)
+
+    def _decompile_handler(self, func):
+        return handlers_decompiler.Handler(func, True)
+
+    def _preprocess_handlers(self):
+        #fish_handlers_cleaner.clean_junk_field(self.handlers.values(), self.fields, self.file.get_arch())
+        dolphin_handlers_cleaner.clean_junk_check(self.handlers.values(), self.fields, self.file.get_arch())
+        dolphin_handlers_cleaner.clean_junk_flag(self.handlers.values(), self.fields, self.file.get_arch())
+        #if self.mode == 64:
+        #    fish_handlers_cleaner.fix_64_junk_bool_field(self.handlers.values(), self.fields)
+
+    def _process_pre_decoding(self, handler):
+        VMHandlers._process_pre_decoding(self, handler)
+        self.dolphin_parser_encoding.clean_handler(handler.handler, self.fields)
+        dolphin_handlers_cleaner.fix_encoding_values(handler.handler, self.fields, self.file.get_arch())
+
+    def _process_final(self, handler):
+        #self.fish_encoding_parser.clean_handler(handler.handler, self.fields)
+        #fish_handlers_cleaner.fix_encoding_values(handler, self.fields)
+        VMHandlers._process_final(self, handler)
+
+    def create_state(self, address, read):
+        return vm_encoding.new_dolphin_state(address, read)
 
 
 class SHARKVMHandlers(FISHVMHandlers):
@@ -416,6 +475,12 @@ class TIGERVMInfo(VMInfo):
     cache = {}
     def __init__(self, file, vm_address):
         VMInfo.__init__(self, file, vm_address, "TIGER", TIGERVMHandlers)
+
+
+class DOLPHINVMInfo(VMInfo):
+    cache = {}
+    def __init__(self, file, vm_address):
+        VMInfo.__init__(self, file, vm_address, "DOLPHIN", DOLPHINVMHandlers)
 
 
 class SHARKVMInfo(VMInfo):
@@ -515,7 +580,7 @@ class VMFunction(vm.VMFunction):
                 h = self.vm_info.handlers.handlers[handler]
                 params = h.decode.decode(state)
                 self._do_handler(h, params, state)
-                handler_reader = h.info.reader(h.info, params, arch)
+                handler_reader = h.info.reader(h.info, params, arch, state, self.vm_info.handlers.global_vars)
 
                 inst = self._get_instruction(handler_reader.get_name(), handler_reader.get_params(), state)
                 self._do_handler_end(h, params, state)
@@ -572,6 +637,8 @@ class VMFunction(vm.VMFunction):
                 instructions_list.append(inst)
         print "SUCCESS"
 
+        self._process_instructions(instructions_list, instructions)
+
         if not self.vm_info.regs_fields:
             reader = vminstruction.VMInstructionsReader(instructions_list)
             reader.get_cond(lambda x: x.name == "RESET_FLAGS")
@@ -602,7 +669,9 @@ class VMFunction(vm.VMFunction):
                     label = vminstruction.VMInstruction("LABEL", address)
                 label.address = address
                 self.instructions.append(label)
-            self.instructions.append(instructions[address])
+            # Don't add instructions that were removed during cleaning
+            if instructions[address] in instructions_list:
+                self.instructions.append(instructions[address])
         self.code = None
 
         self._clean()
@@ -620,6 +689,9 @@ class VMFunction(vm.VMFunction):
         pass
 
     def _do_handler_end(self, handler, params, state):
+        pass
+
+    def _process_instructions(self, instructions, instructions_map):
         pass
 
     def _get_instruction(self, name, args, state):
@@ -774,3 +846,11 @@ class TIGERVMFunction(VMFunction):
 
     def _get_clean_templates(self):
         return ["tiger_00_clean.txt"] + VMFunction._get_clean_templates(self)
+
+
+class DOLPHINVMFunction(VMFunction):
+    def _process_instructions(self, instructions, instructions_map):
+        templates.Templates.get_template(r"codevirtualizer\animals\dolphin_00_clean.txt", self.mode).clean(instructions, update_instructions=instructions_map)
+
+    def _get_clean_templates(self):
+        return VMFunction._get_clean_templates(self) + ["dolphin_01_xchg.txt"]

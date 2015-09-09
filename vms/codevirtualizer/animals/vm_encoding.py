@@ -108,12 +108,26 @@ class TIGERDecodingState(DecodingState):
         self.vars = VarsMapping()
 
 
+class DOLPHINDecodingState(DecodingState):
+    def __init__(self, address, read_func):
+        DecodingState.__init__(self, {
+            "KEY_DECODE": DwordKey(),
+            "KEY_COND": DwordKey(),
+            "KEY_UNUSED": DwordKey(),
+            }, address, read_func)
+        self.params = {}
+
+
 def new_fish_state(address, read_func):
     return FISHDecodingState(address, read_func)
 
 
 def new_tiger_state(address, read_func):
     return TIGERDecodingState(address, read_func)
+
+
+def new_dolphin_state(address, read_func):
+    return DOLPHINDecodingState(address, read_func)
 
 
 class DecodingOperation(object):
@@ -168,26 +182,20 @@ class UpdateKey(DecodingOperation):
 
 
 class UpdateKeyCond(DecodingOperation):
-    def __init__(self, op):
-        self.op = op
-
-    def decode(self, state):
-        if state.get_key("KEY_COND").get_value() & 1:
-            if self.op is not None:
-                state.get_key("KEY_COND").do_operation(state, self.op)
-
-
-class UpdateKeyCond2(DecodingOperation):
-    def __init__(self, op1, op2):
+    def __init__(self, key, bit, op1, key1, op2=None, key2=None):
+        self.key = key
+        self.bit = bit
         self.op1 = op1
+        self.key1 = key1
         self.op2 = op2
+        self.key2 = key2
 
     def decode(self, state):
-        if state.get_key("KEY_DECODE").get_value() & 2:
+        if state.get_key(self.key).get_value() & self.bit:
             if self.op1 is not None:
-                state.get_key("KEY_DECODE").do_operation(state, self.op1)
+                state.get_key(self.key1).do_operation(state, self.op1)
             if self.op2 is not None:
-                state.get_key("KEY_COND").do_operation(state, self.op2)
+                state.get_key(self.key2).do_operation(state, self.op2)
 
 
 class XchgKeys(DecodingOperation):
@@ -200,9 +208,19 @@ class XchgKeys(DecodingOperation):
         state.get_key("KEY_COND").set_value(key1)
 
 
-class UpdateKeyKey(UpdateKey):
-    def __init__(self, key1, key2, op):
-        UpdateKey.__init__(self, key1, DecodeKey(op, key2))
+class UpdateKeyEx(DecodingOperation):
+    def __init__(self, key1, op1, key2, op2):
+        self.key1 = key1
+        self.op1 = op1
+        self.key2 = key2
+        self.op2 = op2
+
+    def decode(self, state):
+        # key1 op1= op2(key2)
+        value = state.get_key(self.key2).get_value()
+        if self.op2 is not None:
+            value = self.op2.decode(state, value)
+        state.get_key(self.key1).do_operation(state, DecodeNumber(self.op1, value))
 
 
 class UpdateValue(DecodingValueOperation):
@@ -477,7 +495,25 @@ def get_reading_decoding_info(handler, fields, arch):
                 op = DecodeNumber(params.vars["OP"].value, params.vars["NUM"].value)
             else:
                 op = None
-            dec = UpdateKeyCond(op)
+            dec = UpdateKeyCond("KEY_COND", 1, op, "KEY_COND")
+            assert current_decoding is None
+            parser.replace_instructions(handler, handler, i, 1, [])
+        elif parser.match_expression(inst, "UpdateKeyDecodeCond(Operation($[OP1]), $[OPT])", params):
+            if type(params.vars["OPT"]) is not handlers_parser.NoneExpression:
+                assert parser.match_expression(params.vars["OPT"], "SimpleOperation(Operation($[OP2]), $[NUM])", params)
+                op2 = DecodeNumber(params.vars["OP2"].value, params.vars["NUM"].value)
+            else:
+                op2 = None
+            dec = UpdateKeyEx("KEY_DECODE", params.vars["OP1"].value, "KEY_COND", op2)
+            assert current_decoding is None
+            parser.replace_instructions(handler, handler, i, 1, [])
+        elif parser.match_expression(inst, "UpdateKeyDecodeCond2(Operation($[OP1]), $[OPT])", params):
+            if type(params.vars["OPT"]) is not handlers_parser.NoneExpression:
+                assert parser.match_expression(params.vars["OPT"], "SimpleOperation(Operation($[OP2]), $[NUM])", params)
+                op2 = DecodeNumber(params.vars["OP2"].value, params.vars["NUM"].value)
+            else:
+                op2 = None
+            dec = UpdateKeyEx("KEY_COND", params.vars["OP1"].value, "KEY_DECODE", op2)
             assert current_decoding is None
             parser.replace_instructions(handler, handler, i, 1, [])
         elif parser.match_expression(inst, "UpdateKeyCond2($[OPT1], $[OPT2])", params):
@@ -491,7 +527,21 @@ def get_reading_decoding_info(handler, fields, arch):
                 op2 = DecodeNumber(params.vars["OP2"].value, params.vars["NUM2"].value)
             else:
                 op2 = None
-            dec = UpdateKeyCond2(op1, op2)
+            dec = UpdateKeyCond("KEY_DECODE", 2, op1, "KEY_DECODE", op2, "KEY_COND")
+            assert current_decoding is None
+            parser.replace_instructions(handler, handler, i, 1, [])
+        elif parser.match_expression(inst, "UpdateKeyCond3($[OPT1], $[OPT2])", params):
+            if type(params.vars["OPT1"]) is not handlers_parser.NoneExpression:
+                assert parser.match_expression(params.vars["OPT1"], "SimpleOperation(Operation($[OP1]), $[NUM1])", params)
+                op1 = DecodeNumber(params.vars["OP1"].value, params.vars["NUM1"].value)
+            else:
+                op1 = None
+            if type(params.vars["OPT2"]) is not handlers_parser.NoneExpression:
+                assert parser.match_expression(params.vars["OPT2"], "SimpleOperation(Operation($[OP2]), $[NUM2])", params)
+                op2 = DecodeNumber(params.vars["OP2"].value, params.vars["NUM2"].value)
+            else:
+                op2 = None
+            dec = UpdateKeyCond("KEY_COND", 2, op1, "KEY_COND", op2, "KEY_COND")
             assert current_decoding is None
             parser.replace_instructions(handler, handler, i, 1, [])
         elif parser.match_expression(inst, "XchgKeys()", params):
@@ -522,11 +572,11 @@ def get_reading_decoding_info(handler, fields, arch):
             parser.replace_instructions(handler, handler, i, 1, [])
             continue
         elif parser.match_expression(inst, "UpdateKeySpecial(Operation($[X]))", params):
-            dec = UpdateKeyKey("KEY_SPECIAL", "KEY_DECODE", params.vars["X"].value)
+            dec = UpdateKey("KEY_SPECIAL", DecodeKey(params.vars["X"].value, "KEY_DECODE"))
             assert current_decoding is None
             parser.replace_instructions(handler, handler, i, 1, [])
         elif parser.match_expression(inst, "UpdateKeySpecialCond(Operation($[X]))", params):
-            dec = UpdateKeyKey("KEY_DECODE_POST", "KEY_COND", params.vars["X"].value)
+            dec = UpdateKey("KEY_DECODE_POST",  DecodeKey(params.vars["X"].value, "KEY_COND"))
             assert current_decoding is None
             parser.replace_instructions(handler, handler, i, 1, [])
         else:

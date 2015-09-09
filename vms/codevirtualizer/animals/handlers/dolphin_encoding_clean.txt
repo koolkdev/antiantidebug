@@ -1,0 +1,16 @@
+# TODO: Don't leave it like that
+
+OPTION DONT_OPTIMIZE
+
+DEFINE_MACRO[32] SIZE_WORD Dword
+DEFINE_MACRO[64] SIZE_WORD Qword
+
+DEFINE_TEMPLATE
+VMStructField@SIZE_WORD@($N[FIELD_OFFSET]) = VMStructField@SIZE_WORD@($N[FIELD_OFFSET])
+=>
+None
+
+DEFINE_EXPRESSION_TEMPLATE
+EncodeDecode($[X], SimpleOperation(Operation($[OP]), $[NUMBER]))
+=>
+$[X]
