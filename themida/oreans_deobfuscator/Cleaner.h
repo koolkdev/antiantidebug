@@ -41,7 +41,9 @@ public:
 	int fixOperationThruRegByte(uint64_t * address, instruction_info * result);
 	int fixOperationConstantThruReg(uint64_t * address, instruction_info * result);
 	int fixOperationConstantOnEsp(uint64_t * address, instruction_info * result);
-	
+
+	int fixOperationXchgXchg(uint64_t * address, instruction_info * result);
+
 	int fixPushMovMovPopUnusedRegs(uint64_t * address, instruction_info * result);
 	int fixPushMovMovCalcPopUnusedRegs(uint64_t * address, instruction_info * result);
 	int fixOperationConstantThruRegUnusedRegs(uint64_t * address, instruction_info * result);

@@ -1408,6 +1408,36 @@ int Cleaner::fixOperationThruReg2(uint64_t * address, instruction_info * result)
 	return true;
 }
 
+// This handler is to fix a rare deobfuscation bug, when there are the same xchg twice nested, for example:
+//
+// xchg ebp, eax
+// xchg ebp, eax
+// not ebp
+// xchg ebp, eax
+// sub eax, 0xffffffff
+// xchg ebp, eax
+//
+// Since we devirtualize depth first, we will get rid of the second xchg/xchg first, so we will stay with:
+// xchg ebp, eax
+// xchg ebp, eax
+// neg ebp
+//
+// It is ok to get ride of it
+
+// XCHG [...], R32/R16/R8
+// XCHG [...], R32/R16/R8
+int Cleaner::fixOperationXchgXchg(uint64_t * address, instruction_info * result) {
+	if (GET_OPCODE(*result) != XCHG || !IS_OPERAND_REG(*result, 1) || IS_OPERAND_SP(*result, 0) || (this->mode == 64 && GET_OPERAND_SIZE(*result, 1) == 4)) return false;
+
+	instruction_info next = getCleanInstructionAt(address);
+	if (GET_OPCODE(next) != XCHG || !((IS_SAME_OPERANDS(next, 0, *result, 0) && IS_SAME_OPERANDS(next, 1, *result, 1)) || (IS_SAME_OPERANDS(next, 0, *result, 1) && IS_SAME_OPERANDS(next, 1, *result, 0)))) return false;
+
+	// So let's just ignore it and return the next opcode, which shouls be our "main"
+	*result = getCleanInstructionAt(address);
+
+	return true;
+}
+
 // PUSH [...]
 // OPERATION [esp]
 // POP [...]
@@ -1751,6 +1781,8 @@ cleaner_func cleaners[] = {//&Cleaner::cleanIncDec,
 
 						   // It needs to be after operation thru stack
 						   &Cleaner::fixPushPopAddSub,
+
+						   &Cleaner::fixOperationXchgXchg,
 						   
 						   &Cleaner::fixLods,
 						   &Cleaner::fixMovzx,
