@@ -1,8 +1,8 @@
 import handlers_parser
 
 def clean_junk_check(handlers, fields, arch):
-   cleaner = handlers_parser.HandlerParser.get_parser(r"handlers\dolphin_clean.txt", arch.mode)
-   for handler in handlers:
+    cleaner = handlers_parser.HandlerParser.get_parser(r"handlers\dolphin_clean.txt", arch.mode)
+    for handler in handlers:
         cleaner.clean_handler(handler.handler, fields)
 
 
@@ -26,6 +26,8 @@ def clean_junk_flag(handlers, fields, arch):
                         handler.make_unvisible(inst)
                         expr.replace_child(child, parser.create_macro_result("RandomFlags()", nparams))
                         handler.make_visible(inst)
+                        handler.optimize_instructions()
+                        handler.clean_instructions()
                         return True
                     if replace_child_flags(child):
                         return True

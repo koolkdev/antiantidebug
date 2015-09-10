@@ -246,8 +246,6 @@ class VMHandlers(object):
             parser.clean_handler(self.handlers[i].handler, self.fields)
             self._update_progress_bar()
 
-        self._process_clean_handlers()
-
         parser = handlers_parser.HandlerParser.get_default_parser()
         print "Looking for RESET_KEYS...",
         found = False
@@ -318,9 +316,6 @@ class VMHandlers(object):
         return handlers_decompiler.Handler(func, False)
 
     def _preprocess_handlers(self):
-        pass
-
-    def _process_clean_handlers(self):
         pass
 
     def _process_pre_decoding(self, handler):
@@ -428,13 +423,12 @@ class DOLPHINVMHandlers(ObfuscatedVMHandlers):
         #fish_handlers_cleaner.clean_junk_field(self.handlers.values(), self.fields, self.file.get_arch())
         dolphin_handlers_cleaner.clean_junk_check(self.handlers.values(), self.fields, self.file.get_arch())
         dolphin_handlers_cleaner.clean_junk_flag(self.handlers.values(), self.fields, self.file.get_arch())
+        # If some check weren't removed before the clean, remove them now
+        # TODO: should we call clean_junk_flag again after that while something changed?
+        # or we should change clean flag to work better (even before cleaning the junk check)
+        dolphin_handlers_cleaner.clean_junk_check(self.handlers.values(), self.fields, self.file.get_arch())
         #if self.mode == 64:
         #    fish_handlers_cleaner.fix_64_junk_bool_field(self.handlers.values(), self.fields)
-
-    def _process_clean_handlers(self):
-        # If some check weren't removed before the clean, remove them now
-        # TODO: Is it ok? do we need to clean it again after this? again and again?
-        dolphin_handlers_cleaner.clean_junk_check(self.handlers.values(), self.fields, self.file.get_arch())
 
     def _process_pre_decoding(self, handler):
         VMHandlers._process_pre_decoding(self, handler)
