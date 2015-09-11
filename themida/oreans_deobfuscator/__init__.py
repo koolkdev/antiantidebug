@@ -9,7 +9,7 @@ except ImportError:
     setup_dir = os.path.dirname(os.path.abspath(__file__))
     os.chdir(setup_dir)
     try:
-        os.unlink("oreans_deobfuscator.pyd")
+        os.unlink("_oreans_deobfuscator.pyd")
     except:
         pass
     old_argv = sys.argv
