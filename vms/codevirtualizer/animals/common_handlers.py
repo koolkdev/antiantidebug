@@ -660,7 +660,7 @@ COMMON_HANDLERS = [
 ]
 
 
-def match_handlers(parser, handler, fields, handlers, arch, global_vars=None):
+def match_handlers(parser, handler, fields, handlers, arch, global_vars={}):
     instructions = handler.get_instructions()
     for h in handlers:
         index = 0

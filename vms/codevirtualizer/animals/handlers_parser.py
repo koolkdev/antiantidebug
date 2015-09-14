@@ -54,52 +54,66 @@ class Macro(Expression):
         return "%s(%s)" % (self.name, ", ".join([("{%d}" % i) for i in xrange(len(self.parameters))]))
 
 
-class Params(object):
-    def __init__(self, fields, global_vars=None):
-        self.fields = dict(fields)
-        self.real_field_name = dict()
-        self.parameters = {}
-        self.vars = {}
-        self.handler_vars = {}
-        if global_vars is not None:
-            self.global_vars = dict(global_vars)
-        else:
-            self.global_vars = dict()
-        self.unique = {}
+class CowDict(object):
+    __slots__ = ["dict", "copied"]
+    def __init__(self, dict):
+        self.dict = dict
+        self.copied = False
 
-    def copy(self):
-        nparams = Params(self.fields)
-        nparams.parameters = dict(self.parameters)
-        nparams.real_field_name = dict(self.real_field_name)
-        nparams.vars = dict(self.vars)
-        nparams.handler_vars = dict(self.handler_vars)
-        nparams.global_vars = dict(self.global_vars)
-        nparams.unique = dict(self.unique)
-        return nparams
+    def ensure_copy(self):
+        if not self.copied:
+            self.dict = dict(self.dict)
+            self.copied = True
 
     def update(self, other):
-        self.fields.update(other.fields)
-        self.real_field_name.update(other.real_field_name)
-        self.parameters.update(other.parameters)
-        self.vars.update(other.vars)
-        self.handler_vars.update(other.handler_vars)
-        self.global_vars.update(other.global_vars)
-        self.unique.update(other.unique)
+        if id(self.dict) != id(other):
+            self.ensure_copy()
+            self.dict.update(other)
+
+class Params(object):
+    __slots__ = ["_fields", "_real_field_name", "_parameters", "_vars", "_handler_vars", "_global_vars", "_unique"]
+
+    def __init__(self, fields, global_vars={}, real_field_name={}, parameters={}, vars={}, handler_vars={}, unique={}):
+        self._fields = CowDict(fields)
+        self._real_field_name = CowDict(real_field_name)
+        self._parameters = CowDict(parameters)
+        self._vars = CowDict(vars)
+        self._handler_vars = CowDict(handler_vars)
+        self._global_vars = CowDict(global_vars)
+        self._unique = CowDict(unique)
+
+    fields = property(lambda self: self._fields.dict)
+    real_field_name = property(lambda self: self._real_field_name.dict)
+    parameters = property(lambda self: self._parameters.dict)
+    vars = property(lambda self: self._vars.dict)
+    handler_vars = property(lambda self: self._handler_vars.dict)
+    global_vars = property(lambda self: self._global_vars.dict)
+    unique = property(lambda self: self._unique.dict)
+
+    def copy(self):
+        return Params(self.fields, self.global_vars, self.real_field_name, self.parameters, self.vars, self.handler_vars, self.unique)
+
+    def update(self, other):
+        self._fields.update(other.fields)
+        self._real_field_name.update(other.real_field_name)
+        self._parameters.update(other.parameters)
+        self._vars.update(other.vars)
+        self._handler_vars.update(other.handler_vars)
+        self._global_vars.update(other.global_vars)
+        self._unique.update(other.unique)
 
     def update_global(self, other):
-        self.fields.update(other.fields)
-        self.parameters.update(other.parameters)
-        self.handler_vars.update(other.handler_vars)
-        self.global_vars.update(other.global_vars)
+        self._fields.update(other.fields)
+        self._parameters.update(other.parameters)
+        self._handler_vars.update(other.handler_vars)
+        self._global_vars.update(other.global_vars)
 
     def _set_dict_value(self, dict, key, value, comp = lambda x,y: x == y):
-        if dict.has_key(key):
-            return comp(dict[key], value)
+        if dict.dict.has_key(key):
+            return comp(dict.dict[key], value)
         else:
-            # We don't want to always update it because of variables
-            # If we have a Variable and VariableProxy, if we met the Varaible first, so we want it to stay variable hen we will create the result
-            # For example setting a value of a variable. We will probably want to set the value of the varibale in the result (and not of the VariableProxy)
-            dict[key] = value
+            dict.ensure_copy()
+            dict.dict[key] = value
         return True
 
     def get_field_name(self, value):
@@ -113,25 +127,25 @@ class Params(object):
         if oname is not None:
             return oname == name
         else:
-            return self._set_dict_value(self.fields, name, value)
+            return self._set_dict_value(self._fields, name, value)
 
     def set_param_value(self, name, value):
-        return self._set_dict_value(self.parameters, name, value)
+        return self._set_dict_value(self._parameters, name, value)
 
     def set_var_value(self, name, value):
-        return self._set_dict_value(self.vars, name, value, comp = lambda x,y: x.equals(y))
+        return self._set_dict_value(self._vars, name, value, comp = lambda x,y: x.equals(y))
 
     def set_handler_var_value(self, name, value):
-        return self._set_dict_value(self.handler_vars, name, value, comp = lambda x,y: x == y)
+        return self._set_dict_value(self._handler_vars, name, value, comp = lambda x,y: x == y)
 
     def set_global_var_value(self, name, value):
-        return self._set_dict_value(self.global_vars, name, value, comp = lambda x,y: x == y)
+        return self._set_dict_value(self._global_vars, name, value, comp = lambda x,y: x == y)
 
     def set_unique_value(self, name, value):
         if value in self.unique.values():
             return name in self.unique and self.unique[name] == value
         else:
-            return self._set_dict_value(self.unique, name, value)
+            return self._set_dict_value(self._unique, name, value)
 
 
 def is_var_name(string):
