@@ -2,6 +2,14 @@ from pyx86utils import *
 from collections import deque
 import re
 
+def build_reg_to_reg_group(regs):
+    res = {}
+    for reg_group in regs:
+        for reg in reg_group:
+            if reg is not None:
+                res[reg] = reg_group
+    return res
+
 class Arch(object):
     REGS = [
         ["al", "ah", "ax", "eax", "rax"],
@@ -21,6 +29,7 @@ class Arch(object):
         ["r14b", None, "r14w", "r14d", "r14"],
         ["r15b", None, "r15w", "r15d", "r15"],
     ]
+    REG_TO_REG_GROUP = build_reg_to_reg_group(REGS)
 
     SIZES = {1: "byte", 2: "word", 4: "dword", 8: "qword"}
     def __init__(self, mode):
@@ -39,9 +48,9 @@ class Arch(object):
             return [x[4] for x in self.REGS]
 
     def _get_reg(self, reg, size_index):
-        for r in self.REGS:
-            if reg in r:
-                return r[size_index]
+        reg_group = self.REG_TO_REG_GROUP.get(reg, None)
+        if reg_group is not None:
+            return reg_group[size_index]
         return None
 
     def reg_byte(self, reg):

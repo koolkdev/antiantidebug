@@ -606,7 +606,7 @@ class State(object):
             self.flags = Invalid()
 
     def _get_full_register(self, reg):
-        return self.mode.translate("{R:%s}" % reg)
+        return self.mode.reg_native(reg)
 
     def get_register(self, reg):
         return self.registers[self._get_full_register(reg)]
