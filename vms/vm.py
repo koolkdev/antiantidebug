@@ -8,9 +8,15 @@ class VMInfo(object):
     @classmethod
     def get_vm_info(cls, file, address):
         if cls.cache.has_key((file, address)):
+            if cls.cache[(file, address)] is None:
+                raise Exception("Invalid VM")
             return cls.cache[(file, address)]
 
-        res = cls(file, address)
+        try:
+            res = cls(file, address)
+        except:
+            cls.cache[(file, address)] = None
+            raise
 
         cls.cache[(file, address)] = res
         return res
