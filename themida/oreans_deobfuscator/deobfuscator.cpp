@@ -14,7 +14,7 @@ void * create_cleaner(reader_f reader, int mode, void * opaque) {
 uint64_t clean_instruction(void * cleaner, uint64_t address, unsigned char * output, size_t * output_size) {
 	try {
 		uint64_t naddress = address;
-		instruction_info opcode = ((Cleaner *)cleaner)->getCleanInstructionAt(&naddress);
+		instruction_info opcode = ((Cleaner *)cleaner)->getCleanInstructionAt(&naddress, true);
 		((Cleaner *)cleaner)->cleanIncDecSure(&naddress, &opcode); // fix inc and dec before returning the result
 		if (instruction_assemble(&opcode, output, output_size, address)) {
 			throw std::runtime_error("FATAL: Failed to assemble instruction\n");

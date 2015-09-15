@@ -220,6 +220,7 @@ class VMHandlers(object):
                 handler_address = handler_address + vm_info.init_handler.base_address
             funcs.append(self._read_handler_function(handler_address))
             self._update_progress_bar()
+        self._close_reader()
         print "Reading handlers... SUCCESS"
 
         # TODO: Multithreaded
@@ -312,6 +313,9 @@ class VMHandlers(object):
     def _read_handler_function(self, address):
         return instruction.Function(self.file, address)
 
+    def _close_reader(self):
+        pass
+
     def _decompile_handler(self, func):
         return handlers_decompiler.Handler(func, False)
 
@@ -347,10 +351,14 @@ class ObfuscatedVMHandlers(VMHandlers):
                 # TODO: Detect it in a better way.. (number of instructions/handlers?)
                 self._reader = cleaner.Cleaner(self.file)
                 self._reader.set_option("ignore_jumps", False)
+                self._reader.set_option("ignore_nontop_jumps", True)
                 self._reader.set_option("fix_inc_dec", False)
                 self._reader.set_option("fixPush_allowConstants", True)
                 handlers_decompiler.Handler(instruction.Function(self._reader, address))
         return instruction.Function(self._reader, address)
+
+    def _close_reader(self):
+        self._reader = None
 
 
 class FISHVMHandlers(ObfuscatedVMHandlers):

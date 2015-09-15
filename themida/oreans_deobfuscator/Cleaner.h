@@ -13,7 +13,7 @@ class Cleaner {
 public:
 	Cleaner(reader_f reader, int mode, void * opaque);
 	instruction_info getInstructionAt(uint64_t * address);
-	instruction_info getCleanInstructionAt(uint64_t * address);
+	instruction_info getCleanInstructionAt(uint64_t * address, bool top=false);
 	
 	bool is_inc(instruction_info * opcode);
 	bool is_dec(instruction_info * opcode, bool change = true);

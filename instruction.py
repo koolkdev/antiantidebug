@@ -366,6 +366,8 @@ class Function(object):
                 old_block.next_cond = None
                 continue
             while True:
+                if len(instructions_blocks) > 10000:
+                    raise Exception("Too complex function")
                 if instructions_blocks.has_key(address):
                     if instructions_blocks[address].address != address:
                         nblock = FunctionBlock(address)

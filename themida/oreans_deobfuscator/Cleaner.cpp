@@ -1809,7 +1809,7 @@ instruction_info Cleaner::getInstructionAt(uint64_t * address) {
 }
  #define CALL_MEMBER_FN(object,ptrToMember)  ((object).*(ptrToMember))
 
-instruction_info Cleaner::getCleanInstructionAt(uint64_t * address) {
+instruction_info Cleaner::getCleanInstructionAt(uint64_t * address, bool top) {
 	if (cache.find(*address) != cache.end()) {
 		instruction_info res = cache[*address].first;
 		*address = cache[*address].second;
@@ -1823,7 +1823,7 @@ instruction_info Cleaner::getCleanInstructionAt(uint64_t * address) {
 	uint64_t original_address = *address;
 	bool changed = true;
 	instruction_info result = getInstructionAt(address);
-	if (options[StringHash("ignore_jumps")] && GET_OPCODE(result) == JMP && IS_OPERAND_JIMM(result, 0)) {
+	if ((options[StringHash("ignore_jumps")] || (options[StringHash("ignore_nontop_jumps")] && !top)) && GET_OPCODE(result) == JMP && IS_OPERAND_JIMM(result, 0)) {
 		*address = get_immediate_value(&result, 0);
 		if (*address == options[StringHash("end_address")]) {
 			return result;
@@ -1860,6 +1860,7 @@ Cleaner::Cleaner(reader_f reader, int mode, void * opaque) : reader(reader), mod
 	options[StringHash("fixPush_allowConstants")] = false;
 	
 	options[StringHash("ignore_jumps")] = true;
+	options[StringHash("ignore_nontop_jumps")] = false;
 	options[StringHash("ignore_calls")] = false;
 	options[StringHash("fix_inc_dec")] = true;
 	
