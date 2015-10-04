@@ -363,8 +363,8 @@ class Templates(object):
                             insts.pop(releated[ri]-diff)
                             diff += 1
                         elif new_insts[ri].name != "SAME":
+                            new_insts[ri].address = insts[ni].address
                             if update_instructions is not None:
-                                new_insts[ri].address = insts[ni].address
                                 new_insts[ri].info = insts[ni].info
                                 update_instructions[new_insts[ri].address] = new_insts[ri]
                             ni = releated[ri]-diff
