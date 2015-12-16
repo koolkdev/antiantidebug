@@ -284,11 +284,12 @@ class VMHandlers(object):
 
     def get_handler(self, index):
         if index in self.handlers:
-            return self.handlers
+            return self.handlers[index]
 
         mode = self.file.get_arch()
         handler_address = self.file.read_pointer(self.vm_info.init_handler.handlers_address + index * mode.pointer_size())
         if handler_address in self.handlers_by_address:
+            self.handlers[index] = self.handlers_by_address[handler_address]
             return self.handlers_by_address[handler_address]
 
         handler = VMOpcodeHandler(self.file.get_reader(handler_address))
@@ -386,10 +387,13 @@ class VMFunction(vm.VMFunction):
         while not addresses_to_explore.empty():
             next_labeled = True
             address = addresses_to_explore.get()
+            print "@@@@"
+            print hex(address)
             if instructions.has_key(address):
                 instructions[address].set_info("labled", True)
                 continue
             bytes_reader = vminstruction.BytesReader(file, address)
+            section_instructions = []
             while True:
                 if instructions.has_key(bytes_reader.address):
                     if next_labeled:
@@ -401,15 +405,18 @@ class VMFunction(vm.VMFunction):
                 func = self.vm_info.main_handler.read.read(bytes_reader)
                 handler = self.vm_info.handlers.get_handler(func)
                 instructions_size[address] = 1
-                if self.vm_info.handlers.handlers[func].read is not None:
-                    instructions_size[address] += self.vm_info.handlers.handlers[func].read.size
-                inst = self.vm_info.handlers.handlers[func].get_vm_instruction(bytes_reader)
-                print inst
+                if handler.read is not None:
+                    instructions_size[address] += handler.read.size
+                inst = handler.get_vm_instruction(bytes_reader)
 
                 inst.address = address
                 inst.set_info("labled", next_labeled)
                 next_labeled = False
 
+                #if inst.name == "STACK_JMP":
+                #    break
+                if inst.name == "PUSH_DWORD_IMM" and 0x403000 < inst.args[0] < 0x405000:
+                    addresses_to_explore.put(inst.args[0])
                 # if inst.name in ("JMP", "JMPIF"):
                 #     inst.args[0] += bytes_reader.address
                 #     inst.args[0] &= (1 << self.mode) - 1
@@ -438,10 +445,19 @@ class VMFunction(vm.VMFunction):
                 #     inst.args = [self.vm_info.handlers.realloc_offset]
 
                 instructions[inst.address] = inst
+                section_instructions.append(inst)
                 #print inst
                 if inst.name == "RETURN":
                     break
+                elif inst.name == "STACK_JMP":
+                    break
+            self._clean_section(section_instructions)
+            for inst in section_instructions:
+                print inst
+            print "------------------------------------"
         print "SUCCESS"
+        assert False
+
 
         last_address = 0
         last_size = 0
@@ -471,6 +487,14 @@ class VMFunction(vm.VMFunction):
             self.printfunc()
             raise
         print "SUCCESS"
+
+    def _clean_section(self, instructions):
+        TEMPLATES = ["vmp_00_clean.txt"]
+        vars = {}
+        vars["SIZE_TO_NUM"] = lambda x: {"BYTE": 1, "WORD": 2, "DWORD": 4, "QWORD": 8}[x]
+        for template in TEMPLATES:
+            templates.Templates.get_template(r"vmprotect\%s" % template, self.mode).clean(instructions, vars)
+        return instruction
 
     def _clean(self):
         TEMPLATES = ["cisc_00_clean.txt", "cisc_01_flags.txt", "cisc_02_realloc.txt", "cisc_03_movdx.txt", "cisc_04_push_pop.txt", "cisc_05_jumps_prepare.txt"]

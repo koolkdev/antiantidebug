@@ -353,7 +353,9 @@ class Templates(object):
                                 new_args.extend(["0x%x" % x for x in saved_args[arg[1:]]])
                             else:
                                 new_args.append(arg)
-                        new_args = [eval(x, {}, values)&value_mask for x in new_args]
+                        nvars = dict(variables)
+                        nvars.update(values)
+                        new_args = [eval(x, {}, nvars)&value_mask for x in new_args]
                         new_insts.append(vminstruction.VMInstruction(new_name, *new_args))
                     new_insts += [nop] * (len(releated) - len(new_insts))
                     diff = 0

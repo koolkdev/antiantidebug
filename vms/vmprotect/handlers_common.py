@@ -6,7 +6,7 @@ HANDLER = namedtuple("HANDLER", ["NAME", "VARS", "CODE"])
 
 HANDLERS = [
 HANDLER(
-"STACK_POP_#SIZE#_REG",
+"POP_#SIZE#_REG",
 {"SIZE": [1, 2, 4, 8]},
 """
 READ_PARAM 1
@@ -16,7 +16,7 @@ mov {S:#SIZE#} [{R:ax}+{R:di}], {R:dx:#SIZE#}
 """),
 
 HANDLER(
-"STACK_PUSH_#SIZE#_REG",
+"PUSH_#SIZE#_REG",
 {"SIZE": [1, 2]},
 """
 READ_PARAM 1
@@ -26,7 +26,7 @@ mov @STACK_STORE(#S_SIZE#)@, {R:ax:#S_SIZE#}
 """),
 
 HANDLER(
-"STACK_PUSH_#SIZE#_REG",
+"PUSH_#SIZE#_REG",
 {"SIZE": [4, 8]},
 """
 READ_PARAM 1
@@ -36,7 +36,7 @@ mov @STACK_STORE(#SIZE#)@, {R:dx:#SIZE#}
 """),
 
 HANDLER(
-"STACK_PUSH_#SIZE#_IMM",
+"PUSH_#SIZE#_IMM",
 {"SIZE": [1, 2, 4, 8]},
 """
 READ_PARAM #SIZE#
@@ -108,7 +108,7 @@ mov {S:#SIZE#} #SEG#:[{R:ax}], {R:dx:#SIZE#}
 """),
 
 HANDLER(
-"STACK_PUSH_#SIZE#_SP",
+"PUSH_#SIZE#_SP",
 {"SIZE": [2, 4, 8]},
 """
 mov {R:ax}, {R:bp}
@@ -117,10 +117,18 @@ mov @STACK_STORE(#SIZE#)@, {R:ax:#SIZE#}
 """),
 
 HANDLER(
-"STACK_POP_#SIZE#_SP",
+"POP_#SIZE#_SP",
 {"SIZE": [2, 4, 8]},
 """
 mov {R:bp:#SIZE#}, @STACK_OP(#SIZE#)@
+"""),
+
+HANDLER(
+"STACK_JMP",
+{},
+"""
+mov {R:si}, @STACK_LOAD(@SIZE_NATIVE@)@
+BALANCE_STACK
 """),
 
 HANDLER(
@@ -179,7 +187,7 @@ pop @STACK_STORE({N})@
 """),
 
 HANDLER(
-"STACK_AND_NOT_#SIZE#",
+"STACK_NOR_#SIZE#",
 {"SIZE": [1,4,8]},
 """
 mov {R:ax:#S_SIZE#}, @STACK_LOAD(#S_SIZE#)@
@@ -195,7 +203,7 @@ pop @STACK_STORE({N})@
 """),
 
 HANDLER(
-"STACK_AND_NOT_WORD",
+"STACK_NOR_WORD",
 {},
 """
 not @STACK_OP(4)@
