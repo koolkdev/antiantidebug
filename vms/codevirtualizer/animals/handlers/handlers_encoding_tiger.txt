@@ -16,11 +16,6 @@ DEFINE_EXPRESSION_TEMPLATE
 ValueDecode($[FIELD](?O[VALUE]), SimpleOperation(Operation($[OP]), $[NUMBER]), None)
 
 DEFINE_TEMPLATE
-VMStructFieldDword(?O[KEY_DECODE_POST]) $G[UPDATE_MATH:OP]= VMStructFieldDword(?O[KEY_COND])
+VMStructFieldDword(?O[KEY_*:KEY]) $G[UPDATE_MATH:OP]= ReadParameterDword($N[OFFSET])
 =>
-UpdateKeySpecialCond(Operation($[OP]))
-
-DEFINE_TEMPLATE
-VMStructFieldDword(?O[KEY_DECODE]) $G[UPDATE_MATH:OP]= ReadParameterDword($N[OFFSET])
-=>
-UpdateKeyDecode(VMStructFieldDword(?O[KEY_DECODE]), SimpleOperation(Operation($[OP]), ReadParameterDword($N[OFFSET])))
+UpdateKeyDecode(VMStructFieldDword(?O[KEY]), SimpleOperation(Operation($[OP]), ReadParameterDword($N[OFFSET])))

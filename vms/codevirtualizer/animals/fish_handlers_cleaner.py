@@ -62,9 +62,32 @@ def clean_junk_check(handlers, fields, arch):
              "    $V[VAR] = Flags(Compare($[V1], $[V2]))",
              arch.translate("    *({SU}*)({R:bp} + $O[ENCODED_VALUE_3]) = ((~(((*({SU}*)({R:bp} + $O[ENCODED_VALUE_1]) $G[SIMPLE_MATH:OP3] *({SU}*)({R:bp} + ?O[JUNK])) $G[SIMPLE_MATH:OP4] *({SU}*)({R:bp} + $O[ENCODED_VALUE_4])) $G[SIMPLE_MATH:OP1] $N[NUMBER1])) $G[SIMPLE_MATH:OP2] $N[NUMBER2])")]
 
+    # Newer versions
+    lines3 = map(arch.translate, ["If(($[X] == 0x0))",
+             "    $V[TEMP_ENCODED] = (~((*({SU}*)({R:bp} + $O[ENCODED_VALUE_1]) $G[SIMPLE_MATH:OP3] *({SU}*)({R:bp} + ?O[JUNK])) $G[SIMPLE_MATH:OP1] $N[NUMBER1]))",
+             "    $V[VAR] = Flags(Compare($[V1], $[V2]))",
+             "    If((*(BYTE*)({R:bp} + $O[CHOOSE_BYTE]) <= $H[NUM]))",
+             "        *({SU}*)({R:bp} + $O[ENCODED_VALUE_3]) = $[Y]", # Operation with another number on TEMP_ENCODED, first is the opposite of OP1?
+             "    Else",
+             "        *({SU}*)({R:bp} + $O[ENCODED_VALUE_3_2]) = $[Z]", # Operation with another number on TEMP_ENCODED
+             ])
+
+    lines4 = map(arch.translate, ["If(($[X] == 0x0))",
+             "    $V[TEMP_ENCODED] = (~(((*({SU}*)({R:bp} + $O[ENCODED_VALUE_1]) $G[SIMPLE_MATH:OP3] *({SU}*)({R:bp} + ?O[JUNK])) $G[SIMPLE_MATH:OP4] *({SU}*)({R:bp} + $O[ENCODED_VALUE_4])) $G[SIMPLE_MATH:OP1] $N[NUMBER1]))",
+             "    $V[VAR] = Flags(Compare($[V1], $[V2]))",
+             "    If((*(BYTE*)({R:bp} + $O[CHOOSE_BYTE]) <= $H[NUM]))",
+             "        *({SU}*)({R:bp} + $O[ENCODED_VALUE_3]) = $[Y]", # Operation with another number on TEMP_ENCODED, first is the opposite of OP1?
+             "    Else",
+             "        *({SU}*)({R:bp} + $O[ENCODED_VALUE_3_2]) = $[Z]", # Operation with another number on TEMP_ENCODED
+             ])
+
     def fix_func(handler, instructions_container, index, params):
         nparams = params.copy()
-        if parser.match_instructions(instructions_container.instructions, index, lines, 0, nparams)[0] or parser.match_instructions(instructions_container.instructions, index, lines2, 0, nparams)[0]:
+        if parser.match_instructions(instructions_container.instructions, index, lines3, 0, nparams)[0] or parser.match_instructions(instructions_container.instructions, index, lines4, 0, nparams)[0]:
+            params.update_global(nparams)
+            parser.replace_instructions(handler, instructions_container.instructions[index], 1, 1, [parser.create_macro_result("$[VAR] = RandomFlags()", nparams)])
+            return True
+        elif parser.match_instructions(instructions_container.instructions, index, lines, 0, nparams)[0] or parser.match_instructions(instructions_container.instructions, index, lines2, 0, nparams)[0]:
             params.update_global(nparams)
             parser.replace_instructions(handler, instructions_container.instructions[index], 0, 1, [parser.create_macro_result("$[VAR] = RandomFlags()", nparams)])
             return True
@@ -133,6 +156,42 @@ def fix_encoding_values(handler, fields):
                 assert res_lines in lines_to_replace
                 assert type(nparams.vars["OP2T"]) is handlers_parser.NoneExpression and type(nparams.vars["VAR1"]) is handlers_parser.Immediate
             #return True # No need a second pass
+        elif parser.match_instructions(instructions_container.instructions, index, ["StoreResultEncodedValue($[X1], $[X2], $[X3], $N[SPLIT_NUM], SimpleOperation(Operation($[OP1]), $[VAR1]), $[OP2T], SimpleOperation(Operation($[OP3]), $[VAR3]))"], 0, nparams)[0]:
+            current_expression1 = nparams.vars["X1"]
+            current_expression2 = nparams.vars["X2"]
+            # TODO more generic code
+            if type(nparams.vars["OP2T"]) is not handlers_parser.NoneExpression:
+                assert parser.match_expression(nparams.vars["OP2T"], "SimpleOperation(Operation($[OP2]), $[VAR2])", nparams)
+                if str(nparams.vars["OP2"]) == "+":
+                    neg_op = handlers_parser.Sub
+                elif str(nparams.vars["OP2"]) == "-":
+                    neg_op = handlers_parser.Add
+                elif str(nparams.vars["OP2"]) == "^":
+                    neg_op = handlers_parser.Xor
+                current_expression1 = neg_op(current_expression1, nparams.vars["VAR2"])
+            if str(nparams.vars["OP1"]) == "+":
+                neg_op = handlers_parser.Sub
+            elif str(nparams.vars["OP1"]) == "-":
+                neg_op = handlers_parser.Add
+            elif str(nparams.vars["OP1"]) == "^":
+                neg_op = handlers_parser.Xor
+            current_expression1 = neg_op(current_expression1, nparams.vars["VAR1"])
+            if str(nparams.vars["OP3"]) == "+":
+                neg_op = handlers_parser.Sub
+            elif str(nparams.vars["OP3"]) == "-":
+                neg_op = handlers_parser.Add
+            elif str(nparams.vars["OP3"]) == "^":
+                neg_op = handlers_parser.Xor
+            current_expression2 = neg_op(current_expression2, nparams.vars["VAR3"])
+            parser.replace_instructions(handler, instructions_container, index, 1, [parser.create_macro_result("$[X1] = EncodedValue($[X3])", nparams)])
+            replace_lines = [
+                "If((VMStructFieldByte(?O[CHOOSE_BYTE]) <= 0x%X))" % nparams.vars["SPLIT_NUM"].value,
+                "    $[X] = %s" % str(current_expression1),
+                "Else",
+                "    $[X] = %s" % str(current_expression2),
+            ]
+            result = "$[X] = " + str(parser.create_macro_result("DecodedValue($[X1])", nparams))
+            lines_to_replace.append((replace_lines, result))
         elif parser.match_instructions(instructions_container.instructions, index, ["$[X1] = EncodedValueByte($[X2], SimpleOperation(Operation($[OP1]), $[VAR1]))"], 0, nparams)[0]:
             current_expression = nparams.vars["X1"]
             if str(nparams.vars["OP1"]) == "+":

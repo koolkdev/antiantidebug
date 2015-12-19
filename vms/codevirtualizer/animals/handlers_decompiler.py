@@ -303,6 +303,13 @@ class NotEqual(BinaryOperationExpression, ConditionExpression):
     def invert(self):
         return Equal(self.lvalue, self.rvalue)
 
+class LessEqual(BinaryOperationExpression, ConditionExpression):
+    def __init__(self, lvalue, rvalue):
+        BinaryOperationExpression.__init__(self, lvalue, rvalue, "<=")
+
+    def invert(self):
+        return NotEqual(self.lvalue, self.rvalue)
+
 class AndCond(BinaryOperationExpression, ConditionExpression):
     def __init__(self, lvalue, rvalue):
         BinaryOperationExpression.__init__(self, lvalue, rvalue, "&&")
@@ -836,7 +843,7 @@ class Handler(object):
                         state.flags = FlagsOf(Cmp(lvalue, value))
                     elif inst.opcode == "test":
                         state.flags = FlagsOf(Test(lvalue, value))
-                elif inst.opcode in ("jz", "jnz"):
+                elif inst.opcode in ("jz", "jnz", "jbe"):
                     # Determine if it is an If/Else or If
                     # If both have common block, than it is a. If one of the next blocks is the common block (or after an empty one), than it is a If.
                     # Else it is a If/Else
@@ -867,6 +874,8 @@ class Handler(object):
                             cond = NotEqual(state.flags.value.lvalue, state.flags.value.rvalue)
                         elif inst.opcode == "jnz":
                             cond = Equal(state.flags.value.lvalue, state.flags.value.rvalue)
+                        elif inst.opcode == "jbe":
+                            cond = LessEqual(state.flags.value.lvalue, state.flags.value.rvalue)
                         else:
                             assert False
                     elif isinstance(state.flags.value, And):
@@ -888,7 +897,13 @@ class Handler(object):
                         self.make_visible(instructions[-1])
                         break
 
-                    assert next_block != block.next
+                    if next_block == block.next:
+                        # Empty block..
+                        instructions.append(If(cond, []))
+                        self.make_visible(instructions[-1])
+                        block = next_block
+                        new_block = True
+                        break
 
                     if next_block == block.next_cond:
                         # Only if

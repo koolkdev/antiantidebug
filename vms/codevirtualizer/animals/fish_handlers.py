@@ -48,19 +48,33 @@ def create_fish_handler_reader_class(name, params=[]):
     return GenericHandlerReader
 
 
-RESET_KEYS = HandlerMatch(match_funcs([lines_matcher(\
+RESET_KEYS = HandlerMatch(match_reset_key(
     [
-        "VMStructFieldDword($O[KEY_DECODE]) = 0x0",
-        "VMStructFieldDword($O[KEY_COND]) = 0x0",
-        "VMStructFieldDword($O[KEY_REGULAR_1]) = 0x0",
-        "VMStructFieldDword($O[KEY_REGULAR_2]) = 0x0",
-        "VMStructFieldDword($O[KEY_UNUSED]) = 0x0",
-        "VMStructFieldWord($O[UNKNOWN_WORD]) = 0x0",
-        "VMStructFieldByte($O[VALUE_BYTE]) = 0x0",
-        "VMStructFieldDword($O[KEY_SPECIAL]) = 0x0"
-    ]), UPDATE_IP_AND_JUMP]),
+        ("Dword", "KEY_1"),
+        ("Dword", "KEY_2"),
+        ("Dword", "KEY_3"),
+        ("Dword", "KEY_4"),
+        ("Dword", "KEY_5"),
+        ("Dword", "KEY_6"),
+        ("Word", "UNKNOWN_WORD"),
+        ("Byte", "VALUE_BYTE"),
+    ]),
     create_handler_reader_class("RESET_KEYS"))
 
+
+RESET_KEYS_NEW = HandlerMatch(match_reset_key(
+    [
+        ("Dword", "KEY_1"),
+        ("Dword", "KEY_2"),
+        ("Dword", "KEY_3"),
+        ("Dword", "KEY_4"),
+        ("Dword", "KEY_5"),
+        ("Dword", "KEY_6"),
+        ("Word", "UNKNOWN_WORD"),
+        ("Byte", "VALUE_BYTE"),
+        ("Byte", "CHOOSE_BYTE"),
+    ]),
+    create_handler_reader_class("RESET_KEYS"))
 
 MOVS = HandlerMatch(match_funcs([
     MOVS_MAIN,
@@ -69,24 +83,31 @@ MOVS = HandlerMatch(match_funcs([
     UPDATE_IP_AND_JUMP
     ]), create_string_op_handler_reader("MOVS"))
 
+BUG_SCAS_1 = match_funcs([
+    BUG_SCAS_MAIN,
+    READ_DI,
+    UPDATE_DI2,
+    update_flags_cond(BUG_SCAS_UPDATE_FLAGS),
+    UPDATE_IP_AND_JUMP
+])
+
+BUG_SCAS_2 = match_funcs([
+    BUG_SCAS_MAIN,
+    BUG_SCAS_UPDATE_FLAGS_1,
+    READ_DI,
+    UPDATE_DI2,
+    update_flags_cond(BUG_SCAS_UPDATE_FLAGS_2),
+    UPDATE_IP_AND_JUMP
+])
+
 SCAS_1 = match_funcs([
-    SCAS_MAIN,
     READ_DI,
     UPDATE_DI2,
     update_flags_cond(SCAS_UPDATE_FLAGS),
     UPDATE_IP_AND_JUMP
 ])
 
-SCAS_2 = match_funcs([
-    SCAS_MAIN,
-    SCAS_UPDATE_FLAGS_1,
-    READ_DI,
-    UPDATE_DI2,
-    update_flags_cond(SCAS_UPDATE_FLAGS_2),
-    UPDATE_IP_AND_JUMP
-])
-
-SCAS = HandlerMatch(match_one([SCAS_1, SCAS_2]), create_string_op_handler_reader("SCAS"))
+SCAS = HandlerMatch(match_one([SCAS_1, BUG_SCAS_1, BUG_SCAS_2]), create_string_op_handler_reader("SCAS"))
 
 CMPS = HandlerMatch(match_funcs([
     match_one([match_funcs([READ_SI, READ_DI]), match_funcs([READ_DI, READ_SI])]),
@@ -454,6 +475,16 @@ ADD_VAR_BASEADDRESS = HandlerMatch(match_funcs([
     UPDATE_IP_AND_JUMP,
 ]), create_handler_reader_class("ADD_VAR_BASEADDRESS", [("VAR", "VAR")]))
 
+UPDATE_KEY_1 = HandlerMatch(match_funcs([
+    lines_matcher(["UpdateKey1()"]),
+    UPDATE_IP_AND_JUMP,
+]), create_handler_reader_class("UPDATE_KEY_1", []))
+
+UPDATE_KEY_2 = HandlerMatch(match_funcs([
+    lines_matcher(["UpdateKey2()"]),
+    UPDATE_IP_AND_JUMP,
+]), create_handler_reader_class("UPDATE_KEY_2", []))
+
 HANDLERS = [
     RESET_KEYS,
     FLAGS_OP,
@@ -466,4 +497,6 @@ HANDLERS = [
     PUSH_POP,
     XCHG,
     CALL,
+    UPDATE_KEY_1,
+    UPDATE_KEY_2,
 ] + COMMON_HANDLERS

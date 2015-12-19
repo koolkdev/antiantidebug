@@ -193,7 +193,7 @@ class VMOpcodeHandler(VMHandler):
         self.decode = None
 
 class VMHandlers(object):
-    RESET_KEYS = None
+    RESET_KEYS_HANDLERS = None
     HANDLERS = None
 
     def __init__(self, file, vm_info):
@@ -211,6 +211,7 @@ class VMHandlers(object):
         if PROGRESSBAR:
             self.prog = None
 
+        already_parsed = False
         # Let's find all the handlers now
         print "Reading handlers... (%d handlers)" % self.handlers_count
         self._start_progress_bar()
@@ -218,9 +219,21 @@ class VMHandlers(object):
             handler_address = file.read_pointer(vm_info.init_handler.handlers_address + i * arch.native_size())
             if fix_handlers:
                 handler_address = handler_address + vm_info.init_handler.base_address
-            funcs.append(self._read_handler_function(handler_address))
+            # Check if we already parsed this handler
+            if handler_address in vm_info.handlers_cache:
+                assert already_parsed or i == 0
+                already_parsed = True
+                self.handlers[i] = vm_info.handlers_cache[handler_address]
+            else:
+                assert not already_parsed
+                funcs.append(self._read_handler_function(handler_address))
             self._update_progress_bar()
         self._close_reader()
+
+        if already_parsed:
+            print "VM already parsed"
+            return
+
         print "Reading handlers... SUCCESS"
 
         # TODO: Multithreaded
@@ -251,7 +264,7 @@ class VMHandlers(object):
         print "Looking for RESET_KEYS...",
         found = False
         for handler in self.handlers.itervalues():
-            handler_info = common_handlers.match_handlers(parser, handler.handler, self.fields, [self.RESET_KEYS], arch)
+            handler_info = common_handlers.match_handlers(parser, handler.handler, self.fields, self.RESET_KEYS_HANDLERS, arch)
             if handler_info is not None:
                 handler.info = handler_info
                 assert not found
@@ -285,6 +298,10 @@ class VMHandlers(object):
                 raise Exception("Failed to detect handlers")
             handlers_to_detect = undetected_handlers
         print "SUCCESS"
+
+        # Save the functions in the cache
+        for i in xrange(len(self.handlers)):
+            vm_info.handlers_cache[funcs[i].address] = self.handlers[i]
 
         # for index, handler in self.handlers.iteritems():
         #     print "---------------------------------------------------"
@@ -362,7 +379,7 @@ class ObfuscatedVMHandlers(VMHandlers):
 
 
 class FISHVMHandlers(ObfuscatedVMHandlers):
-    RESET_KEYS = fish_handlers.RESET_KEYS
+    RESET_KEYS_HANDLERS = [fish_handlers.RESET_KEYS, fish_handlers.RESET_KEYS_NEW]
     HANDLERS = fish_handlers.HANDLERS
 
     def __init__(self, file, vm_info):
@@ -393,7 +410,7 @@ class FISHVMHandlers(ObfuscatedVMHandlers):
 
 
 class TIGERVMHandlers(VMHandlers):
-    RESET_KEYS = tiger_handlers.RESET_KEYS
+    RESET_KEYS_HANDLERS = [tiger_handlers.RESET_KEYS]
     HANDLERS = tiger_handlers.HANDLERS
 
     def __init__(self, file, vm_info):
@@ -416,7 +433,7 @@ class TIGERVMHandlers(VMHandlers):
 
 
 class DOLPHINVMHandlers(ObfuscatedVMHandlers):
-    RESET_KEYS = dolphin_handlers.RESET_KEYS
+    RESET_KEYS_HANDLERS = [dolphin_handlers.RESET_KEYS]
     HANDLERS = dolphin_handlers.HANDLERS
 
     def __init__(self, file, vm_info):
@@ -477,6 +494,8 @@ class EAGLEVMHandlers(FISHVMHandlers):
 
 
 class VMInfo(vm.VMInfo):
+    handlers_cache = {}
+
     def __init__(self, file, vm_address, name, vm_handlers_cls):
         print "Parsing %s%d VM at 0x%08x" % (name, file.mode, vm_address)
         self.struct_fields = {}
@@ -487,36 +506,42 @@ class VMInfo(vm.VMInfo):
 
 class FISHVMInfo(VMInfo):
     cache = {}
+    handlers_cache = {}
     def __init__(self, file, vm_address):
         VMInfo.__init__(self, file, vm_address, "FISH", FISHVMHandlers)
 
 
 class TIGERVMInfo(VMInfo):
     cache = {}
+    handlers_cache = {}
     def __init__(self, file, vm_address):
         VMInfo.__init__(self, file, vm_address, "TIGER", TIGERVMHandlers)
 
 
 class DOLPHINVMInfo(VMInfo):
     cache = {}
+    handlers_cache = {}
     def __init__(self, file, vm_address):
         VMInfo.__init__(self, file, vm_address, "DOLPHIN", DOLPHINVMHandlers)
 
 
 class SHARKVMInfo(VMInfo):
     cache = {}
+    handlers_cache = {}
     def __init__(self, file, vm_address):
         VMInfo.__init__(self, file, vm_address, "SHARK", SHARKVMHandlers)
 
 
 class PUMAVMInfo(VMInfo):
     cache = {}
+    handlers_cache = {}
     def __init__(self, file, vm_address):
         VMInfo.__init__(self, file, vm_address, "PUMA", PUMAVMHandlers)
 
 
 class EAGLEVMInfo(VMInfo):
     cache = {}
+    handlers_cache = {}
     def __init__(self, file, vm_address):
         VMInfo.__init__(self, file, vm_address, "EAGLE", EAGLEVMHandlers)
 
@@ -718,7 +743,7 @@ class VMFunction(vm.VMFunction):
         pass
 
     def _process_instructions(self, instructions, instructions_map):
-        pass
+        templates.Templates.get_template(r"codevirtualizer\animals\animals_00_clean.txt", self.mode).clean(instructions, update_instructions=instructions_map)
 
     def _get_instruction(self, name, args, state):
         nargs = []
@@ -880,6 +905,7 @@ class TIGERVMFunction(VMFunction):
 
 class DOLPHINVMFunction(VMFunction):
     def _process_instructions(self, instructions, instructions_map):
+        super(VMFunction, self)._process_instructions(instructions, instructions_map)
         templates.Templates.get_template(r"codevirtualizer\animals\dolphin_00_clean.txt", self.mode).clean(instructions, update_instructions=instructions_map)
 
     def _get_clean_templates(self):

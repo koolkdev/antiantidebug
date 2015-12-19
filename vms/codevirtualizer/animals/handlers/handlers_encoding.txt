@@ -11,11 +11,12 @@ DEFINE_EXPRESSION_TEMPLATE
 =>
 DecodeWithKey($[X], SimpleOperation(Operation($[OP]), VMStructFieldDword(?O[KEY])))
 
+# KEY_DECODE
 # Bug
 DEFINE_EXPRESSION_TEMPLATE[64]
-(ReadParameterDword($N[OFFSET]) $G[SIMPLE_MATH:OP] VMStructFieldQword(?O[KEY_DECODE]))
+(ReadParameterDword($N[OFFSET]) $G[SIMPLE_MATH:OP] VMStructFieldQword(?O[KEY_*:KEY]))
 =>
-DecodeWithKey(ReadParameterDword($N[OFFSET]), SimpleOperation(Operation($[OP]), VMStructFieldDword(?O[KEY_DECODE])))
+DecodeWithKey(ReadParameterDword($N[OFFSET]), SimpleOperation(Operation($[OP]), VMStructFieldDword(?O[KEY])))
 
 # For decoding next handler
 DEFINE_EXPRESSION_TEMPLATE
@@ -23,10 +24,11 @@ DEFINE_EXPRESSION_TEMPLATE
 =>
 DecodeWithNumber(ReadParameterWord($N[OFFSET]), SimpleOperation(Operation($[OP]), $N[NUMBER]))
 
+# KEY_DECODE
 DEFINE_EXPRESSION_TEMPLATE
-(DecodeWithKey(ReadParameterWord($N[OFFSET]), SimpleOperation($[OP1], VMStructFieldDword(?O[KEY_DECODE]))) $G[SIMPLE_MATH:OP2] $N[NUMBER])
+(DecodeWithKey(ReadParameterWord($N[OFFSET]), SimpleOperation($[OP1], VMStructFieldDword(?O[KEY_*:KEY]))) $G[SIMPLE_MATH:OP2] $N[NUMBER])
 =>
-DecodeWithNumber(DecodeWithKey(ReadParameterWord($N[OFFSET]), SimpleOperation($[OP1], VMStructFieldDword(?O[KEY_DECODE]))), SimpleOperation(Operation($[OP2]), $N[NUMBER]))
+DecodeWithNumber(DecodeWithKey(ReadParameterWord($N[OFFSET]), SimpleOperation($[OP1], VMStructFieldDword(?O[KEY]))), SimpleOperation(Operation($[OP2]), $N[NUMBER]))
 
 ### Key Updates ###
 DEFINE_TEMPLATE
@@ -34,116 +36,67 @@ VMStructFieldDword(?O[KEY_*:KEY]) $G[UPDATE_MATH:OP]= $N[NUMBER]
 =>
 UpdateKey(VMStructFieldDword(?O[KEY]), SimpleOperation(Operation($[OP]), $[NUMBER]))
 
+# KEY_DECODE
 DEFINE_TEMPLATE
-VMStructFieldDword(?O[KEY_DECODE*:KEY]) $G[UPDATE_MATH:OP]= $V[VAR]
+VMStructFieldDword(?O[KEY_*:KEY]) $G[UPDATE_MATH:OP]= $V[VAR]
 =>
 UpdateKeyDecode(VMStructFieldDword(?O[KEY]), SimpleOperation(Operation($[OP]), $[VAR]))
 
+# KEY_COND (0x1), KEY_DECODE (0x2)
 DEFINE_TEMPLATE
-If(((VMStructFieldDword(?O[KEY_COND]) & 0x1) != 0x0))
+If(((VMStructFieldDword(?O[KEY_*:KEY]) & $N[BIT]) != 0x0))
 =>
-UpdateKeyCond(None)
+UpdateKeyCond(VMStructFieldDword(?O[KEY]), $[BIT], None, None)
+
+# KEY_COND (0x1), KEY_DECODE (0x2)
+DEFINE_TEMPLATE
+If(((VMStructFieldDword(?O[KEY_*:KEY]) & $N[BIT]) != 0x0))
+    UpdateKey(VMStructFieldDword(?O[KEY_*:KEY2]), $[X])
+=>
+UpdateKeyCond(VMStructFieldDword(?O[KEY]), $[BIT], UpdateKey(VMStructFieldDword(?O[KEY2]), $[X]), None)
+
+# KEY_DECODE (0x2)
+DEFINE_TEMPLATE
+If(((VMStructFieldDword(?O[KEY_*:KEY]) & $N[BIT]) != 0x0))
+    UpdateKey(VMStructFieldDword(?O[KEY_*:KEY2]), $[X])
+    UpdateKey(VMStructFieldDword(?O[KEY_*:KEY3]), $[Y])
+=>
+UpdateKeyCond(VMStructFieldDword(?O[KEY]), $[BIT], UpdateKey(VMStructFieldDword(?O[KEY2]), $[X]), UpdateKey(VMStructFieldDword(?O[KEY3]), $[Y]))
 
 DEFINE_TEMPLATE
-If(((VMStructFieldDword(?O[KEY_COND]) & 0x1) != 0x0))
-    UpdateKey(VMStructFieldDword(?O[KEY_COND]), $[X])
+VMStructFieldDword(?O[KEY_*:KEY]) $G[UPDATE_MATH:OP]= (VMStructFieldDword(?O[KEY_*:KEY2]) $G[UPDATE_MATH:OP2] $N[NUMBER])
 =>
-UpdateKeyCond($[X])
+UpdateKeyComplex(VMStructFieldDword(?O[KEY]), Operation($[OP]), VMStructFieldDword(?O[KEY2]), SimpleOperation(Operation($[OP2]), $N[NUMBER]))
 
 DEFINE_TEMPLATE
-If(((VMStructFieldDword(?O[KEY_DECODE]) & 0x2) != 0x0))
+VMStructFieldDword(?O[KEY_*:KEY]) $G[UPDATE_MATH:OP]= VMStructFieldDword(?O[KEY_*:KEY2])
 =>
-UpdateKeyCond2(None, None)
-
-DEFINE_TEMPLATE
-If(((VMStructFieldDword(?O[KEY_DECODE]) & 0x2) != 0x0))
-    UpdateKey(VMStructFieldDword(?O[KEY_COND]), $[Y])
-=>
-UpdateKeyCond2(None, $[Y])
-
-DEFINE_TEMPLATE
-If(((VMStructFieldDword(?O[KEY_DECODE]) & 0x2) != 0x0))
-    UpdateKey(VMStructFieldDword(?O[KEY_DECODE]), $[X])
-=>
-UpdateKeyCond2($[X], None)
-
-DEFINE_TEMPLATE
-If(((VMStructFieldDword(?O[KEY_DECODE]) & 0x2) != 0x0))
-    UpdateKey(VMStructFieldDword(?O[KEY_DECODE]), $[X])
-    UpdateKey(VMStructFieldDword(?O[KEY_COND]), $[Y])
-=>
-UpdateKeyCond2($[X], $[Y])
-
-DEFINE_TEMPLATE
-If(((VMStructFieldDword(?O[KEY_DECODE]) & 0x2) != 0x0))
-    UpdateKey(VMStructFieldDword(?O[KEY_DECODE]), $[X])
-    UpdateKey(VMStructFieldDword(?O[KEY_COND]), $[Y])
-=>
-UpdateKeyCond2($[X], $[Y])
-
-# For Dolphin
-DEFINE_TEMPLATE
-If(((VMStructFieldDword(?O[KEY_COND]) & 0x2) != 0x0))
-    UpdateKey(VMStructFieldDword(?O[KEY_COND]), $[X])
-=>
-UpdateKeyCond3($[X], None)
-
-DEFINE_TEMPLATE
-If(((VMStructFieldDword(?O[KEY_COND]) & 0x2) != 0x0))
-    UpdateKey(VMStructFieldDword(?O[KEY_COND]), $[X])
-    UpdateKey(VMStructFieldDword(?O[KEY_COND]), $[Y])
-=>
-UpdateKeyCond3($[X], $[Y])
-
-DEFINE_TEMPLATE
-VMStructFieldDword(?O[KEY_DECODE]) $G[UPDATE_MATH:OP]= (VMStructFieldDword(?O[KEY_COND]) $G[UPDATE_MATH:OP2] $N[NUMBER])
-=>
-UpdateKeyDecodeCond(Operation($[OP]), SimpleOperation(Operation($[OP2]), $N[NUMBER]))
-
-DEFINE_TEMPLATE
-VMStructFieldDword(?O[KEY_DECODE]) $G[UPDATE_MATH:OP]= VMStructFieldDword(?O[KEY_COND])
-=>
-UpdateKeyDecodeCond(Operation($[OP]), None)
-
-DEFINE_TEMPLATE
-VMStructFieldDword(?O[KEY_COND]) $G[UPDATE_MATH:OP]= (VMStructFieldDword(?O[KEY_DECODE]) $G[UPDATE_MATH:OP2] $N[NUMBER])
-=>
-UpdateKeyDecodeCond2(Operation($[OP]), SimpleOperation(Operation($[OP2]), $N[NUMBER]))
-
-DEFINE_TEMPLATE
-VMStructFieldDword(?O[KEY_COND]) $G[UPDATE_MATH:OP]= VMStructFieldDword(?O[KEY_DECODE])
-=>
-UpdateKeyDecodeCond2(Operation($[OP]), None)
+UpdateKeyComplex(VMStructFieldDword(?O[KEY]), Operation($[OP]), VMStructFieldDword(?O[KEY2]), None)
 
 # For Dolphin end
 
 DEFINE_TEMPLATE
-$V[VAR] = VMStructFieldDword(?O[KEY_DECODE])
+$V[VAR] = VMStructFieldDword(?O[KEY_*:KEY])
 =>
-XchgKeys1($V[VAR])
+XchgKeys1($V[VAR], VMStructFieldDword(?O[KEY]))
 
 DEFINE_TEMPLATE
-VMStructFieldDword(?O[KEY_DECODE]) = VMStructFieldDword(?O[KEY_COND])
+VMStructFieldDword(?O[KEY_*:KEY1]) = VMStructFieldDword(?O[KEY_*:KEY2])
 =>
-XchgKeys2()
+XchgKeys2(VMStructFieldDword(?O[KEY1]), VMStructFieldDword(?O[KEY2]))
 
 DEFINE_TEMPLATE
-VMStructFieldDword(?O[KEY_COND]) = $V[VAR]
+VMStructFieldDword(?O[KEY_*:KEY]) = $V[VAR]
 =>
-XchgKeys3($V[VAR])
+XchgKeys3($V[VAR], VMStructFieldDword(?O[KEY]))
 
 # TODO: If it is in a start of a function, it may not work
 DEFINE_TEMPLATE
-XchgKeys1($V[VAR])
-XchgKeys2()
-XchgKeys3($V[VAR])
+XchgKeys1($V[VAR], VMStructFieldDword(?O[KEY_*:KEY1]))
+XchgKeys2(VMStructFieldDword(?O[KEY_*:KEY1]), VMStructFieldDword(?O[KEY_*:KEY2]))
+XchgKeys3($V[VAR], VMStructFieldDword(?O[KEY_*:KEY2]))
 =>
-XchgKeys()
-
-DEFINE_TEMPLATE
-VMStructFieldDword(?O[KEY_SPECIAL]) $G[UPDATE_MATH:OP]= VMStructFieldDword(?O[KEY_DECODE])
-=>
-UpdateKeySpecial(Operation($[OP]))
+XchgKeys(VMStructFieldDword(?O[KEY1]), VMStructFieldDword(?O[KEY2]))
 
 # Not used anyway, no need to take it into account
 # Commented it out for a case that it is used
@@ -159,3 +112,7 @@ $G[FIELDS:FIELD](?O[VALUE_*:VALUE]) $G[SIMPLE_MATH:OP]= $[X]
 =>
 UpdateValue($[FIELD](?O[VALUE]), SimpleOperation(Operation($G[OP]), $[X]))
 
+DEFINE_TEMPLATE
+VMStructFieldDword(?O[KEY_*:KEY]) $G[UPDATE_MATH:OP3]= DecodeWithKey((VMStructFieldDword(?O[KEY_*:KEY]) $G[SIMPLE_MATH:OP1] $N[NUMBER]), SimpleOperation(Operation($G[SIMPLE_MATH:OP2]), VMStructFieldDword(?O[KEY_*:KEY2])))
+=>
+UpdateKeyComplex2(VMStructFieldDword(?O[KEY]), Operation($[OP3]), SimpleOperation(Operation($[OP1]), $N[NUMBER]), SimpleOperation(Operation($[OP2]), VMStructFieldDword(?O[KEY2])))

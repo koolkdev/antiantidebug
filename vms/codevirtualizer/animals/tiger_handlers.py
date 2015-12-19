@@ -582,24 +582,31 @@ MOVS = HandlerMatch(match_funcs([
     UPDATE_IP_AND_JUMP
     ]), create_string_op_handler_reader("MOVS"))
 
-SCAS_1 = match_funcs([
-    SCAS_MAIN,
+BUG_SCAS_1 = match_funcs([
+    BUG_SCAS_MAIN,
     READ_DI,
     UPDATE_DI3,
+    optional(match_one([update_flags_cond(BUG_SCAS_UPDATE_FLAGS), BUG_SCAS_UPDATE_FLAGS]), "UPDATE_FLAGS"),
+    UPDATE_IP_AND_JUMP
+])
+
+BUG_SCAS_2 = match_funcs([
+    BUG_SCAS_MAIN,
+    optional(BUG_SCAS_UPDATE_FLAGS_1, "UPDATE_FLAGS"),
+    READ_DI,
+    UPDATE_DI3,
+    optional(match_one([update_flags_cond(BUG_SCAS_UPDATE_FLAGS_2), BUG_SCAS_UPDATE_FLAGS_2]), "UPDATE_FLAGS"),
+    UPDATE_IP_AND_JUMP
+])
+
+SCAS_1 = match_funcs([
+    READ_DI,
+    UPDATE_DI2,
     optional(match_one([update_flags_cond(SCAS_UPDATE_FLAGS), SCAS_UPDATE_FLAGS]), "UPDATE_FLAGS"),
     UPDATE_IP_AND_JUMP
 ])
 
-SCAS_2 = match_funcs([
-    SCAS_MAIN,
-    optional(SCAS_UPDATE_FLAGS_1, "UPDATE_FLAGS"),
-    READ_DI,
-    UPDATE_DI3,
-    optional(match_one([update_flags_cond(SCAS_UPDATE_FLAGS_2), SCAS_UPDATE_FLAGS_2]), "UPDATE_FLAGS"),
-    UPDATE_IP_AND_JUMP
-])
-
-SCAS = HandlerMatch(match_one([SCAS_1, SCAS_2]), create_string_op_handler_reader("SCAS"))
+SCAS = HandlerMatch(match_one([SCAS_1, BUG_SCAS_1, BUG_SCAS_2]), create_string_op_handler_reader("SCAS"))
 
 CMPS = HandlerMatch(match_funcs([
     match_one([match_funcs([READ_SI, READ_DI]), match_funcs([READ_DI, READ_SI])]),

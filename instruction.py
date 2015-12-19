@@ -326,6 +326,7 @@ class Function(object):
         instructions_blocks = {}
         self.blocks = {}
         self.mode = file.mode
+        self.address = address
         blocks_to_explores = deque()
 
         def get_block(address):

@@ -189,6 +189,9 @@ UPDATE_IP_AND_JUMP = lines_matcher(\
         "JumpToHandler(ReadParameterWord($P[NEXT_HANDLER]))"
     ])
 
+def match_reset_key(keys):
+    return match_funcs([any_order([lines_matcher(["VMStructField%s($O[%s]) = 0x0" % (key_size, key_name)]) for key_size, key_name in keys]), UPDATE_IP_AND_JUMP])
+
 UPDATE_IP_AND_JUMP_PARAM = lines_matcher(\
     [
         "UpdateEip(ReadParameterDword($P[JUMP_VALUE]))",
@@ -281,18 +284,22 @@ MOVS_MAIN = string_op(["*($G[SIZES:SIZE]*)VMStructField{SS}(ReadParameterWord($P
 
 # BUG, it seems to be wrong..
 
-SCAS_MAIN = match_one([string_op(["$V[VAR_DI] = VMStructField{SS}(ReadParameterWord($P[DI_OFFSET]))",
-                                  "$V[VAR_AX] = VMStructField{SS}(ReadParameterWord($P[AX_OFFSET]))",
-                                  "*($G[SIZES:SIZE]*)$V[VAR_DI] -= $V[VAR_AX]"]),
-                       string_op(["$V[VAR_AX] = VMStructField{SS}(ReadParameterWord($P[AX_OFFSET]))",
-                                  "$V[VAR_DI] = VMStructField{SS}(ReadParameterWord($P[DI_OFFSET]))",
-                                  "*($G[SIZES:SIZE]*)$V[VAR_DI] -= $V[VAR_AX]"])])
+BUG_SCAS_MAIN = match_one([
+    string_op(["$V[VAR_DI] = VMStructField{SS}(ReadParameterWord($P[DI_OFFSET]))",
+        "$V[VAR_AX] = VMStructField{SS}(ReadParameterWord($P[AX_OFFSET]))",
+        "*($G[SIZES:SIZE]*)$V[VAR_DI] -= $V[VAR_AX]"]),
+    string_op(["$V[VAR_AX] = VMStructField{SS}(ReadParameterWord($P[AX_OFFSET]))",
+        "$V[VAR_DI] = VMStructField{SS}(ReadParameterWord($P[DI_OFFSET]))",
+        "*($G[SIZES:SIZE]*)$V[VAR_DI] -= $V[VAR_AX]"])
+])
 
-SCAS_UPDATE_FLAGS_1 = string_op(["var_1 = Flags(*($G[SIZES:SIZE]*)$V[VAR_DI] -= $V[VAR_AX])"])
+BUG_SCAS_UPDATE_FLAGS_1 = string_op(["var_1 = Flags(*($G[SIZES:SIZE]*)$V[VAR_DI] -= $V[VAR_AX])"])
 
-SCAS_UPDATE_FLAGS_2 = string_op(["VMStructField{SS}(ReadParameterWord($P[SET_FLAGS_OFFSET])) = var_1"])
+BUG_SCAS_UPDATE_FLAGS_2 = string_op(["VMStructField{SS}(ReadParameterWord($P[SET_FLAGS_OFFSET])) = var_1"])
 
-SCAS_UPDATE_FLAGS = string_op(["VMStructField{SS}(ReadParameterWord($P[SET_FLAGS_OFFSET])) = Flags(*($G[SIZES:SIZE]*)$V[VAR_DI] -= $V[VAR_AX])"])
+BUG_SCAS_UPDATE_FLAGS = string_op(["VMStructField{SS}(ReadParameterWord($P[SET_FLAGS_OFFSET])) = Flags(*($G[SIZES:SIZE]*)$V[VAR_DI] -= $V[VAR_AX])"])
+
+SCAS_UPDATE_FLAGS = string_op(["VMStructField{SS}(ReadParameterWord($P[SET_FLAGS_OFFSET])) = Flags((VMStructField{SS}(ReadParameterWord($P[AX_OFFSET])) - *($G[SIZES:SIZE]*)VMStructField{SS}(ReadParameterWord($P[DI_OFFSET]))))"])
 
 CMPS_UPDATE_FLAGS_1 = string_op(["VMStructField{SS}(ReadParameterWord($P[SET_FLAGS_OFFSET])) = Flags(Compare(*($G[SIZES:SIZE]*)VMStructField{SS}(ReadParameterWord($P[SI_OFFSET])), *($G[SIZES:SIZE]*)VMStructField{SS}(ReadParameterWord($P[DI_OFFSET]))))"])
 
