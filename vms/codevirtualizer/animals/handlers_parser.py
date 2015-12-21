@@ -566,12 +566,39 @@ class HandlerParser(object):
     def replace_instructions(self, handler, instructions_container, index, count, new_instructions):
         for inst in instructions_container.instructions[index:index+count]:
             handler.make_unvisible(inst, True)
-        for inst in instructions_container.instructions[index:index+count]:
+        def remove_vars(inst):
             if isinstance(inst, SetValueOperation) and isinstance(inst.lvalue, Variable):
                 inst.lvalue.instructions.remove(inst)
+            if isinstance(inst, ConditionBlock):
+                for inst in inst.instructions:
+                    remove_vars(inst)
+        for inst in instructions_container.instructions[index:index+count]:
+            # Remove the references recursive
+            remove_vars(inst)
         instructions_container.instructions[index:index+count] = new_instructions
+        # TODO: Support adding condition blocks, so do it recursive
         for inst in new_instructions:
             if isinstance(inst, SetValueOperation) and isinstance(inst.lvalue, Variable):
+                # HACK: For case
+                # var_bla = ..
+                # if (...)
+                #   var_bla = var_bla + 1
+                # var_bla
+                # TODO TODO IMPORTANT: Fix it proper, make a function the rebuilds the vars relations
+                if inst.lvalue.name != "1" and len(inst.lvalue.used_instructions) == 1 and inst.lvalue not in inst.lvalue.used_instructions[0].get_all_children():
+                    print str(new_instructions[0])
+                    sinst = inst.lvalue.used_instructions[0]
+                    for ninst in sinst.get_all_children():
+                        if isinstance(ninst, Variable):
+                            if isinstance(sinst, SetValueOperation) and sinst.lvalue == ninst:
+                                continue
+                            if ninst.name == inst.lvalue.name:
+                                ninst.instructions[0].lvalue.used_instructions.remove(sinst)
+                                for linst in sinst.get_all_children():
+                                    if ninst in linst.get_children():
+                                        linst.replace_child(ninst, inst.lvalue)
+                                break
+                # # HACK end
                 inst.lvalue.instructions.append(inst)
             handler.make_visible(inst)
         if not self.dont_optimize:
@@ -603,6 +630,15 @@ class HandlerParser(object):
 
     def replace_templates(self, handler, instructions_container, index, params):
         return self.replace_instructions_templates(handler, self.templates, instructions_container, index, params)
+
+    def find_child(self, expr, query, params):
+        for child in expr.get_children():
+            res = self.find_child(child, query, params)
+            if res is not None:
+                return res
+            if self.match_expression(child, query, params):
+                return child, expr
+        return None
 
     def clean_instructions_container(self, handler, instructions_container, params, funcs, reverse=None):
         if reverse is None:

@@ -303,9 +303,9 @@ class NotEqual(BinaryOperationExpression, ConditionExpression):
     def invert(self):
         return Equal(self.lvalue, self.rvalue)
 
-class LessEqual(BinaryOperationExpression, ConditionExpression):
+class Greater(BinaryOperationExpression, ConditionExpression):
     def __init__(self, lvalue, rvalue):
-        BinaryOperationExpression.__init__(self, lvalue, rvalue, "<=")
+        BinaryOperationExpression.__init__(self, lvalue, rvalue, ">")
 
     def invert(self):
         return NotEqual(self.lvalue, self.rvalue)
@@ -875,7 +875,7 @@ class Handler(object):
                         elif inst.opcode == "jnz":
                             cond = Equal(state.flags.value.lvalue, state.flags.value.rvalue)
                         elif inst.opcode == "jbe":
-                            cond = LessEqual(state.flags.value.lvalue, state.flags.value.rvalue)
+                            cond = Greater(state.flags.value.lvalue, state.flags.value.rvalue)
                         else:
                             assert False
                     elif isinstance(state.flags.value, And):

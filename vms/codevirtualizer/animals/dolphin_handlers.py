@@ -350,7 +350,8 @@ ADD_VAR_BASEADDRESS = HandlerMatch(match_funcs([
     UPDATE_IP_AND_JUMP
 ]), create_dolphin_handler_reader_class("ADD_VAR_BASEADDRESS", [("PARAM", "VAR", "DST_VALUE")], [("DST_OFFSET_TYPE", "INVALID"), ("DST_OFFSET_VALUE", "INVALID")]))
 
-RESET_KEYS = HandlerMatch(match_funcs([lines_matcher(\
+# Deprecated
+RESET_KEYS_OLD = HandlerMatch(match_funcs([lines_matcher(\
     [
         "VMStructFieldDword($O[KEY_DECODE]) = 0x0",
         "VMStructFieldDword($O[KEY_COND]) = 0x0",
@@ -381,7 +382,6 @@ HANDLERS = [
     LOAD_DST_OFFSET_VAR,
     LOAD_DST_OFFSET_MEMVAR,
     ADD_VAR_BASEADDRESS,
-    RESET_KEYS,
     fish_handlers.FLAGS_OP,
     tiger_handlers.CALL,
     tiger_handlers.MOVS,

@@ -19,9 +19,3 @@ DEFINE_EXPRESSION_TEMPLATE
 ((((VMStructFieldByte(?O[VALUE_BYTE]) $G[SIMPLE_MATH:OP1] $N[NUMBER1]) $G[SIMPLE_MATH:OP2] $N[NUMBER2]) - $N[VALUE]) $G[COMPARE:COMP_OP] 0x0)
 =>
 (ValueDecode(VMStructFieldByte(?O[VALUE_BYTE]), SimpleOperation(Operation($[OP1]), $[NUMBER1]), SimpleOperation(Operation($[OP2]), $[NUMBER2])) $[COMP_OP] $[VALUE])
-
-# Not interested in the value of CHOOSE_BYTE, so we ignore it
-DEFINE_TEMPLATE
-VMStructFieldByte(?O[CHOOSE_BYTE]) $G[UPDATE_MATH:OP]= $V[VAR]
-=>
-None

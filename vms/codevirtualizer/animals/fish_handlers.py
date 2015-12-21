@@ -48,32 +48,18 @@ def create_fish_handler_reader_class(name, params=[]):
     return GenericHandlerReader
 
 
-RESET_KEYS = HandlerMatch(match_reset_key(
+# Deprecated
+RESET_KEYS_OLD = HandlerMatch(match_funcs([lines_matcher(\
     [
-        ("Dword", "KEY_1"),
-        ("Dword", "KEY_2"),
-        ("Dword", "KEY_3"),
-        ("Dword", "KEY_4"),
-        ("Dword", "KEY_5"),
-        ("Dword", "KEY_6"),
-        ("Word", "UNKNOWN_WORD"),
-        ("Byte", "VALUE_BYTE"),
-    ]),
-    create_handler_reader_class("RESET_KEYS"))
-
-
-RESET_KEYS_NEW = HandlerMatch(match_reset_key(
-    [
-        ("Dword", "KEY_1"),
-        ("Dword", "KEY_2"),
-        ("Dword", "KEY_3"),
-        ("Dword", "KEY_4"),
-        ("Dword", "KEY_5"),
-        ("Dword", "KEY_6"),
-        ("Word", "UNKNOWN_WORD"),
-        ("Byte", "VALUE_BYTE"),
-        ("Byte", "CHOOSE_BYTE"),
-    ]),
+        "VMStructFieldDword($O[KEY_DECODE]) = 0x0",
+        "VMStructFieldDword($O[KEY_COND]) = 0x0",
+        "VMStructFieldDword($O[KEY_REGULAR_1]) = 0x0",
+        "VMStructFieldDword($O[KEY_REGULAR_2]) = 0x0",
+        "VMStructFieldDword($O[KEY_UNUSED]) = 0x0",
+        "VMStructFieldWord($O[UNKNOWN_WORD]) = 0x0",
+        "VMStructFieldByte($O[VALUE_BYTE]) = 0x0",
+        "VMStructFieldDword($O[KEY_SPECIAL]) = 0x0"
+    ]), UPDATE_IP_AND_JUMP]),
     create_handler_reader_class("RESET_KEYS"))
 
 MOVS = HandlerMatch(match_funcs([
@@ -486,7 +472,6 @@ UPDATE_KEY_2 = HandlerMatch(match_funcs([
 ]), create_handler_reader_class("UPDATE_KEY_2", []))
 
 HANDLERS = [
-    RESET_KEYS,
     FLAGS_OP,
     MOVS,
     CMPS,

@@ -66,7 +66,7 @@ def clean_junk_check(handlers, fields, arch):
     lines3 = map(arch.translate, ["If(($[X] == 0x0))",
              "    $V[TEMP_ENCODED] = (~((*({SU}*)({R:bp} + $O[ENCODED_VALUE_1]) $G[SIMPLE_MATH:OP3] *({SU}*)({R:bp} + ?O[JUNK])) $G[SIMPLE_MATH:OP1] $N[NUMBER1]))",
              "    $V[VAR] = Flags(Compare($[V1], $[V2]))",
-             "    If((*(BYTE*)({R:bp} + $O[CHOOSE_BYTE]) <= $H[NUM]))",
+             "    If((*(BYTE*)({R:bp} + $O[KEY_CHOOSE_BYTE]) > $H[NUM]))",
              "        *({SU}*)({R:bp} + $O[ENCODED_VALUE_3]) = $[Y]", # Operation with another number on TEMP_ENCODED, first is the opposite of OP1?
              "    Else",
              "        *({SU}*)({R:bp} + $O[ENCODED_VALUE_3_2]) = $[Z]", # Operation with another number on TEMP_ENCODED
@@ -75,7 +75,7 @@ def clean_junk_check(handlers, fields, arch):
     lines4 = map(arch.translate, ["If(($[X] == 0x0))",
              "    $V[TEMP_ENCODED] = (~(((*({SU}*)({R:bp} + $O[ENCODED_VALUE_1]) $G[SIMPLE_MATH:OP3] *({SU}*)({R:bp} + ?O[JUNK])) $G[SIMPLE_MATH:OP4] *({SU}*)({R:bp} + $O[ENCODED_VALUE_4])) $G[SIMPLE_MATH:OP1] $N[NUMBER1]))",
              "    $V[VAR] = Flags(Compare($[V1], $[V2]))",
-             "    If((*(BYTE*)({R:bp} + $O[CHOOSE_BYTE]) <= $H[NUM]))",
+             "    If((*(BYTE*)({R:bp} + $O[KEY_CHOOSE_BYTE]) > $H[NUM]))",
              "        *({SU}*)({R:bp} + $O[ENCODED_VALUE_3]) = $[Y]", # Operation with another number on TEMP_ENCODED, first is the opposite of OP1?
              "    Else",
              "        *({SU}*)({R:bp} + $O[ENCODED_VALUE_3_2]) = $[Z]", # Operation with another number on TEMP_ENCODED
@@ -185,7 +185,7 @@ def fix_encoding_values(handler, fields):
             current_expression2 = neg_op(current_expression2, nparams.vars["VAR3"])
             parser.replace_instructions(handler, instructions_container, index, 1, [parser.create_macro_result("$[X1] = EncodedValue($[X3])", nparams)])
             replace_lines = [
-                "If((VMStructFieldByte(?O[CHOOSE_BYTE]) <= 0x%X))" % nparams.vars["SPLIT_NUM"].value,
+                "If((VMStructFieldByte(?O[KEY_CHOOSE_BYTE]) > 0x%X))" % nparams.vars["SPLIT_NUM"].value,
                 "    $[X] = %s" % str(current_expression1),
                 "Else",
                 "    $[X] = %s" % str(current_expression2),

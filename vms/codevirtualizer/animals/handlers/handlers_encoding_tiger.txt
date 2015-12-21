@@ -19,3 +19,16 @@ DEFINE_TEMPLATE
 VMStructFieldDword(?O[KEY_*:KEY]) $G[UPDATE_MATH:OP]= ReadParameterDword($N[OFFSET])
 =>
 UpdateKeyDecode(VMStructFieldDword(?O[KEY]), SimpleOperation(Operation($[OP]), ReadParameterDword($N[OFFSET])))
+
+# X and Y are the same var, but we do it to keep the references right. TODO: fix it in proper way
+DEFINE_TEMPLATE
+If((VMStructFieldByte(?O[KEY_CHOOSE_BYTE]) > $N[NUMBER]))
+    $V[X] = ($V[Y] $G[SIMPLE_MATH:OP] $N[NUMBER2])
+=>
+$[X] = DecodeIfLess($[Y], VMStructFieldByte(?O[KEY_CHOOSE_BYTE]), $N[NUMBER], SimpleOperation(Operation($[OP]), $N[NUMBER2]))
+
+
+DEFINE_TEMPLATE
+If((VMStructFieldByte($O[KEY_CHOOSE_BYTE]) > $N[NUMBER]))
+=>
+None

@@ -189,8 +189,15 @@ UPDATE_IP_AND_JUMP = lines_matcher(\
         "JumpToHandler(ReadParameterWord($P[NEXT_HANDLER]))"
     ])
 
-def match_reset_key(keys):
-    return match_funcs([any_order([lines_matcher(["VMStructField%s($O[%s]) = 0x0" % (key_size, key_name)]) for key_size, key_name in keys]), UPDATE_IP_AND_JUMP])
+def create_reset_key_handler(keys):
+    return HandlerMatch(
+        match_funcs([any_order([lines_matcher(["VMStructField%s($O[%s]) = 0x0" % (key_size, key_name)]) for key_size, key_name in keys]), UPDATE_IP_AND_JUMP]),
+        create_handler_reader_class("RESET_KEYS", []))
+
+def create_lazy_reset_key_handler(keys):
+    return HandlerMatch(
+        match_funcs([any_order([lines_matcher(["VMStructField%s($N[%s]) = 0x0" % (key_size, key_name)]) for key_size, key_name in keys]), UPDATE_IP_AND_JUMP]),
+        create_handler_reader_class("RESET_KEYS", []))
 
 UPDATE_IP_AND_JUMP_PARAM = lines_matcher(\
     [

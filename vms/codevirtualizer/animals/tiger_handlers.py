@@ -560,7 +560,8 @@ CALL = HandlerMatch(match_funcs([
 ]), create_tiger_handler_reader_class("CALL_{T:DST_TYPE}_NEXT",
                                       [("{AT:DST_TYPE}", "DST_VALUE"), ("RELIMM", "RETURN_ADDRESS")]))
 
-RESET_KEYS = HandlerMatch(match_funcs([lines_matcher(\
+# Deprecated
+RESET_KEYS_OLD = HandlerMatch(match_funcs([lines_matcher(\
     [
         "VMStructFieldDword($O[KEY_DECODE]) = 0x0",
         "VMStructFieldDword($O[KEY_COND]) = 0x0",
@@ -675,7 +676,6 @@ HANDLERS = [
     MOV_QWORD,
     SHL_SHR,
     CMP_TEST,
-    RESET_KEYS,
     FLAGS_OP,
     MOVS,
     CMPS,

@@ -116,7 +116,7 @@ DEFINE_TEMPLATE
 @NATIVE_FIELD@(?O[ENCODED_VALUE_3_2]) = EncodedValueSecond($[VAR], SimpleOperation(Operation($[OP]), $N[NUMBER]))
 
 DEFINE_TEMPLATE
-If((VMStructFieldByte(?O[CHOOSE_BYTE]) <= $N[SPLIT_NUM]))
+If((VMStructFieldByte(?O[KEY_CHOOSE_BYTE]) > $N[SPLIT_NUM]))
     @NATIVE_FIELD@(?O[ENCODED_VALUE_3]) = EncodedValue($V[VAR], $[X], $[Y], None)
 Else
     @NATIVE_FIELD@(?O[ENCODED_VALUE_3_2]) = EncodedValueSecond($V[VAR], $[Z])

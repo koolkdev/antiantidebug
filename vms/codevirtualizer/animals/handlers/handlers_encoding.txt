@@ -105,6 +105,17 @@ XchgKeys(VMStructFieldDword(?O[KEY1]), VMStructFieldDword(?O[KEY2]))
 #=>
 #None
 
+# Well there is just one such byte key right now
+DEFINE_TEMPLATE
+VMStructFieldByte(?O[KEY_*:KEY]) $G[UPDATE_MATH:OP]= $N[NUMBER]
+=>
+UpdateKey(VMStructFieldByte(?O[KEY]), SimpleOperation(Operation($[OP]), $[NUMBER]))
+
+DEFINE_TEMPLATE
+VMStructFieldByte(?O[KEY_*:KEY]) $G[SIMPLE_MATH:OP]= $V[VAR]
+=>
+UpdateKeyDecode(VMStructFieldByte(?O[KEY]), SimpleOperation(Operation($[OP]), $[VAR]))
+
 ### Value fields ###
 
 DEFINE_TEMPLATE

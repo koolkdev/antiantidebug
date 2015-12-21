@@ -83,17 +83,17 @@ class VarsMapping(object):
 class FISHDecodingState(DecodingState):
     def __init__(self, address, read_func):
         DecodingState.__init__(self, {
-            "KEY_1": DwordKey(),
-            "KEY_2": DwordKey(),
-            "KEY_3": DwordKey(),
-            "KEY_4": DwordKey(),
-            "KEY_5": DwordKey(),
-            "KEY_6": DwordKey(),
+            "KEY_DECODE": DwordKey(),
+            "KEY_COND": DwordKey(),
+            "KEY_REGULAR_1": DwordKey(),
+            "KEY_REGULAR_2": DwordKey(),
+            "KEY_UNUSED": DwordKey(),
+            "KEY_SPECIAL": DwordKey(),
             "VALUE_BYTE": ByteKey(),
             }, address, read_func)
 
 
-class TIGERDecodingState(DecodingState):
+class TIGERDecodingStateOld(DecodingState):
     def __init__(self, address, read_func):
         DecodingState.__init__(self, {
             "KEY_DECODE": DwordKey(),
@@ -118,12 +118,18 @@ class DOLPHINDecodingState(DecodingState):
         self.params = {}
 
 
+class TIGERDecodingState(DecodingState):
+    def __init__(self, keys, address, read_func):
+        DecodingState.__init__(self, keys, address, read_func)
+        self.vars = VarsMapping()
+
+
 def new_fish_state(address, read_func):
     return FISHDecodingState(address, read_func)
 
 
 def new_tiger_state(address, read_func):
-    return TIGERDecodingState(address, read_func)
+    return TIGERDecodingStateOld(address, read_func)
 
 
 def new_dolphin_state(address, read_func):
@@ -161,6 +167,19 @@ class DecodeNumber(Decode):
 
     def decode(self, state, x):
         return Decode.OPERATIONS[self.op](x, self.value)
+
+
+class DecodeIf(Decode):
+    def __init__(self, key, cond, op):
+        self.key = key
+        self.cond = cond
+        self.op = op
+
+    def decode(self, state, x):
+        if self.cond(state.get_key(self.key).value):
+            return self.op.decode(state, x)
+        else:
+            return x
 
 
 class DecodeKey(Decode):
@@ -498,6 +517,15 @@ def get_reading_decoding_info(handler, fields, arch):
                 dec = DecodeNumber(params.vars["OP"].value, params.vars["NUMBER"].value)
                 parent.replace_child(expr, expr.lvalue)
                 return dec, offset, size, False
+        res = find_child(inst, "DecodeIfLess($G[READ_PARAMETER:READ_OP]($N[OFFSET]), VMStructFieldByte(?O[KEY_*:KEY]), $N[NUMBER], SimpleOperation(Operation($[OP]), $N[NUMBER2]))", params)
+        if res is not None:
+            # KEY_CHOOSE_BYTE, For tiger
+            expr, parent = res
+            size = {"ReadParameterByte": 1, "ReadParameterWord": 2, "ReadParameterDword": 4, "ReadParameterQword": 8}[params.vars["READ_OP"].value]
+            offset = params.vars["OFFSET"].value
+            dec = DecodeIf(params.real_field_name["KEY"], lambda x: x > params.vars["NUMBER"].value, DecodeNumber(params.vars["OP"].value, params.vars["NUMBER2"].value))
+            parent.replace_child(expr, expr.parameters[0])
+            return dec, offset, size, False
         if parser.match_expression(inst, "UpdateKeyDecode(VMStructFieldDword(?O[KEY*:KEY]), SimpleOperation(Operation($[OP]), $G[READ_PARAMETER:READ_OP]($N[OFFSET])))", params):
             # It is in tiger. And we return the new read parameter, even it isn't going to be used, because it will be handled correclty anyway
             size = {"ReadParameterByte": 1, "ReadParameterWord": 2, "ReadParameterDword": 4, "ReadParameterQword": 8}[params.vars["READ_OP"].value]
@@ -515,10 +543,11 @@ def get_reading_decoding_info(handler, fields, arch):
         nparams = params.copy()
         if i + 1 < len(handler.instructions) and \
                 parser.match_expression(inst, "$V[VAR] = $G[READ_PARAMETER:READ_OP]($N[OFFSET])", nparams) and \
-                parser.match_expression(handler.instructions[i+1], "UpdateKeyDecode(VMStructFieldDword(?O[KEY*:KEY]), SimpleOperation(Operation($[OP]), $V[VAR]))", nparams):
+                parser.match_expression(handler.instructions[i+1], "UpdateKeyDecode($G[FIELDS:KEY_FIELD](?O[KEY*:KEY]), SimpleOperation(Operation($[OP]), $V[VAR]))", nparams):
+            # TODO: Check that key size is right
             size = {"ReadParameterByte": 1, "ReadParameterWord": 2, "ReadParameterDword": 4, "ReadParameterQword": 8}[nparams.vars["READ_OP"].value]
             offset = nparams.vars["OFFSET"].value
-            dec = DecodeParameter.UpdateKeyDecode(params.real_field_name["KEY"], nparams.vars["OP"].value)
+            dec = DecodeParameter.UpdateKeyDecode(nparams.real_field_name["KEY"], nparams.vars["OP"].value)
             parser.replace_instructions(handler, handler, i+1, 1, [])
             return dec, offset, size, False
         nparams = params.copy()
@@ -573,10 +602,12 @@ def get_reading_decoding_info(handler, fields, arch):
         inst = handler.instructions[i]
         params = handlers_parser.Params(fields)
         dec = None
-        if parser.match_expression(inst, "UpdateKey(VMStructFieldDword(?O[KEY*:KEY]), SimpleOperation(Operation($[X]), $[Y]))", params):
+        if parser.match_expression(inst, "UpdateKey($G[FIELDS:KEY_FIELD](?O[KEY*:KEY]), SimpleOperation(Operation($[X]), $[Y]))", params):
+            # TODO: Check that key size is fit
             dec = UpdateKey(params.real_field_name["KEY"], DecodeNumber(params.vars["X"].value, params.vars["Y"]. value))
             parser.replace_instructions(handler, handler, i, 1, [])
-            if current_decoding is not None:
+            # If it is right after the reading of the parameter, we haven't create the current decoding yet
+            if current_decoding is not None or (i > 0 and parser.match_expression(handler.instructions[i-1], "$V[VAR] = $G[READ_PARAMETER:READ_OP]($N[OFFSET])", params.copy())):
                 i -= 1
         elif parser.match_expression(inst, "UpdateKeyCond(VMStructFieldDword(?O[KEY*:KEY]), $N[BIT], $[OPT1], $[OPT2])", params):
             if type(params.vars["OPT1"]) is not handlers_parser.NoneExpression:
@@ -717,8 +748,10 @@ def get_reading_decoding_info(handler, fields, arch):
                 continue
             else:
                 if current_decoding:
-                    decoding.append(DecodeParameter(offset, size, current_decoding))
-                    current_decoding = None
+                    # We need to skip UpdateEip
+                    if not (isinstance(inst, handlers_parser.Macro) and inst.name == "UpdateEip"):
+                        decoding.append(DecodeParameter(offset, size, current_decoding))
+                        current_decoding = None
                 replace_value_decoding(i)
                 if not do_inside and isinstance(inst, handlers_parser.ConditionBlock) and len(inst.instructions) == 1:
                     do_inside = True

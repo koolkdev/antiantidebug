@@ -7,12 +7,15 @@ from vms import vmtools
 import mappedfile
 import handlers_decompiler
 import handlers_parser
+import fish_keys
 import fish_handlers_cleaner
 import fish_handlers
+import tiger_keys
 import tiger_handlers_cleaner
 import tiger_handlers
 import dolphin_handlers_cleaner
 import dolphin_handlers
+import common_keys
 import common_handlers
 import vm_encoding
 
@@ -193,7 +196,8 @@ class VMOpcodeHandler(VMHandler):
         self.decode = None
 
 class VMHandlers(object):
-    RESET_KEYS_HANDLERS = None
+    RESET_KEYS_OLD = None
+    KEYS = []
     HANDLERS = None
 
     def __init__(self, file, vm_info):
@@ -207,6 +211,10 @@ class VMHandlers(object):
         self.handlers_count = vm_info.init_handler.handlers_count
         self.global_vars = {}
         funcs = []
+
+        # The different vm main with the same handlers feature is new, so if it is used,
+        # the other handler was new reset handler for sure
+        self.old_reset_handler = False
 
         if PROGRESSBAR:
             self.prog = None
@@ -264,12 +272,16 @@ class VMHandlers(object):
         print "Looking for RESET_KEYS...",
         found = False
         for handler in self.handlers.itervalues():
-            handler_info = common_handlers.match_handlers(parser, handler.handler, self.fields, self.RESET_KEYS_HANDLERS, arch)
+            handler_info = common_handlers.match_handlers(parser, handler.handler, self.fields, [self.RESET_KEYS_OLD], arch)
             if handler_info is not None:
                 handler.info = handler_info
                 assert not found
                 found = True
-        assert found
+        if found:
+            self.old_reset_handler = True
+        else:
+            common_keys.find_keys(self.KEYS, self.handlers.values(), self.fields, arch)
+
         print "SUCCESS"
 
         self.parser_encoding = handlers_parser.HandlerParser.get_parser(r"handlers\handlers_encoding.txt", self.mode)
@@ -347,8 +359,13 @@ class VMHandlers(object):
         handler.handler.clean_instructions()
         self.parser_final.clean_handler(handler.handler, self.fields)
 
-    def create_state(self, address, read):
+    def create_state_old(self, address, read):
         pass
+
+    def create_state(self, address, read):
+        if self.old_reset_handler:
+            return self.create_state_old(address, read)
+        return common_keys.create_state(self.KEYS, address, read)
 
 
 class ObfuscatedVMHandlers(VMHandlers):
@@ -379,7 +396,8 @@ class ObfuscatedVMHandlers(VMHandlers):
 
 
 class FISHVMHandlers(ObfuscatedVMHandlers):
-    RESET_KEYS_HANDLERS = [fish_handlers.RESET_KEYS, fish_handlers.RESET_KEYS_NEW]
+    RESET_KEYS_OLD = fish_handlers.RESET_KEYS_OLD
+    KEYS = fish_keys.KEYS
     HANDLERS = fish_handlers.HANDLERS
 
     def __init__(self, file, vm_info):
@@ -405,12 +423,13 @@ class FISHVMHandlers(ObfuscatedVMHandlers):
         fish_handlers_cleaner.fix_encoding_values(handler, self.fields)
         VMHandlers._process_final(self, handler)
 
-    def create_state(self, address, read):
+    def create_state_old(self, address, read):
         return vm_encoding.new_fish_state(address, read)
 
 
 class TIGERVMHandlers(VMHandlers):
-    RESET_KEYS_HANDLERS = [tiger_handlers.RESET_KEYS]
+    RESET_KEYS_OLD = tiger_handlers.RESET_KEYS_OLD
+    KEYS = tiger_keys.KEYS
     HANDLERS = tiger_handlers.HANDLERS
 
     def __init__(self, file, vm_info):
@@ -428,12 +447,19 @@ class TIGERVMHandlers(VMHandlers):
         self.tiger_final_parser.clean_handler(handler.handler, self.fields)
         self.xchg[handler] = tiger_handlers_cleaner.get_vars_xchg(handler.handler, self.file.get_arch())
 
-    def create_state(self, address, read):
+    def create_state_old(self, address, read):
         return vm_encoding.new_tiger_state(address, read)
+
+    def create_state(self, address, read):
+        if self.old_reset_handler:
+            return self.create_state_old(address, read)
+        return common_keys.create_state(self.KEYS, address, read, vm_encoding.TIGERDecodingState)
+
 
 
 class DOLPHINVMHandlers(ObfuscatedVMHandlers):
-    RESET_KEYS_HANDLERS = [dolphin_handlers.RESET_KEYS]
+    RESET_KEYS_OLD = dolphin_handlers.RESET_KEYS_OLD
+    # TODO: KEYS = #
     HANDLERS = dolphin_handlers.HANDLERS
 
     def __init__(self, file, vm_info):
@@ -465,7 +491,7 @@ class DOLPHINVMHandlers(ObfuscatedVMHandlers):
         #fish_handlers_cleaner.fix_encoding_values(handler, self.fields)
         VMHandlers._process_final(self, handler)
 
-    def create_state(self, address, read):
+    def create_state_old(self, address, read):
         return vm_encoding.new_dolphin_state(address, read)
 
 
