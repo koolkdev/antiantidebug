@@ -194,6 +194,7 @@ class VMOpcodeHandler(VMHandler):
         self.handler = handler
         self.info = None
         self.decode = None
+        self.extra_info = {}
 
 class VMHandlers(object):
     RESET_KEYS_OLD = None
@@ -211,6 +212,8 @@ class VMHandlers(object):
         self.handlers_count = vm_info.init_handler.handlers_count
         self.global_vars = {}
         funcs = []
+
+        original_addresses = {}
 
         # The different vm main with the same handlers feature is new, so if it is used,
         # the other handler was new reset handler for sure
@@ -235,6 +238,8 @@ class VMHandlers(object):
             else:
                 assert not already_parsed
                 funcs.append(self._read_handler_function(handler_address))
+                # If it is virtualized vm, we will get another address
+                original_addresses[funcs[-1].address] = handler_address
             self._update_progress_bar()
         self._close_reader()
 
@@ -313,7 +318,7 @@ class VMHandlers(object):
 
         # Save the functions in the cache
         for i in xrange(len(self.handlers)):
-            vm_info.handlers_cache[funcs[i].address] = self.handlers[i]
+            vm_info.handlers_cache[original_addresses[funcs[i].address]] = self.handlers[i]
 
         # for index, handler in self.handlers.iteritems():
         #     print "---------------------------------------------------"
@@ -445,7 +450,7 @@ class TIGERVMHandlers(VMHandlers):
     def _process_final(self, handler):
         VMHandlers._process_final(self, handler)
         self.tiger_final_parser.clean_handler(handler.handler, self.fields)
-        self.xchg[handler] = tiger_handlers_cleaner.get_vars_xchg(handler.handler, self.file.get_arch())
+        handler.extra_info["xchg"] = tiger_handlers_cleaner.get_vars_xchg(handler.handler, self.file.get_arch())
 
     def create_state_old(self, address, read):
         return vm_encoding.new_tiger_state(address, read)
@@ -906,11 +911,11 @@ class FISHVMFunction(VMFunction):
 
 class TIGERVMFunction(VMFunction):
     def _do_handler(self, handler, params, state):
-        for src, dst in self.vm_info.handlers.xchg[handler][0]:
+        for src, dst in handler.extra_info["xchg"][0]:
             state.vars.xchg_vars(params[src], params[dst])
 
     def _do_handler_end(self, handler, params, state):
-        for src, dst in self.vm_info.handlers.xchg[handler][1]:
+        for src, dst in handler.extra_info["xchg"][1]:
             state.vars.xchg_vars(params[src], params[dst])
 
     def _get_instruction(self, name, args, state):
