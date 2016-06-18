@@ -461,15 +461,8 @@ ADD_VAR_BASEADDRESS = HandlerMatch(match_funcs([
     UPDATE_IP_AND_JUMP,
 ]), create_handler_reader_class("ADD_VAR_BASEADDRESS", [("VAR", "VAR")]))
 
-UPDATE_KEY_1 = HandlerMatch(match_funcs([
-    lines_matcher(["UpdateKey1()"]),
-    UPDATE_IP_AND_JUMP,
-]), create_handler_reader_class("UPDATE_KEY_1", []))
-
-UPDATE_KEY_2 = HandlerMatch(match_funcs([
-    lines_matcher(["UpdateKey2()"]),
-    UPDATE_IP_AND_JUMP,
-]), create_handler_reader_class("UPDATE_KEY_2", []))
+# Those aren't really nops, but handlers to update keys, which we parse and remove
+NOP = HandlerMatch(UPDATE_IP_AND_JUMP, create_handler_reader_class("NOP"))
 
 HANDLERS = [
     FLAGS_OP,
@@ -482,6 +475,5 @@ HANDLERS = [
     PUSH_POP,
     XCHG,
     CALL,
-    UPDATE_KEY_1,
-    UPDATE_KEY_2,
+    NOP,
 ] + COMMON_HANDLERS

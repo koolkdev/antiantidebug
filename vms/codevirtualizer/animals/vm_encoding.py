@@ -538,7 +538,7 @@ def get_reading_decoding_info(handler, fields, arch):
             size = {"ReadParameterByte": 1, "ReadParameterWord": 2, "ReadParameterDword": 4, "ReadParameterQword": 8}[params.vars["READ_OP"].value]
             offset = params.vars["OFFSET"].value
             dec = DecodeParameter.UpdateKeyDecode(params.real_field_name["KEY"], params.vars["OP"].value)
-            parser.replace_instructions(handler, handler, i, 1, [parser.create_macro_result("UpdateKey2()", params)])
+            parser.replace_instructions(handler, handler, i, 1, [])
             return dec, offset, size, True
         nparams = params.copy()
         if i + 1 < len(handler.instructions) and \
@@ -632,10 +632,14 @@ def get_reading_decoding_info(handler, fields, arch):
             dec = UpdateKeyEx(params.real_field_name["KEY1"], params.vars["OP1"].value, params.real_field_name["KEY2"], op2)
             assert current_decoding is None
             parser.replace_instructions(handler, handler, i, 1, [])
-        elif parser.match_expression(inst, "UpdateKeyComplex2(VMStructFieldDword(?O[KEY_*:KEY1]), Operation($[OP3]), SimpleOperation(Operation($[OP1]), $N[NUM]), SimpleOperation(Operation($[OP2]), VMStructFieldDword(?O[KEY_*:KEY2])))", params):
-            dec = SetKey(params.real_field_name["KEY1"], DecodeOperation(params.vars["OP3"].value, GetKey(params.real_field_name["KEY1"]), DecodeOperation(params.vars["OP2"].value, DecodeOperation(params.vars["OP1"].value, GetKey(params.real_field_name["KEY1"]), Number(params.vars["NUM"].value)), GetKey(params.real_field_name["KEY2"]))))
+        elif parser.match_expression(inst, "UpdateKeyComplex2(VMStructFieldDword(?O[KEY_*:KEY1]), Operation($[OP3]), $[OPT1], SimpleOperation(Operation($[OP2]), VMStructFieldDword(?O[KEY_*:KEY2])))", params):
+            value = GetKey(params.real_field_name["KEY1"])
+            if type(params.vars["OPT1"]) is not handlers_parser.NoneExpression:
+                assert parser.match_expression(params.vars["OPT1"], "SimpleOperation(Operation($[OP1]), $[NUM])", params)
+                value = DecodeOperation(params.vars["OP1"].value, value, Number(params.vars["NUM"].value))
+            dec = SetKey(params.real_field_name["KEY1"], DecodeOperation(params.vars["OP3"].value, GetKey(params.real_field_name["KEY1"]), DecodeOperation(params.vars["OP2"].value, value, GetKey(params.real_field_name["KEY2"]))))
             assert current_decoding is None
-            parser.replace_instructions(handler, handler, i, 1, [parser.create_macro_result("UpdateKey1()", params)])
+            parser.replace_instructions(handler, handler, i, 1, [])
         elif parser.match_expression(inst, "XchgKeys(VMStructFieldDword(?O[KEY_*:KEY1]), VMStructFieldDword(?O[KEY_*:KEY2]))", params):
             dec = XchgKeys(params.real_field_name["KEY1"], params.real_field_name["KEY2"])
             assert current_decoding is None
@@ -671,15 +675,20 @@ def get_reading_decoding_info(handler, fields, arch):
             res = read_decode(i)
             if res is not None:
                 dec, toffset, tsize, end = res
+                if current_decoding is not None:
+                    if offset == toffset:
+                        assert size == tsize
+                    else:
+                        # The parameter was just for update key decode, so there should be at least one
+                        assert any([x for x in current_decoding if type(x) is DecodeParameter.UpdateKeyDecode])
+                        decoding.append(DecodeParameter(offset, size, current_decoding))
+                        current_decoding = None
                 if current_decoding is None:
                     current_decoding = []
                     offset = toffset
                     size = tsize
                     assert offset not in offsets
                     offsets[offset] = size
-                else:
-                    assert offset == toffset
-                    assert size == tsize
                 if end:
                     current_decoding.append(dec)
                     decoding.append(DecodeParameter(offset, size, current_decoding))

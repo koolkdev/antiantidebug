@@ -127,3 +127,8 @@ DEFINE_TEMPLATE
 VMStructFieldDword(?O[KEY_*:KEY]) $G[UPDATE_MATH:OP3]= DecodeWithKey((VMStructFieldDword(?O[KEY_*:KEY]) $G[SIMPLE_MATH:OP1] $N[NUMBER]), SimpleOperation(Operation($G[SIMPLE_MATH:OP2]), VMStructFieldDword(?O[KEY_*:KEY2])))
 =>
 UpdateKeyComplex2(VMStructFieldDword(?O[KEY]), Operation($[OP3]), SimpleOperation(Operation($[OP1]), $N[NUMBER]), SimpleOperation(Operation($[OP2]), VMStructFieldDword(?O[KEY2])))
+
+DEFINE_TEMPLATE
+VMStructFieldDword(?O[KEY_*:KEY]) $G[UPDATE_MATH:OP3]= DecodeWithKey(VMStructFieldDword(?O[KEY_*:KEY]), SimpleOperation(Operation($G[SIMPLE_MATH:OP2]), VMStructFieldDword(?O[KEY_*:KEY2])))
+=>
+UpdateKeyComplex2(VMStructFieldDword(?O[KEY]), Operation($[OP3]), None, SimpleOperation(Operation($[OP2]), VMStructFieldDword(?O[KEY2])))
