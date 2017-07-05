@@ -1694,6 +1694,7 @@ int Cleaner::fixOperationConstantThruRegOnStack(uint64_t * address, instruction_
 // MOV AL/AX/EAX/RAX, [RSI]
 // ADD RSI, 1/2/4/8
 int Cleaner::fixLods(uint64_t * address, instruction_info * result) {
+	if (!options[StringHash("fixLods")]) return false;
 	if (this->mode != 64) return false;
 	if (GET_OPCODE(*result) != MOV || !IS_OPERAND_REG(*result, 0) || !IS_OPERAND_MEM(*result, 1) || GET_OPERAND(*result, 1).offset != 0 || \
 		get_register_group(GET_OPERAND(*result, 0).reg) != get_register_group(UD_R_RAX) || \
@@ -1858,7 +1859,8 @@ instruction_info Cleaner::getCleanInstructionAt(uint64_t * address, bool top) {
 Cleaner::Cleaner(reader_f reader, int mode, void * opaque) : reader(reader), mode(mode), opaque(opaque) {	
 	options[StringHash("fixDoubleStackOperation")] = false;
 	options[StringHash("fixPush_allowConstants")] = false;
-	
+	options[StringHash("fixLods")] = false;
+
 	options[StringHash("ignore_jumps")] = true;
 	options[StringHash("ignore_nontop_jumps")] = false;
 	options[StringHash("ignore_calls")] = false;
