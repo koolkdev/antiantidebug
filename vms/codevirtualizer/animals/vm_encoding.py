@@ -411,6 +411,14 @@ class DecodeHandler(DecodingOperation):
         return params
 
 
+class ResetKeys(DecodingOperation):
+    def __init__(self):
+        pass
+
+    def decode(self, state):
+        state.reset()
+
+
 def simple_optimization(handler, instructions_container, index):
     olen = len(instructions_container.instructions)
     if index + 1 >= olen:
@@ -644,6 +652,10 @@ def get_reading_decoding_info(handler, fields, arch):
             dec = XchgKeys(params.real_field_name["KEY1"], params.real_field_name["KEY2"])
             assert current_decoding is None
             parser.replace_instructions(handler, handler, i, 1, [])
+        elif parser.match_expression(inst, "ResetKeys()", params):
+            assert current_decoding is None
+            dec = ResetKeys()
+            i += 1
         elif parser.match_expression(inst, "XchgKeys1($V[VAR], VMStructFieldDword(?O[KEY_*:KEY]))", params):
             # TODO: Can one of the keys change during xchg? because there may be other key updates between the xchg
             # TODO: add checks to verify it

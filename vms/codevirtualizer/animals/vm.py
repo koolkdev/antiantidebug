@@ -701,8 +701,6 @@ class VMFunction(vm.VMFunction):
                     inst.name = inst.name[:-len("_NEXT")]
                 elif inst.name == "ADD_VAR_BASEADDRESS":
                     inst.args.append(self.vm_info.init_handler.base_address)
-                elif inst.name == "RESET_KEYS":
-                    state.reset()
                 elif inst.name == "MOV_VAR_UNKVAR":
                     # This vm instruction only used in anti-dump/integrity-test
                     # TODO: Check that in first section
