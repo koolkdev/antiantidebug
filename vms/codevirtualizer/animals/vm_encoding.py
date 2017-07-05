@@ -648,6 +648,10 @@ def get_reading_decoding_info(handler, fields, arch):
             dec = SetKey(params.real_field_name["KEY1"], DecodeOperation(params.vars["OP3"].value, GetKey(params.real_field_name["KEY1"]), DecodeOperation(params.vars["OP2"].value, value, GetKey(params.real_field_name["KEY2"]))))
             assert current_decoding is None
             parser.replace_instructions(handler, handler, i, 1, [])
+        elif parser.match_expression(inst, "UpdateKeyComplex3(VMStructFieldDword(?O[KEY_*:KEY1]), Operation($[OP3]), SimpleOperation(Operation($[OP2]), VMStructFieldDword(?O[KEY_*:KEY2])), SimpleOperation(Operation($[OP1]), VMStructFieldDword(?O[KEY_*:KEY3])))", params):
+            dec = SetKey(params.real_field_name["KEY1"], DecodeOperation(params.vars["OP3"].value, GetKey(params.real_field_name["KEY1"]), DecodeOperation(params.vars["OP1"].value, DecodeOperation(params.vars["OP2"].value, GetKey(params.real_field_name["KEY1"]), GetKey(params.real_field_name["KEY2"])), GetKey(params.real_field_name["KEY3"]))))
+            assert current_decoding is None
+            parser.replace_instructions(handler, handler, i, 1, [])
         elif parser.match_expression(inst, "XchgKeys(VMStructFieldDword(?O[KEY_*:KEY1]), VMStructFieldDword(?O[KEY_*:KEY2]))", params):
             dec = XchgKeys(params.real_field_name["KEY1"], params.real_field_name["KEY2"])
             assert current_decoding is None
