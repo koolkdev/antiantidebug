@@ -49,8 +49,11 @@ class HandlerReader(object):
         return vminstruction.VMInstruction(self.get_name(), *[x[1] for x in self.get_params()])
 
     def get_next_handler(self):
-        if "NEXT_HANDLER" in self.params:
-            return self.params["NEXT_HANDLER"]
+        if "NEXT_HANDLER_INDEX" in self.params:
+            return self.params["NEXT_HANDLER_INDEX"]
+        elif "NEXT_HANDLER_OFFSET" in self.params:
+            assert (self.params["NEXT_HANDLER_OFFSET"] % self.arch.native_size()) == 0
+            return self.params["NEXT_HANDLER_OFFSET"] / self.arch.native_size()
         else:
             return None
 
@@ -182,12 +185,15 @@ def at_start(func):
         return match, index
     return _func
 
+JUMP_TO_NEXT_HANDLER = match_one([
+    lines_matcher(["JumpToHandlerByIndex(ReadParameterWord($P[NEXT_HANDLER_INDEX]))"]),
+    lines_matcher(["JumpToHandlerByOffset(ReadParameterWord($P[NEXT_HANDLER_OFFSET]))"]),
+])
 
-UPDATE_IP_AND_JUMP = lines_matcher(\
-    [
-        "UpdateEip($H[OPCODE_SIZE])",
-        "JumpToHandler(ReadParameterWord($P[NEXT_HANDLER]))"
-    ])
+UPDATE_IP_AND_JUMP = match_funcs([
+    lines_matcher(["UpdateEip($H[OPCODE_SIZE])"]),
+    JUMP_TO_NEXT_HANDLER
+])
 
 def create_reset_key_matcher(keys):
     return any_order([lines_matcher(["VMStructField%s($O[%s]) = 0x0" % (key_size, key_name)]) for key_size, key_name in keys])
@@ -200,11 +206,10 @@ RESET_KEYS = HandlerMatch(
         create_handler_reader_class("RESET_KEYS", [])
 )
 
-UPDATE_IP_AND_JUMP_PARAM = lines_matcher(\
-    [
-        "UpdateEip(ReadParameterDword($P[JUMP_VALUE]))",
-        "JumpToHandler(ReadParameterWord($P[JUMP_HANDLER]))"
-    ])
+UPDATE_IP_AND_JUMP_PARAM = match_funcs([
+    lines_matcher(["UpdateEip(ReadParameterDword($P[JUMP_VALUE]))"]),
+    JUMP_TO_NEXT_HANDLER
+])
 
 
 def update_flags_cond(op):

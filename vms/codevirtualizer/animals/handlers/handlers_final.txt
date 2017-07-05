@@ -11,4 +11,9 @@ DEFINE_MACRO[64] LOG_SIZE 0x3
 DEFINE_TEMPLATE
 Jump(*(@SIZE_WORD_B@*)(VMStructField@SIZE_WORD@(?O[HANDLERS]) + ((ReadParameterWord($N[OFFSET]) & 0xFFFF) << @LOG_SIZE@)))
 =>
-JumpToHandler(ReadParameterWord($[OFFSET]))
+JumpToHandlerByIndex(ReadParameterWord($[OFFSET]))
+
+DEFINE_TEMPLATE
+Jump(*(@SIZE_WORD_B@*)(VMStructField@SIZE_WORD@(?O[HANDLERS]) + (ReadParameterWord($N[OFFSET]) & 0xFFFF)))
+=>
+JumpToHandlerByOffset(ReadParameterWord($[OFFSET]))

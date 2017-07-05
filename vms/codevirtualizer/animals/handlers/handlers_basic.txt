@@ -80,4 +80,4 @@ UpdateEip($V[X])
 DEFINE_TEMPLATE
 Jump(*(@SIZE_WORD_B@*)(VMStructField@SIZE_WORD@(?O[HANDLERS]) + (ReadParameterWord($N[OFFSET]) << @LOG_SIZE@)))
 =>
-JumpToHandler(ReadParameterWord($[OFFSET]))
+JumpToHandlerByIndex(ReadParameterWord($[OFFSET]))
