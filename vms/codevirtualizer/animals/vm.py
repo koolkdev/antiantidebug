@@ -717,6 +717,10 @@ class VMFunction(vm.VMFunction):
                     inst.name = inst.name[:-len("_NEXT")]
                 elif inst.name == "ADD_VAR_BASEADDRESS":
                     inst.args.append(self.vm_info.init_handler.base_address)
+                elif self.vm_info.handlers.old_reset_handler and inst.name == "RESET_KEYS":
+                    # In the new mechanism this call is part of the state decoder,
+                    # because there may be key update alongside the keys reset
+                    state.reset()
                 elif inst.name == "MOV_VAR_UNKVAR":
                     # This vm instruction only used in anti-dump/integrity-test
                     # TODO: Check that in first section
