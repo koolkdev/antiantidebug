@@ -268,6 +268,27 @@ UPDATE_FLAGS = lines_matcher(["If((ReadParameterByte($P[UPDATE_FLAGS]) != 0x0))"
                               "    VMStructField{SS}(ReadParameterWord($P[FLAGS_OFFSET])) = var_1"])
 
 
+def set_value(dst_address_var, src_var, size_var, zero_high_word_bool="VMStructFieldByte($O[ZERO_HIGH_DWORD_BOOL])", invert_bool_test=False):
+    return match_funcs([
+         lines_matcher(
+             ["If(($V[%s] == 0x1))" % size_var,
+              "    *(BYTE*)$V[%s] = $V[%s]" % (dst_address_var, src_var),
+              "If(($V[%s] == 0x2))" % size_var,
+              "    *(WORD*)$V[%s] = $V[%s]" % (dst_address_var, src_var)]),
+         match_condition("If(($V[%s] == 0x3))" % size_var,
+            [
+              lines_matcher(["*(DWORD*)$V[%s] = $V[%s]" % (dst_address_var, src_var)]),
+              only_64(lines_matcher(
+                ["$V[%s] = %s" % (src_var, zero_high_word_bool),
+                 "If(($V[%s] %s))" % (src_var, invert_bool_test and "== 0x1" or "!= 0x0"),
+                 "    $V[%s] = ($V[%s] + 0x4)" % (dst_address_var, dst_address_var),
+                 "    *(DWORD*)$V[%s] = 0x0" % dst_address_var]))
+            ]),
+         only_64(lines_matcher(
+            ["If(($V[%s] == 0x4))" % size_var,
+             "    *(QWORD*)$V[%s] = $V[%s]" % (dst_address_var, src_var)])),
+    ])
+
 UPDATE_RESULT = match_condition("If((ReadParameterByte($P[OPERATION]) != $H[OPERATION_CMP]))",
     [match_condition("If((ReadParameterByte($P[OPERATION]) != $H[OPERATION_TEST]))",
          [
@@ -275,24 +296,7 @@ UPDATE_RESULT = match_condition("If((ReadParameterByte($P[OPERATION]) != $H[OPER
                  ["$V[RESULT_VAR] = DecodedValue(VMStructField{SS}($U[RESULT]))",
                   "$V[RESULT_VAR_SIZE] = DecodedValueByte(VMStructFieldByte($U[DST_SIZE]))",
                   "$V[RESULT_VAR_ADDRESS] = DecodedValue(VMStructField{SS}($U[DST_ADDRESS]))"]),
-             lines_matcher(
-                 ["If(($V[RESULT_VAR_SIZE] == 0x1))",
-                  "    *(BYTE*)$V[RESULT_VAR_ADDRESS] = $V[RESULT_VAR]",
-                  "If(($V[RESULT_VAR_SIZE] == 0x2))",
-                  "    *(WORD*)$V[RESULT_VAR_ADDRESS] = $V[RESULT_VAR]"]),
-             match_condition("If(($V[RESULT_VAR_SIZE] == 0x3))",
-                [
-                  lines_matcher(["*(DWORD*)$V[RESULT_VAR_ADDRESS] = $V[RESULT_VAR]"]),
-                  only_64(lines_matcher(
-                    ["$V[RESULT_VAR] = VMStructFieldByte($O[ZERO_HIGH_DWORD_BOOL])",
-                     "If(($V[RESULT_VAR] != 0x0))",
-                     "    $V[RESULT_VAR_ADDRESS] = ($V[RESULT_VAR_ADDRESS] + 0x4)",
-                     "    *(DWORD*)$V[RESULT_VAR_ADDRESS] = 0x0"]))
-                ]),
-             only_64(lines_matcher(
-                ["If(($V[RESULT_VAR_SIZE] == 0x4))",
-                 "    *(QWORD*)$V[RESULT_VAR_ADDRESS] = $V[RESULT_VAR]"])),
-
+             set_value("RESULT_VAR_ADDRESS", "RESULT_VAR", "RESULT_VAR_SIZE")
          ])
     ])
 
@@ -411,13 +415,21 @@ XCHG_OPERATION_0 = lines_matcher_any_order(["$V[XCHG_VAR_DST] = DecodedValue(VMS
                                             "$V[XCHG_VAR_SIZE] = DecodedValueByte(VMStructFieldByte($U[DST_SIZE]))",
                                             "$V[XCHG_VAR_SRC_ADDRESS] = DecodedValue(VMStructField{SS}($U[SRC_ADDRESS]))"])
 
-XCHG_OPERATION = match_funcs(
+XCHG_OPERATION_OLD = match_funcs(
     duplicate_by_size(["If(($V[XCHG_SIZE_VAR] == 0x@LOGSIZE@))",
                        "    *({SU:@SIZE@}*)$V[XCHG_VAR_SRC_ADDRESS] = $V[XCHG_VAR_DST]"]) +
     [lines_matcher(["$V[XCHG_VAR_SRC] = DecodedValue(VMStructField{SS}($U[SRC_VALUE]))",
                     "$V[XCHG_VAR_DST_ADDRESS] = DecodedValue(VMStructField{SS}($U[DST_ADDRESS]))"])] +
     duplicate_by_size(["If(($V[XCHG_SIZE_VAR] == 0x@LOGSIZE@))",
                        "    *({SU:@SIZE@}*)$V[XCHG_VAR_DST_ADDRESS] = $V[XCHG_VAR_SRC]"]))
+
+XCHG_OPERATION = match_funcs([
+    # BUG: It doesn't use ZERO_HIGH_DWORD_BOOL and use random thing instead...
+    set_value("XCHG_VAR_SRC_ADDRESS", "XCHG_VAR_DST", "XCHG_SIZE_VAR", "DecodedValueByte(VMStructFieldByte($U[SRC_TYPE]))", invert_bool_test=True),
+    lines_matcher(["$V[XCHG_VAR_SRC] = DecodedValue(VMStructField{SS}($U[SRC_VALUE]))",
+                    "$V[XCHG_VAR_DST_ADDRESS] = DecodedValue(VMStructField{SS}($U[DST_ADDRESS]))"]),
+    set_value("XCHG_VAR_DST_ADDRESS", "XCHG_VAR_SRC", "XCHG_SIZE_VAR", "DecodedValueByte(VMStructFieldByte($U[DST_TYPE]))", invert_bool_test=True),
+])
 
 XCHG_T = [RESET_ZERO_HIGH_DWORD_BOOL, read_var_and_keep_address("DST", True), read_memvar_and_keep_address("DST"),
           read_var_and_keep_address("SRC"), read_memvar_and_keep_address("SRC")]
@@ -431,7 +443,7 @@ XCHG = HandlerMatch(match_funcs([
     at_start(any_order([read_encoded_param(7, "SRC_VALUE"), read_encoded_param(8, "DST_VALUE"),
                         read_two_nibbles(9, "SRC_TYPE_AND_SIZE", ("SRC_TYPE", "SRC_SIZE")),
                         read_two_nibbles(10, "DST_TYPE_AND_SIZE", ("DST_TYPE", "DST_SIZE"))])),
-    XCHG_OPERATION,
+    match_one([XCHG_OPERATION_OLD, XCHG_OPERATION]),
     UPDATE_IP_AND_JUMP
     ]), create_fish_handler_reader_class("XCHG_{S:DST_TYPE_AND_SIZE}_{T:DST_TYPE_AND_SIZE}_{T:SRC_TYPE_AND_SIZE}",
                                          [("{AT:DST_TYPE_AND_SIZE}", "DST_VALUE"), ("{AT:SRC_TYPE_AND_SIZE}", "SRC_VALUE")]))
