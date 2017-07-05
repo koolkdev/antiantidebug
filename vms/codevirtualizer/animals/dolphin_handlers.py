@@ -284,12 +284,18 @@ LOAD_SRC_IMM = HandlerMatch(match_funcs([
 ]), create_dolphin_handler_reader_class("LOAD_SRC_IMM", [("PARAM", "IMM", "SRC_VALUE")], [("SRC_TYPE", "IMM"), ("SRC_VALUE", "SRC_VALUE")]))
 
 # BUGBUG
-LOAD_SRC_QWORD_IMM = HandlerMatch(match_funcs([
+LOAD_SRC_QWORD_IMM_BUG = HandlerMatch(match_funcs([
     lines_matcher(["$V[VAR_VALUE] = ReadParameterQword($P[SRC_VALUE])"]),
     match_one([
         lines_matcher(["VMStructField{SS}($O[SRC_VALUE]) = (ReadParameterDword($P[SRC_VALUE]) | ((($V[VAR_VALUE] >> 0x20) + $V[VAR_VALUE]) << 0x20))"]),
         lines_matcher(["VMStructField{SS}($O[SRC_VALUE]) = (ReadParameterDword($P[SRC_VALUE]) | ((($V[VAR_VALUE] >> 0x20) - $V[VAR_VALUE]) << 0x20))"])
     ]),
+    UPDATE_IP_AND_JUMP
+]), create_dolphin_handler_reader_class("LOAD_SRC_QWORD_IMM", [("PARAM", "IMM", "SRC_VALUE")], [("SRC_TYPE", "IMM"), ("SRC_VALUE", "SRC_VALUE")]))
+
+# In newer versions they added this fixed handler but left the bugged one still in....
+LOAD_SRC_QWORD_IMM = HandlerMatch(match_funcs([
+    lines_matcher(["VMStructField{SS}($O[SRC_VALUE]) = (ReadParameterDword($P[SRC_VALUE]) | ((ReadParameterQword($P[SRC_VALUE]) >> 0x20) << 0x20))"]),
     UPDATE_IP_AND_JUMP
 ]), create_dolphin_handler_reader_class("LOAD_SRC_QWORD_IMM", [("PARAM", "IMM", "SRC_VALUE")], [("SRC_TYPE", "IMM"), ("SRC_VALUE", "SRC_VALUE")]))
 
@@ -372,6 +378,7 @@ HANDLERS = [
     STORE_RESULT,
     LOAD_SRC_IMM,
     LOAD_SRC_QWORD_IMM,
+    LOAD_SRC_QWORD_IMM_BUG,
     LOAD_SRC_VAR,
     LOAD_SRC_MEMVAR,
     LOAD_SRC_SIZE,

@@ -462,7 +462,11 @@ POP = HandlerMatch(match_funcs([
                        "    *({SU}*)$V[SP_OFFSET] += $H[DST_SIZE_NUM]"]),
         ]),
     only_32(lambda parser, instructions, index, params, arch, info: (params.handler_vars["DST_SIZE"] == params.handler_vars["DST_SIZE_NUM"], index)),
-    only_64(lambda parser, instructions, index, params, arch, info: (0x8 == params.handler_vars["DST_SIZE_NUM"], index)),
+    match_one([
+        only_64(lambda parser, instructions, index, params, arch, info: (0x8 == params.handler_vars["DST_SIZE_NUM"], index)),  # legacy bug support
+        # Fixed in version..
+        only_64(lambda parser, instructions, index, params, arch, info: (params.handler_vars["DST_SIZE"] == params.handler_vars["DST_SIZE_NUM"], index)),
+    ]),
     UPDATE_IP_AND_JUMP
 ]), create_tiger_handler_reader_class("POP_{S:DST_SIZE}_{T:DST_TYPE}",
                                       [("{AT:DST_TYPE}", "DST_VALUE")]))
@@ -607,7 +611,15 @@ SCAS_1 = match_funcs([
     UPDATE_IP_AND_JUMP
 ])
 
-SCAS = HandlerMatch(match_one([SCAS_1, BUG_SCAS_1, BUG_SCAS_2]), create_string_op_handler_reader("SCAS"))
+# This one use Qword when access the flag, in newer versions. In 32 bit it will be the same as SCAS_1
+SCAS_2 = match_funcs([
+    READ_DI,
+    UPDATE_DI3,
+    optional(match_one([update_flags_cond(SCAS_UPDATE_FLAGS), SCAS_UPDATE_FLAGS]), "UPDATE_FLAGS"),
+    UPDATE_IP_AND_JUMP
+])
+
+SCAS = HandlerMatch(match_one([SCAS_1, SCAS_2, BUG_SCAS_1, BUG_SCAS_2]), create_string_op_handler_reader("SCAS"))
 
 CMPS = HandlerMatch(match_funcs([
     match_one([match_funcs([READ_SI, READ_DI]), match_funcs([READ_DI, READ_SI])]),
