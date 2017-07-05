@@ -2,6 +2,9 @@ from handlers_decompiler import *
 import re
 import os
 
+#TODO: Fix and remove this
+showed_warning = False
+
 OPS = {
     "+": Add,
     "-": Sub,
@@ -586,7 +589,11 @@ class HandlerParser(object):
                 # var_bla
                 # TODO TODO IMPORTANT: Fix it proper, make a function the rebuilds the vars relations
                 if inst.lvalue.name != "1" and len(inst.lvalue.used_instructions) == 1 and inst.lvalue not in inst.lvalue.used_instructions[0].get_all_children():
-                    print str(new_instructions[0])
+                    global showed_warning
+                    if not showed_warning:
+                        print "WARNING: PLEASE FIX THIS"
+                        showed_warning = True
+                    #print str(new_instructions[0])
                     sinst = inst.lvalue.used_instructions[0]
                     for ninst in sinst.get_all_children():
                         if isinstance(ninst, Variable):
