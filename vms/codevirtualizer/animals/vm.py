@@ -13,6 +13,7 @@ import fish_handlers
 import tiger_keys
 import tiger_handlers_cleaner
 import tiger_handlers
+import dolphin_keys
 import dolphin_handlers_cleaner
 import dolphin_handlers
 import common_keys
@@ -465,7 +466,7 @@ class TIGERVMHandlers(VMHandlers):
 
 class DOLPHINVMHandlers(ObfuscatedVMHandlers):
     RESET_KEYS_OLD = dolphin_handlers.RESET_KEYS_OLD
-    # TODO: KEYS = #
+    KEYS = dolphin_keys.KEYS
     HANDLERS = dolphin_handlers.HANDLERS
 
     def __init__(self, file, vm_info):
@@ -499,6 +500,9 @@ class DOLPHINVMHandlers(ObfuscatedVMHandlers):
 
     def create_state_old(self, address, read):
         return vm_encoding.new_dolphin_state(address, read)
+
+    def create_state_new(self, address, read):
+        return common_keys.create_state(self.KEYS, address, read, vm_encoding.DOLPHINDecodingState)
 
 
 class SHARKVMHandlers(FISHVMHandlers):
@@ -935,7 +939,7 @@ class TIGERVMFunction(VMFunction):
 
 class DOLPHINVMFunction(VMFunction):
     def _process_instructions(self, instructions, instructions_map):
-        super(VMFunction, self)._process_instructions(instructions, instructions_map)
+        super(DOLPHINVMFunction, self)._process_instructions(instructions, instructions_map)
         templates.Templates.get_template(r"codevirtualizer\animals\dolphin_00_clean.txt", self.mode).clean(instructions, update_instructions=instructions_map)
 
     def _get_clean_templates(self):

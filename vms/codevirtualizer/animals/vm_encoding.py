@@ -108,7 +108,7 @@ class TIGERDecodingStateOld(DecodingState):
         self.vars = VarsMapping()
 
 
-class DOLPHINDecodingState(DecodingState):
+class DOLPHINDecodingStateOld(DecodingState):
     def __init__(self, address, read_func):
         DecodingState.__init__(self, {
             "KEY_DECODE": DwordKey(),
@@ -124,6 +124,12 @@ class TIGERDecodingState(DecodingState):
         self.vars = VarsMapping()
 
 
+class DOLPHINDecodingState(DecodingState):
+    def __init__(self, keys, address, read_func):
+        DecodingState.__init__(self, keys, address, read_func)
+        self.params = {}
+
+
 def new_fish_state(address, read_func):
     return FISHDecodingState(address, read_func)
 
@@ -133,7 +139,7 @@ def new_tiger_state(address, read_func):
 
 
 def new_dolphin_state(address, read_func):
-    return DOLPHINDecodingState(address, read_func)
+    return DOLPHINDecodingStateOld(address, read_func)
 
 
 class DecodingOperation(object):
