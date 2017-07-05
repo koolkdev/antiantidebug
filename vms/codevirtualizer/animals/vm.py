@@ -276,17 +276,7 @@ class VMHandlers(object):
 
         parser = handlers_parser.HandlerParser.get_default_parser()
         print "Looking for RESET_KEYS...",
-        found = False
-        for handler in self.handlers.itervalues():
-            handler_info = common_handlers.match_handlers(parser, handler.handler, self.fields, [self.RESET_KEYS_OLD], arch)
-            if handler_info is not None:
-                handler.info = handler_info
-                assert not found
-                found = True
-        if found:
-            self.old_reset_handler = True
-        else:
-            common_keys.find_keys(self.KEYS, self.handlers.values(), self.fields, arch)
+        self._find_reset_keys_handler()
 
         print "SUCCESS"
 
@@ -364,6 +354,23 @@ class VMHandlers(object):
         handler.handler.optimize_instructions()
         handler.handler.clean_instructions()
         self.parser_final.clean_handler(handler.handler, self.fields)
+
+    def _find_old_reset_keys_handler(self):
+        parser = handlers_parser.HandlerParser.get_default_parser()
+        found = False
+        for handler in self.handlers.itervalues():
+            handler_info = common_handlers.match_handlers(parser, handler.handler, self.fields, [self.RESET_KEYS_OLD], self.file.get_arch())
+            if handler_info is not None:
+                handler.info = handler_info
+                assert not found
+                found = True
+        if found:
+            self.old_reset_handler = True
+
+    def _find_reset_keys_handler(self):
+        self._find_old_reset_keys_handler()
+        if not self.old_reset_handler:
+            common_keys.find_keys(self.KEYS, self.handlers.values(), self.fields, self.file.get_arch())
 
     def create_state_old(self, address, read):
         pass
@@ -497,6 +504,10 @@ class DOLPHINVMHandlers(ObfuscatedVMHandlers):
         #self.fish_encoding_parser.clean_handler(handler.handler, self.fields)
         #fish_handlers_cleaner.fix_encoding_values(handler, self.fields)
         VMHandlers._process_final(self, handler)
+
+    def _find_old_reset_keys_handler(self):
+        # There wasn't change in the key, so use the new mechanism
+        pass
 
     def create_state_old(self, address, read):
         return vm_encoding.new_dolphin_state(address, read)
