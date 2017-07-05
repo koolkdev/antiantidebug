@@ -80,7 +80,7 @@ class VarsMapping(object):
         self.map = {}
 
 
-class FISHDecodingState(DecodingState):
+class FISHDecodingStateOld(DecodingState):
     def __init__(self, address, read_func):
         DecodingState.__init__(self, {
             "KEY_DECODE": DwordKey(),
@@ -131,7 +131,7 @@ class DOLPHINDecodingState(DecodingState):
 
 
 def new_fish_state(address, read_func):
-    return FISHDecodingState(address, read_func)
+    return FISHDecodingStateOld(address, read_func)
 
 
 def new_tiger_state(address, read_func):
