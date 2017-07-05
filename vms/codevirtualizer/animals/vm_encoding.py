@@ -611,11 +611,14 @@ def get_reading_decoding_info(handler, fields, arch):
 
                 parent.replace_child(expr, read_op)
 
+    unused_params = []
+
     i = 0
     while i < len(handler.instructions):
         inst = handler.instructions[i]
         params = handlers_parser.Params(fields)
         dec = None
+        clear_current_decoding = False
         if parser.match_expression(inst, "UpdateKey($G[FIELDS:KEY_FIELD](?O[KEY*:KEY]), SimpleOperation(Operation($[X]), $[Y]))", params):
             # TODO: Check that key size is fit
             dec = UpdateKey(params.real_field_name["KEY"], DecodeNumber(params.vars["X"].value, params.vars["Y"]. value))
@@ -635,7 +638,11 @@ def get_reading_decoding_info(handler, fields, arch):
             else:
                 op2 = None
             dec = UpdateKeyCond(params.real_field_name["KEY"], params.vars["BIT"].value, op1, op2)
-            assert current_decoding is None
+            # TODO: It seems that one there is one unused parameter (maybe the one that used to be the flag offset in RESET_FLAGS?)
+            # It seems that it can happen in any places, right now I do it only here because it is the only area that I saw it
+            # I verify that current_decoding is really of unused params with new assertions and checks, so even without the next assertion I could still find bugs
+            clear_current_decoding = True
+            # assert current_decoding is None
             parser.replace_instructions(handler, handler, i, 1, [])
         elif parser.match_expression(inst, "UpdateKeyComplex(VMStructFieldDword(?O[KEY_*:KEY1]), Operation($[OP1]), VMStructFieldDword(?O[KEY_*:KEY2]), $[OPT])", params):
             if type(params.vars["OPT"]) is not handlers_parser.NoneExpression:
@@ -718,6 +725,7 @@ def get_reading_decoding_info(handler, fields, arch):
                     continue
             elif parser.match_expression(inst, "$V[VAR] = $G[READ_PARAMETER:READ_OP]($N[OFFSET])", params) and \
                     len(params.vars["VAR"].instructions) == 1 and len(params.vars["VAR"].used_instructions) == 1:
+                assert params.vars["OFFSET"].value not in unused_params
                 if not simple_optimization(handler, handler, i):
                     i += 1
                 continue
@@ -726,6 +734,7 @@ def get_reading_decoding_info(handler, fields, arch):
                     current_decoding = []
                     offset = params.vars["OFFSET"].value
                     size = {"ReadParameterByte": 1, "ReadParameterWord": 2, "ReadParameterDword": 4, "ReadParameterQword": 8}[params.vars["READ_OP"].value]
+                    assert offset not in unused_params
                     assert size <= {"VMStructFieldByte": 1, "VMStructFieldWord": 2, "VMStructFieldDword": 4}[params.vars["FIELD"].value]
                     assert offset not in offsets
                     offsets[offset] = size
@@ -747,6 +756,7 @@ def get_reading_decoding_info(handler, fields, arch):
             elif parser.match_expression(inst, "VMStructFieldDword(?O[VALUE_DWORD_HIGH]) = (ReadParameterQword($N[OFFSET]) >> 0x20)", params):
                 toffset = params.vars["OFFSET"].value
                 tsize = 8
+                assert toffset not in unused_params
                 assert current_decoding is not None
                 assert type(current_decoding[0]) is UpdateValue and current_decoding[0].value == "VALUE_DWORD"
                 assert offset == toffset
@@ -766,6 +776,7 @@ def get_reading_decoding_info(handler, fields, arch):
                 # Checking only for UpdateKey isn't enough
                 tsize = {"ReadParameterByte": 1, "ReadParameterWord": 2, "ReadParameterDword": 4, "ReadParameterQword": 8}[params.vars["READ_OP"].value]
                 toffset = params.vars["OFFSET"].value
+                assert toffset not in unused_params
                 if current_decoding is None:
                     current_decoding = []
                     offset = toffset
@@ -778,6 +789,12 @@ def get_reading_decoding_info(handler, fields, arch):
                 i += 1
                 continue
             else:
+                if unused_params:
+                    # It may be slow, so do only if necessary (TODO: can I do better check?)
+                    nparams = params.copy()
+                    res = find_child(inst, "$G[READ_PARAMETER:READ_OP]($N[OFFSET])", nparams)
+                    if res is not None:
+                        assert nparams.vars["OFFSET"].value not in unused_params
                 if current_decoding:
                     # We need to skip UpdateEip
                     if not (isinstance(inst, handlers_parser.Macro) and inst.name == "UpdateEip"):
@@ -791,6 +808,10 @@ def get_reading_decoding_info(handler, fields, arch):
                     i += 1
                 continue
 
+        if clear_current_decoding and current_decoding:
+            decoding.append(DecodeParameter(offset, size, current_decoding))
+            current_decoding = None
+            unused_params.append(offset)
         if current_decoding is not None:
             current_decoding.append(dec)
         else:
