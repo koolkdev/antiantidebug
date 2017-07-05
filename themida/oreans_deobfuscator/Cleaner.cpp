@@ -986,7 +986,7 @@ int Cleaner::fixPushPop(uint64_t * address, instruction_info * result) {
 	if (GET_OPCODE(*result) != PUSH) return false;
 	
 	instruction_info next = getCleanInstructionAt(address);
-	if (GET_OPCODE(next) != POP || GET_OPERAND_SIZE(*result, 0) != GET_OPERAND_SIZE(next, 0) || (IS_OPERAND_MEM(*result, 0) && IS_OPERAND_MEM(next, 1))) return false;
+	if (GET_OPCODE(next) != POP || GET_OPERAND_SIZE(*result, 0) != GET_OPERAND_SIZE(next, 0) || (IS_OPERAND_MEM(*result, 0) && IS_OPERAND_MEM(next, 0))) return false;
 	
 	COPY_OPERAND(*result, 1, *result, 0);
 	COPY_OPERAND(*result, 0, next, 0);
