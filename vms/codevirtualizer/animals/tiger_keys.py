@@ -13,13 +13,13 @@ def check_value_dword(expr, usages, fields, arch):
 def check_value_dword_high(expr, usages, fields, arch):
     if arch.mode == 32:
         return len(usages) == 0
-    if len(usages) != 1:
-        return False
     parser = handlers_parser.HandlerParser.get_default_parser()
     params = handlers_parser.Params(fields)
-    for usage in usages[0]:
-        if parser.match_expression(usage, "%s = (ReadParameterQword($N[OFFSET]) >> 0x20)" % expr, params):
-            return True
+    for func_usage in usages:
+        if len(func_usage) == 2:
+            for usage in func_usage:
+                if parser.match_expression(usage, "%s = (ReadParameterQword($N[OFFSET]) >> 0x20)" % expr, params):
+                    return True
     return False
 
 
@@ -29,8 +29,7 @@ KEYS = [
     common_keys.KeyInfo("KEY_2", 4),
     common_keys.KeyInfo("KEY_3", 4),
     common_keys.KeyInfo("KEY_4", 4),
-
-    common_keys.KeyInfo("UNKNOWN_DWORD", 4, common_keys.check_if_unused),
+    common_keys.KeyInfo("KEY_5", 4),
 
     common_keys.KeyInfo("VALUE_DWORD", 4, check_value_dword),
     common_keys.KeyInfo("VALUE_DWORD_HIGH", 4, check_value_dword_high),
