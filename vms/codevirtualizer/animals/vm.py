@@ -726,7 +726,12 @@ class VMFunction(vm.VMFunction):
 
         if not self.vm_info.regs_fields:
             reader = vminstruction.VMInstructionsReader(instructions_list)
-            reader.get_cond(lambda x: x.name == "RESET_FLAGS")
+            try:
+                reader.get_cond(lambda x: x.name == "RESET_FLAGS")
+            except vminstruction.ReaderException:
+                # It seems that sometimes the reset flags handler DOESN'T reset the flag, so it is detected as NOP and ignored
+                # TODO: Check that the issue isn't at my code
+                pass
             try:
                 reader.get_cond(lambda x: x.name == "RESET_KEYS")
             except vminstruction.ReaderException:
@@ -850,7 +855,11 @@ class VMFunction(vm.VMFunction):
 
             if section.start:
                 if section_counter == 0:
-                    reader.get_cond(lambda x: x.name == "RESET_FLAGS")
+                    try:
+                        reader.get_cond(lambda x: x.name == "RESET_FLAGS")
+                    except vminstruction.ReaderException:
+                        # See the comment above abour RESET_FLAGS
+                        pass
 
                 if section_counter == 1:
                     code = cleaner.clean_animals_vm_code(code, self.file.get_arch())
