@@ -367,10 +367,13 @@ class VMHandlers(object):
     def create_state_old(self, address, read):
         pass
 
+    def create_state_new(self, address, read):
+        return common_keys.create_state(self.KEYS, address, read)
+
     def create_state(self, address, read):
         if self.old_reset_handler:
             return self.create_state_old(address, read)
-        return common_keys.create_state(self.KEYS, address, read)
+        return self.create_state_new(address, read)
 
 
 class ObfuscatedVMHandlers(VMHandlers):
@@ -455,9 +458,7 @@ class TIGERVMHandlers(VMHandlers):
     def create_state_old(self, address, read):
         return vm_encoding.new_tiger_state(address, read)
 
-    def create_state(self, address, read):
-        if self.old_reset_handler:
-            return self.create_state_old(address, read)
+    def create_state_new(self, address, read):
         return common_keys.create_state(self.KEYS, address, read, vm_encoding.TIGERDecodingState)
 
 
