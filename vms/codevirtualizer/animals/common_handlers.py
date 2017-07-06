@@ -206,10 +206,11 @@ RESET_KEYS = HandlerMatch(
         create_handler_reader_class("RESET_KEYS", [])
 )
 
-UPDATE_IP_AND_JUMP_PARAM = match_funcs([
-    lines_matcher(["UpdateEip(ReadParameterDword($P[JUMP_VALUE]))"]),
-    JUMP_TO_NEXT_HANDLER
-])
+UPDATE_IP_AND_JUMP_PARAM = lines_matcher(\
+    [
+        "UpdateEip(ReadParameterDword($P[JUMP_VALUE]))",
+        "JumpToHandlerByIndex(ReadParameterWord($P[JUMP_HANDLER]))"
+    ])
 
 
 def update_flags_cond(op):
