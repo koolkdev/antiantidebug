@@ -288,7 +288,9 @@ LOAD_SRC_QWORD_IMM_BUG = HandlerMatch(match_funcs([
     lines_matcher(["$V[VAR_VALUE] = ReadParameterQword($P[SRC_VALUE])"]),
     match_one([
         lines_matcher(["VMStructField{SS}($O[SRC_VALUE]) = (ReadParameterDword($P[SRC_VALUE]) | ((($V[VAR_VALUE] >> 0x20) + $V[VAR_VALUE]) << 0x20))"]),
-        lines_matcher(["VMStructField{SS}($O[SRC_VALUE]) = (ReadParameterDword($P[SRC_VALUE]) | ((($V[VAR_VALUE] >> 0x20) - $V[VAR_VALUE]) << 0x20))"])
+        lines_matcher(["VMStructField{SS}($O[SRC_VALUE]) = (ReadParameterDword($P[SRC_VALUE]) | ((($V[VAR_VALUE] >> 0x20) - $V[VAR_VALUE]) << 0x20))"]),
+        # Added in CV somewhere between 2.1.9.0 - 2.2.1.0
+        lines_matcher(["VMStructField{SS}($O[SRC_VALUE]) = (ReadParameterDword($P[SRC_VALUE]) | ((($V[VAR_VALUE] >> 0x20) ^ $V[VAR_VALUE]) << 0x20))"])
     ]),
     UPDATE_IP_AND_JUMP
 ]), create_dolphin_handler_reader_class("LOAD_SRC_QWORD_IMM", [("PARAM", "IMM", "SRC_VALUE")], [("SRC_TYPE", "IMM"), ("SRC_VALUE", "SRC_VALUE")]))
