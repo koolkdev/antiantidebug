@@ -671,8 +671,10 @@ def get_reading_decoding_info(handler, fields, arch):
             else:
                 op2 = None
             dec = UpdateKeyEx(params.real_field_name["KEY1"], params.vars["OP1"].value, params.real_field_name["KEY2"], op2)
-            assert current_decoding is None
             parser.replace_instructions(handler, handler, i, 1, [])
+            if current_decoding is not None:
+                assert i > 0
+                i -= 1
         elif parser.match_expression(inst, "UpdateKeyComplex2(VMStructFieldDword(?O[KEY_*:KEY1]), Operation($[OP3]), $[OPT1], SimpleOperation(Operation($[OP2]), VMStructFieldDword(?O[KEY_*:KEY2])))", params):
             value = GetKey(params.real_field_name["KEY1"])
             if type(params.vars["OPT1"]) is not handlers_parser.NoneExpression:
@@ -787,7 +789,7 @@ def get_reading_decoding_info(handler, fields, arch):
                 continue
             elif parser.match_expression(inst, "$V[VAR] = $G[READ_PARAMETER:READ_OP]($N[OFFSET])", params) and \
                     len(params.vars["VAR"].instructions) == 1 and len(params.vars["VAR"].used_instructions) >= 2 and \
-                    type(handler.instructions[i+1]) is handlers_parser.Macro and handler.instructions[i+1].name == "UpdateKey":
+                    type(handler.instructions[i+1]) is handlers_parser.Macro and handler.instructions[i+1].name in ("UpdateKey", "UpdateKeyComplex"):
                 # For UpdateKey,... UpdateKeyDecode
                 # TODO: Check for UpdateKey,.. UpdateKeyDecode, because right now this flow may do troubles
                 # Checking only for UpdateKey isn't enough
