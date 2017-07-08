@@ -356,9 +356,11 @@ class SetValue(DecodingValueOperation):
 
 class DecodeParameter(DecodingValueOperation):
     class UpdateKeyDecode(object):
-        def __init__(self, key, op):
-            self.op = op
+        def __init__(self, key, op1, op2=None, value2=None):
             self.key = key
+            self.op1 = op1
+            self.op2 = op2
+            self.value2 = value2
 
     def __init__(self, offset, size, ops):
         self.offset = offset
@@ -369,7 +371,10 @@ class DecodeParameter(DecodingValueOperation):
         res = state.read_parameter(self.offset, self.size)
         for op in self.ops:
             if type(op) is DecodeParameter.UpdateKeyDecode:
-                UpdateKey(op.key, DecodeNumber(op.op, res)).decode(state)
+                num = res
+                if op.op2 is not None:
+                    num = DecodeNumber(op.op2, op.value2).decode(state, num)
+                UpdateKey(op.key, DecodeNumber(op.op1, num)).decode(state)
             elif type(op) is UpdateKey or isinstance(op, UpdateOperation):
                 op.decode(state)
             else:
@@ -552,6 +557,13 @@ def get_reading_decoding_info(handler, fields, arch):
             size = {"ReadParameterByte": 1, "ReadParameterWord": 2, "ReadParameterDword": 4, "ReadParameterQword": 8}[params.vars["READ_OP"].value]
             offset = params.vars["OFFSET"].value
             dec = DecodeParameter.UpdateKeyDecode(params.real_field_name["KEY"], params.vars["OP"].value)
+            parser.replace_instructions(handler, handler, i, 1, [])
+            return dec, offset, size, True
+        if parser.match_expression(inst, "UpdateKeyDecodeEx(VMStructFieldDword(?O[KEY*:KEY]), SimpleOperation(Operation($[OP1]), $G[READ_PARAMETER:READ_OP]($N[OFFSET])), SimpleOperation(Operation($[OP2]), $N[NUMBER]))", params):
+            # In fish
+            size = {"ReadParameterByte": 1, "ReadParameterWord": 2, "ReadParameterDword": 4, "ReadParameterQword": 8}[params.vars["READ_OP"].value]
+            offset = params.vars["OFFSET"].value
+            dec = DecodeParameter.UpdateKeyDecode(params.real_field_name["KEY"], params.vars["OP1"].value, params.vars["OP2"].value, params.vars["NUMBER"].value)
             parser.replace_instructions(handler, handler, i, 1, [])
             return dec, offset, size, True
         nparams = params.copy()
