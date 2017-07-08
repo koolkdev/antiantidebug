@@ -635,7 +635,10 @@ class Handler(object):
     def __init__(self, function, fish=False):
         state = State(mode=function.mode, fish=fish, top=True)
         state.handler = self
-        nstate, instructions = self._get_handler_block(function.start_block, state)
+        end_states = []
+        nstate, instructions = self._get_handler_block(function.start_block, state, end_states=end_states)
+        for ostate in end_states:
+            State(state).invalidate_diff(ostate)
         state.invalidate_diff(nstate) # For push instructions taking effect
         self.instructions = instructions
         self.clean_instructions()
@@ -760,7 +763,7 @@ class Handler(object):
         while self._optimize_instructions(self.instructions, {}):
             pass
 
-    def _get_handler_block(self, block, state, end = None, one_block = False):
+    def _get_handler_block(self, block, state, end = None, one_block = False, end_states=None):
         instructions = []
         state = State(state)
         def get_operand_value(op):
@@ -909,7 +912,7 @@ class Handler(object):
 
                     if next_block == block.next_cond:
                         # Only if
-                        new_state, new_instructions = self._get_handler_block(block.next, state, next_block)
+                        new_state, new_instructions = self._get_handler_block(block.next, state, next_block, end_states=end_states)
                         instructions.append(If(cond, new_instructions))
                         self.make_visible(instructions[-1])
                         state.invalidate_diff(new_state)
@@ -930,15 +933,15 @@ class Handler(object):
                             assert len(block.next_cond.froms) == len(condition_blocks) + 1
                             cond = cond.invert()
                             for b in condition_blocks:
-                                new_state, new_instructions = self._get_handler_block(b, state, one_block = True)
+                                new_state, new_instructions = self._get_handler_block(b, state, one_block=True, end_states=end_states)
                                 state.invalidate_diff(new_state)
                                 assert len(new_instructions) == 1
                                 assert isinstance(new_instructions[0], If)
                                 cond = OrCond(cond, new_instructions[-1].value.invert())
 
-                        state1, instructions1 = self._get_handler_block(if_block, state, next_block)
+                        state1, instructions1 = self._get_handler_block(if_block, state, next_block, end_states=end_states)
                         if else_block is not None:
-                            state2, instructions2 = self._get_handler_block(else_block, state, next_block)
+                            state2, instructions2 = self._get_handler_block(else_block, state, next_block, end_states=end_states)
                         instructions.append(If(cond, instructions1))
                         self.make_visible(instructions[-1])
                         # TODO check for visible instructions
@@ -946,6 +949,8 @@ class Handler(object):
                             if next_block is None:
                                 # No else if not needed
                                 instructions.extend(instructions2)
+                                end_states.append(state1)
+                                state = state2
                                 break
                             if len(instructions2) > 0:
                                 instructions.append(Else(instructions2))
