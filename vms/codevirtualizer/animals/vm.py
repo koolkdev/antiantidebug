@@ -459,6 +459,7 @@ class TIGERVMHandlers(VMHandlers):
         VMHandlers.__init__(self, file, vm_info)
 
     def _process_pre_decoding(self, handler):
+        tiger_handlers_cleaner.clean_get_speical_push_value_reg(handler.handler)
         VMHandlers._process_pre_decoding(self, handler)
         self.tiger_parser_encoding.clean_handler(handler.handler, self.fields)
 
