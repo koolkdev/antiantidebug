@@ -639,10 +639,17 @@ def get_reading_decoding_info(handler, fields, arch):
             # TODO: Check that key size is fit
             dec = UpdateKey(params.real_field_name["KEY"], DecodeNumber(params.vars["X"].value, params.vars["Y"]. value))
             parser.replace_instructions(handler, handler, i, 1, [])
-            # If it is right after the reading of the parameter, we haven't create the current decoding yet
-            if current_decoding is not None or (i > 0 and parser.match_expression(handler.instructions[i-1], "$V[VAR] = $G[READ_PARAMETER:READ_OP]($N[OFFSET])", params.copy())):
+            nparams = params.copy()
+            if current_decoding is not None:
                 assert i > 0
                 i -= 1
+            elif i > 0 and parser.match_expression(handler.instructions[i-1], "$V[VAR] = $G[READ_PARAMETER:READ_OP]($N[OFFSET])", nparams):
+                # If it is right after the reading of the parameter, we haven't create the current decoding yet
+                if nparams.vars["OFFSET"].value not in offsets:
+                    # Check that we didn't already have encoding for that, if we did it is done and no need to continue
+                    # TODO: is it correct? can we have a situation when the decoding isn't done yet?
+                    assert i > 0
+                    i -= 1
         elif parser.match_expression(inst, "UpdateKeyCond(VMStructFieldDword(?O[KEY*:KEY]), $N[BIT], $[OPT1], $[OPT2])", params):
             if type(params.vars["OPT1"]) is not handlers_parser.NoneExpression:
                 assert parser.match_expression(params.vars["OPT1"], "UpdateKey(VMStructFieldDword(?O[KEY_*:KEY1]), SimpleOperation(Operation($[OP1]), $[NUM1]))", params)
