@@ -791,14 +791,36 @@ class VMFunction(vm.VMFunction):
             else:
                 self.vm_info.regs_fields["SP"] = reader.get_cond(lambda x: x.name == "MOV_VAR_SP").args[0]
             regs = list(self.vm_info.init_handler.regs[::-1])
-            for reg in regs:
-                if reg == "flags":
-                    self.vm_info.regs_fields["FLAGS"] = reader.get_cond(lambda x: x.name == "POPF").args[0]
-                else:
+            assert regs[-1] == "flags"
+            if reader.peek().name == arch.translate("POP_{SU}_VAR"):
+                for reg in regs[:-1]:
                     reg = reg.upper()
                     if not reg[1].isdigit():
                         reg = reg[1:]
                     self.vm_info.regs_fields[reg] = reader.get_cond(lambda x: x.name == arch.translate("POP_{SU}_VAR")).args[0]
+            elif self.file.mode == 32:
+                # New shuffled registers reading..
+                # Clean all the necessary things in order to parse the vm start
+                # TODO: The temp var that is used to load the regs, shouldn't be used anywhere else. But it does
+                # For example for this instruction: imul dword [esp + 5]. it doesn't implement this instruction, but it does
+                # the part of esp+5, and it doesn't do anything with it. So I fail to convert it to assembly. I need to clean it out
+                self._clean_vm_start(instructions_list, instructions)
+                # Skip flags and fake esp reg
+                for i in xrange(len(regs) - 2):
+                    # MOV_DWORD_REG_MEMREGIMM REGVAR VAR
+                    inst = reader.get_cond(lambda x: x.name == "MOV_DWORD_REG_MEMREGIMM" and x.args[1] == self.vm_info.regs_fields["SP"])
+                    sp_offset = inst.args[2]
+                    assert (sp_offset % 4) == 0 and 0 <= sp_offset / 4 < len(regs) - 1
+                    reg = regs[sp_offset/4]
+                    reg = reg.upper()
+                    if not reg[1].isdigit():
+                        reg = reg[1:]
+                    self.vm_info.regs_fields[reg] = inst.args[0]
+                # ADD_DWORD_VAR_IMM SP 0x20
+                reader.get_cond(lambda x: x.name == "ADD_DWORD_VAR_IMM" and x.args[0] == self.vm_info.regs_fields["SP"] and  x.args[1] == (len(regs) - 1) * 4)
+            else:
+                assert False
+            self.vm_info.regs_fields["FLAGS"] = reader.get_cond(lambda x: x.name == "POPF").args[0]
             reader.get_cond(lambda x: x.name == "ADD_SP_IMM" and x.args[0] == arch.native_size() * 2)
 
         self.instructions = []
@@ -834,6 +856,9 @@ class VMFunction(vm.VMFunction):
 
     def _process_instructions(self, instructions, instructions_map):
         templates.Templates.get_template(r"codevirtualizer\animals\animals_00_clean.txt", self.mode).clean(instructions, update_instructions=instructions_map)
+
+    def _clean_vm_start(self, instructions, instructions_map):
+        templates.Templates.get_template(r"codevirtualizer\animals\animals_00_clean_vm_start.txt", self.mode).clean(instructions, update_instructions=instructions_map)
 
     def _get_instruction(self, name, args, state):
         nargs = []
