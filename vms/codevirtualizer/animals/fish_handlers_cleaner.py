@@ -40,6 +40,34 @@ def clean_junk_field(handlers, fields, arch):
                 handler.handler.clean_instructions()
                 break
 
+def clean_junk_field2(handlers, fields, arch):
+    # In FISH, the KEY_CHOOSE_BYTE isn't actually important value. It is just used for junk checks (see clean_junk_check).
+    # Its value is just junk and don't need to be tracked. and it uses junk registers.
+    # We find KEY_CHOOSE_BYTE in clean_junk_check
+    parser = handlers_parser.HandlerParser.get_default_parser()
+    parser.groups["SIMPLE_MATH"] = ["+", "-", "^"]
+
+    def fix_func(handler, instructions_container, index, params):
+        inst = instructions_container.instructions[index]
+        nparams = params.copy()
+        if parser.match_expression(inst, arch.translate("*(BYTE*)({R:bp} + ?O[KEY_CHOOSE_BYTE]) $G[SIMPLE_MATH:OP]= $[X]"), nparams):
+            instructions_container.make_unvisible(inst)
+            instructions_container.optimize_instructions()
+            instructions_container.clean_instructions()
+            return True
+        elif parser.match_expression(inst, arch.translate("$V[VAR] = ({R:bp} + ?O[KEY_CHOOSE_BYTE])"), nparams) and \
+                index < len(instructions_container.instructions) - 1 and \
+                parser.match_expression(instructions_container.instructions[index+1], arch.translate("*(BYTE*)$V[VAR] $G[SIMPLE_MATH:OP]= $[SOMETHING]"), nparams):
+            # If JUNK use the register that was used to get its offset..
+            instructions_container.make_unvisible(instructions_container.instructions[index+1])
+            instructions_container.optimize_instructions()
+            instructions_container.clean_instructions()
+            return True
+        return False
+
+    for handler in handlers:
+        parser.clean_handler(handler.handler, fields, [fix_func])
+
 def fix_64_junk_bool_field(handlers, fields):
     parser = handlers_parser.HandlerParser.get_default_parser()
 

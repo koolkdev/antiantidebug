@@ -427,6 +427,7 @@ class FISHVMHandlers(ObfuscatedVMHandlers):
     def _preprocess_handlers(self):
         fish_handlers_cleaner.clean_junk_field(self.handlers.values(), self.fields, self.file.get_arch())
         fish_handlers_cleaner.clean_junk_check(self.handlers.values(), self.fields, self.file.get_arch())
+        fish_handlers_cleaner.clean_junk_field2(self.handlers.values(), self.fields, self.file.get_arch())
         if self.mode == 64:
             fish_handlers_cleaner.fix_64_junk_bool_field(self.handlers.values(), self.fields)
 
