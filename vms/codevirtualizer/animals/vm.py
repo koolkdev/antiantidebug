@@ -387,26 +387,50 @@ class VMHandlers(object):
 
 class ObfuscatedVMHandlers(VMHandlers):
     def __init__(self, file, vm_info):
-        self.first = True
         VMHandlers.__init__(self, file, vm_info)
 
     def _read_handler_function(self, address):
-        if self.first:
-            self.first = False
-            # Check if black
-            try:
-                # Try to decompile it
-                handlers_decompiler.Handler(instruction.Function(self.file, address))
-                self._reader = self.file
-            except:
-                # TODO: Detect it in a better way.. (number of instructions/handlers?)
-                self._reader = cleaner.Cleaner(self.file)
-                self._reader.set_option("ignore_jumps", False)
-                self._reader.set_option("ignore_nontop_jumps", True)
-                self._reader.set_option("fix_inc_dec", False)
-                self._reader.set_option("fixPush_allowConstants", True)
-                handlers_decompiler.Handler(instruction.Function(self._reader, address))
-        return instruction.Function(self._reader, address)
+        return self.deobfuscate_function(instruction.Function(self.file, address))
+
+    def deobfuscate_block(self, block):
+        if len(block.instructions) == 0:
+            return
+        block_start = block.instructions[0].address
+        def get_next_address(inst):
+            if inst.opcode == "jmp" and inst.operands[0].is_immediate():
+                return inst.operands[0].value
+            return inst.next
+        block_end = get_next_address(block.instructions[-1])
+        self._reader = cleaner.Cleaner(self.file)
+        self._reader.set_option("ignore_jumps", False)
+        self._reader.set_option("ignore_nontop_jumps", True)
+        self._reader.set_option("fix_inc_dec", False)
+        self._reader.set_option("fixPush_allowConstants", True)
+        self._reader.set_option("fixLods", False)
+        self._reader.set_option("end_address", block_end)
+        new_func = instruction.Function(self._reader, block_start, stop_condition=lambda inst: get_next_address(inst) == block_end)
+        assert len(new_func.blocks) == 1
+        new_block = new_func.blocks.values()[0]
+        while len(block.instructions):
+            block.instructions.pop()
+        block.instructions.extend(new_block.instructions)
+
+    def deobfuscate_function(self, function):
+        for block in function.blocks.itervalues():
+            self.deobfuscate_block(block)
+        return function
+
+    # def deobfuscate_last_block(self, function):
+    #     block = function.start_block
+    #     while block.next is not None:
+    #         nblock = instruction.get_common_block(block.next, block.next_cond)
+    #         if nblock is None:
+    #             # Hack for memcpy
+    #             block = block.next_cond
+    #         else:
+    #             block = nblock
+    #     self.deobfuscate_block(block)
+    #     return function
 
     def _close_reader(self):
         self._reader = None
@@ -420,7 +444,7 @@ class FISHVMHandlers(ObfuscatedVMHandlers):
     def __init__(self, file, vm_info):
         self.fish_parser_encoding = handlers_parser.HandlerParser.get_parser(r"handlers\handlers_encoding_fish.txt", file.mode)
         self.fish_encoding_parser = handlers_parser.HandlerParser.get_parser(r"handlers\fish_encoded_value.txt", file.mode)
-        ObfuscatedVMHandlers.__init__(self, file, vm_info)
+        super(FISHVMHandlers, self).__init__(file, vm_info)
 
     def _decompile_handler(self, func):
         return handlers_decompiler.Handler(func, True)
@@ -447,7 +471,7 @@ class FISHVMHandlers(ObfuscatedVMHandlers):
         return vm_encoding.new_fish_state(address, read)
 
 
-class TIGERVMHandlers(VMHandlers):
+class TIGERVMHandlers(ObfuscatedVMHandlers):
     RESET_KEYS_OLD = tiger_handlers.RESET_KEYS_OLD
     KEYS = tiger_keys.KEYS
     HANDLERS = tiger_handlers.HANDLERS
@@ -456,7 +480,7 @@ class TIGERVMHandlers(VMHandlers):
         self.tiger_parser_encoding = handlers_parser.HandlerParser.get_parser(r"handlers\handlers_encoding_tiger.txt", file.mode)
         self.tiger_final_parser = handlers_parser.HandlerParser.get_parser(r"handlers\handlers_final_tiger.txt", file.mode)
         self.xchg = {}
-        VMHandlers.__init__(self, file, vm_info)
+        super(TIGERVMHandlers, self).__init__(file, vm_info)
 
     def _process_pre_decoding(self, handler):
         tiger_handlers_cleaner.clean_get_speical_push_value_reg(handler.handler)
@@ -487,7 +511,7 @@ class DOLPHINVMHandlers(ObfuscatedVMHandlers):
         self.dolphin_parser_encoding = handlers_parser.HandlerParser.get_parser(r"handlers\handlers_encoding_dolphin.txt", file.mode)
         #self.fish_encoding_parser = handlers_parser.HandlerParser.get_parser(r"handlers\fish_encoded_value.txt", file.mode)
         self.dolphin_final_parser = handlers_parser.HandlerParser.get_parser(r"handlers\handlers_final_dolphin.txt", file.mode)
-        ObfuscatedVMHandlers.__init__(self, file, vm_info)
+        super(DOLPHINVMHandlers, self).__init__(file, vm_info)
 
     def _decompile_handler(self, func):
         return handlers_decompiler.Handler(func, True)
