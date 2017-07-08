@@ -146,6 +146,8 @@ class Cleaner(object):
     def __init__(self, read, mode):
         self.read_func = read
         self.mode = mode
+        self.fake_jumps = {}
+
         @ffi.callback("int(void*, uint64_t, unsigned char*, size_t)")
         def _read(null, address, buffer, size):
             #print hex(address)
@@ -157,7 +159,13 @@ class Cleaner(object):
                 size = len(data)
             lib.memcpy(buffer, data, size)
             return size
+
+        @ffi.callback("void(void*, uint64_t, unsigned char)")
+        def _mark_fake_jump(null, address, jump_taken):
+            self.fake_jumps[address] = jump_taken
+
         self.read_func_ref = _read
+        self.mark_fake_jump_ref = _mark_fake_jump
         self.cleaner = lib.create_cleaner(_read, mode, ffi.NULL)
         if self.cleaner == ffi.NULL:
             raise MemoryError()
@@ -170,7 +178,10 @@ class Cleaner(object):
 
     def set_option(self, option, value):
         lib.set_option(self.cleaner, option, value)
-        
+
+    def mark_fake_jumps(self):
+        lib.mark_fake_jumps(self.cleaner, self.mark_fake_jump_ref)
+
     def get_clean_instruction(self, address):
         buffer = ffi.new("unsigned char [20]")
         output_size = ffi.new("size_t*", 20)

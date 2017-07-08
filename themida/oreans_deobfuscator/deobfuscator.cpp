@@ -34,4 +34,7 @@ void set_reg_unused(void * cleaner, int reg) {
 void set_option(void * cleaner, char * option, uint64_t value) {
 	((Cleaner *)cleaner)->options[dynamicStringHash(option)] = value;
 }
+void mark_fake_jumps(void * cleaner, mark_fake_jump_f func) {
+	((Cleaner *)cleaner)->mark_fake_jump_func = func;
+}
 }

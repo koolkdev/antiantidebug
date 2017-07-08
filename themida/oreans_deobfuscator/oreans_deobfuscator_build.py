@@ -19,6 +19,7 @@ uint64_t clean_instruction(void * cleaner, uint64_t address, unsigned char * out
 void destroy_cleaner(void * cleaner);
 void set_reg_unused(void * cleaner, int reg);
 void set_option(void * cleaner, char * option, uint64_t value);
+void mark_fake_jumps(void * cleaner, void * func);
 
 enum ud_type
 {

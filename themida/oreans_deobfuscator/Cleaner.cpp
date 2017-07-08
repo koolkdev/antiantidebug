@@ -779,7 +779,7 @@ int Cleaner::clearMovConstant(uint64_t * address, instruction_info * result) {
 	bool fix_size = false;
 	bool fix_operand = false;
 	bool check_for_mov = false;
-	
+
 	instruction_info next = getCleanInstructionAt(address);
 	if (this->mode == 64) {
 		// An check for the case: (in 32 bit the real size is also the size of the push and the pop (16/32)
@@ -835,7 +835,10 @@ int Cleaner::clearMovConstant(uint64_t * address, instruction_info * result) {
 	while ((is_math_op(GET_OPCODE(next)) && IS_SAME_OPERANDS2(next, 0, real_operand) && (!IS_OPERAND(next, 1) || IS_OPERAND_IMM(next, 1))) || (is_cond_jump(GET_OPCODE(next)) && instructions > 0 && IS_OPERAND_JIMM(next, 0))) {
 		if (is_cond_jump(GET_OPCODE(next))) {
 			if (is_jump_taken(GET_OPCODE(next), &flags)) {
+				mark_fake_jump(*address - 6, true);
 				*address = get_immediate_value(&next, 0);
+			} else {
+				mark_fake_jump(*address - 6, false);
 			}
 			last_address = *address;
 			next = getCleanInstructionAt(address);
@@ -1856,7 +1859,13 @@ instruction_info Cleaner::getCleanInstructionAt(uint64_t * address, bool top) {
 }
 
 
-Cleaner::Cleaner(reader_f reader, int mode, void * opaque) : reader(reader), mode(mode), opaque(opaque) {	
+void Cleaner::mark_fake_jump(uint64_t address, unsigned char jump_taken) {
+	if (mark_fake_jump_func) {
+		mark_fake_jump_func(opaque, address, jump_taken);
+	}
+}
+
+Cleaner::Cleaner(reader_f reader, int mode, void * opaque) : reader(reader), mode(mode), opaque(opaque), mark_fake_jump_func(NULL) {
 	options[StringHash("fixDoubleStackOperation")] = false;
 	options[StringHash("fixPush_allowConstants")] = false;
 	options[StringHash("fixLods")] = false;

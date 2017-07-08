@@ -52,9 +52,12 @@ public:
 	int fixMovzx(uint64_t * address, instruction_info * result);
 	
 	int fixOperationConstantThruRegOnStack(uint64_t * address, instruction_info * result);
-	
+
+	void mark_fake_jump(uint64_t address, unsigned char jump_taken);
+
 	std::vector<ud_type_t> unused_regs;
 	std::map<int, uint64_t> options;
+	mark_fake_jump_f mark_fake_jump_func;
 	
 private:
 	std::map<uint64_t, std::pair<instruction_info, uint64_t> > cache;
