@@ -14,3 +14,18 @@ $G[STACK_VARS:VAR] = *(@SIZE@*)$V[VAR_SRC]
 *(@SIZE@*)$V[VAR_DST] = $G[STACK_VARS:VAR]
 =>
 XchgStructFields(VMStructField@SIZE_L@(ReadParameterWord($N[DST])), VMStructField@SIZE_L@(ReadParameterWord($N[SRC])))
+
+DEFINE_TEMPLATE
+Jump(((VMStructField@SIZE_L@($O[NEXT_HANDLER]) + $N[NUMBER]) - $N[NUMBER]))
+=>
+Jump(VMStructField@SIZE_L@($O[NEXT_HANDLER]))
+
+DEFINE_TEMPLATE
+Jump(((VMStructField@SIZE_L@($O[NEXT_HANDLER]) - $N[NUMBER]) + $N[NUMBER]))
+=>
+Jump(VMStructField@SIZE_L@($O[NEXT_HANDLER]))
+
+DEFINE_TEMPLATE
+Jump(((VMStructField@SIZE_L@($O[NEXT_HANDLER]) ^ $N[NUMBER]) ^ $N[NUMBER]))
+=>
+Jump(VMStructField@SIZE_L@($O[NEXT_HANDLER]))
