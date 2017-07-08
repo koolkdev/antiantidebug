@@ -689,15 +689,14 @@ class VMFunction(vm.VMFunction):
         print ("Reading VMFunction at 0x%08x..." % self.code_address),
 
         # Mark the start of the vm code as part that something is started in it
-        addresses_to_explore.put((real_vm_code_address, first_handler))
+        addresses_to_explore.put((real_vm_code_address, first_handler, self.vm_info.handlers.create_state(real_vm_code_address, file.read)))
         starts.append(real_vm_code_address)
 
         # TODO: Check call IMM64
 
         while not addresses_to_explore.empty():
             next_labeled = True
-            address, handler = addresses_to_explore.get()
-            state = self.vm_info.handlers.create_state(address, file.read)
+            address, handler, state = addresses_to_explore.get()
             if instructions.has_key(address):
                 instructions[address].set_info("labled", True)
                 continue
@@ -725,7 +724,9 @@ class VMFunction(vm.VMFunction):
                     assert handler_reader.params["ADDRS_COUNT"] not in (1,2) # TODO
                     i = file.get_instruction(inst.args[0])
                     jumper = VMFunctionJumper(file, i.next)
-                    addresses_to_explore.put((jumper.vm_code_address + self.vm_info.init_handler.base_address, jumper.first_handler))
+                    # Continue with current state
+                    state.address = jumper.vm_code_address + self.vm_info.init_handler.base_address
+                    addresses_to_explore.put((jumper.vm_code_address + self.vm_info.init_handler.base_address, jumper.first_handler, state))
                     starts.append(jumper.vm_code_address + self.vm_info.init_handler.base_address)
                 elif inst.name == "JMP":
                     state.update_ip(inst.args[0])
@@ -739,12 +740,14 @@ class VMFunction(vm.VMFunction):
                 elif inst.name in ("JZ", "JNZ", "JA", "JAE", "JB", "JBE", "JG", "JGE", "JL", "JLE", "JNO", "JNP", "JNS", "JO", "JP", "JS"):
                     state.update_ip(inst.args[0])
                     inst.args[0] = state.address
-                    addresses_to_explore.put((inst.args[0], inst.args[1]))
+                    addresses_to_explore.put((inst.args[0], inst.args[1], self.vm_info.handlers.create_state(inst.args[0], file.read)))
                     inst.args = inst.args[:1]
                     state.address = inst.address
                 elif inst.name in ("CALL_RELIMM_NEXT", "CALL_VAR_NEXT", "CALL_MEMVAR_NEXT"):
                     jumper = VMFunctionJumper(file, inst.args[1])
-                    addresses_to_explore.put((jumper.vm_code_address + self.vm_info.init_handler.base_address, jumper.first_handler))
+                    # We continue with current state. But RESET_KEYS will probably be called anyway, since this call can use this same VM.
+                    state.address = jumper.vm_code_address + self.vm_info.init_handler.base_address
+                    addresses_to_explore.put((jumper.vm_code_address + self.vm_info.init_handler.base_address, jumper.first_handler, state))
                     starts.append(jumper.vm_code_address + self.vm_info.init_handler.base_address)
                     inst.args = inst.args[:-1]
                     inst.name = inst.name[:-len("_NEXT")]
