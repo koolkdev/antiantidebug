@@ -480,6 +480,7 @@ class DOLPHINVMHandlers(ObfuscatedVMHandlers):
     def __init__(self, file, vm_info):
         self.dolphin_parser_encoding = handlers_parser.HandlerParser.get_parser(r"handlers\handlers_encoding_dolphin.txt", file.mode)
         #self.fish_encoding_parser = handlers_parser.HandlerParser.get_parser(r"handlers\fish_encoded_value.txt", file.mode)
+        self.dolphin_final_parser = handlers_parser.HandlerParser.get_parser(r"handlers\handlers_final_dolphin.txt", file.mode)
         ObfuscatedVMHandlers.__init__(self, file, vm_info)
 
     def _decompile_handler(self, func):
@@ -504,6 +505,7 @@ class DOLPHINVMHandlers(ObfuscatedVMHandlers):
     def _process_final(self, handler):
         #self.fish_encoding_parser.clean_handler(handler.handler, self.fields)
         #fish_handlers_cleaner.fix_encoding_values(handler, self.fields)
+        self.dolphin_final_parser.clean_handler(handler.handler, self.fields)
         VMHandlers._process_final(self, handler)
 
     def _find_old_reset_keys_handler(self):
