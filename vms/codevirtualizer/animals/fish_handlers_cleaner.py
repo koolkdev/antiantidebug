@@ -23,10 +23,19 @@ def clean_junk_field(handlers, fields, arch):
     cparams = handlers_parser.Params(fields)
 
     for handler in handlers:
-        for inst in handler.handler.instructions:
+        for i in xrange(len(handler.handler.instructions)):
+            inst = handler.handler.instructions[i]
             params = cparams.copy()
             if parser.match_expression(inst, arch.translate("*({SU}*)({R:bp} + ?O[JUNK]) $G[SIMPLE_MATH:OP]= $[X]"), params):
                 handler.handler.make_unvisible(inst)
+                handler.handler.optimize_instructions()
+                handler.handler.clean_instructions()
+                break
+            elif parser.match_expression(inst, arch.translate("$V[VAR] = ({R:bp} + ?O[JUNK])"), params) and \
+                    i < len(handler.handler.instructions) - 1 and \
+                    parser.match_expression(handler.handler.instructions[i+1], arch.translate("*({SU}*)$V[VAR] $G[SIMPLE_MATH:OP]= $[SOMETHING]"), params):
+                # If JUNK use the register that was used to get its offset..
+                handler.handler.make_unvisible(handler.handler.instructions[i+1])
                 handler.handler.optimize_instructions()
                 handler.handler.clean_instructions()
                 break
