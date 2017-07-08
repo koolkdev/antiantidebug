@@ -17,6 +17,7 @@ import dolphin_keys
 import dolphin_handlers_cleaner
 import dolphin_handlers
 import common_keys
+import common_handlers_cleaner
 import common_handlers
 import vm_encoding
 
@@ -438,7 +439,9 @@ class FISHVMHandlers(ObfuscatedVMHandlers):
     def _process_final(self, handler):
         self.fish_encoding_parser.clean_handler(handler.handler, self.fields)
         fish_handlers_cleaner.fix_encoding_values(handler, self.fields)
+        common_handlers_cleaner.fix_push_ret(handler.handler)
         VMHandlers._process_final(self, handler)
+        common_handlers_cleaner.fix_jump_to_field(handler.handler, self.fields, self.file.get_arch())
 
     def create_state_old(self, address, read):
         return vm_encoding.new_fish_state(address, read)
@@ -461,7 +464,9 @@ class TIGERVMHandlers(VMHandlers):
 
     def _process_final(self, handler):
         VMHandlers._process_final(self, handler)
+        common_handlers_cleaner.fix_push_ret(handler.handler)
         self.tiger_final_parser.clean_handler(handler.handler, self.fields)
+        common_handlers_cleaner.fix_jump_to_field(handler.handler, self.fields, self.file.get_arch())
         handler.extra_info["xchg"] = tiger_handlers_cleaner.get_vars_xchg(handler.handler, self.file.get_arch())
 
     def create_state_old(self, address, read):

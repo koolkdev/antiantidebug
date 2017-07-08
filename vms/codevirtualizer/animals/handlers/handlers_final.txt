@@ -8,7 +8,19 @@ DEFINE_MACRO[64] SIZE_WORD_B QWORD
 DEFINE_MACRO[32] LOG_SIZE 0x2
 DEFINE_MACRO[64] LOG_SIZE 0x3
 
+DEFINE_EXPRESSION_TEMPLATE
+*(@SIZE_WORD_B@*)(VMStructField@SIZE_WORD@(?O[HANDLERS]) + ((ReadParameterWord($N[OFFSET]) & 0xFFFF) << @LOG_SIZE@))
+=>
+HandlerIndex(ReadParameterWord($N[OFFSET]))
+
 DEFINE_TEMPLATE
-Jump(*(@SIZE_WORD_B@*)(VMStructField@SIZE_WORD@(?O[HANDLERS]) + ((ReadParameterWord($N[OFFSET]) & 0xFFFF) << @LOG_SIZE@)))
+Jump(HandlerIndex(ReadParameterWord($N[OFFSET])))
 =>
 JumpToHandlerByIndex(ReadParameterWord($[OFFSET]))
+
+# In tiger and fish
+DEFINE_TEMPLATE
+Push($[X])
+Return(0)
+=>
+Jump($[X])
