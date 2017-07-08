@@ -17,6 +17,7 @@ ADD_SP_IMM 0x8
 START_VM
 
 # Those instructions are shuffled, so we don't know here the order of the registers
+# TODO: Verify that the reg and the offest are consistent along the vm
 DEFINE_TEMPLATE[32]
 INIT_SP
 MOV_DWORD_REG_MEMREGIMM REG_1 SP OFFSET_1
