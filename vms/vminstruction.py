@@ -124,3 +124,9 @@ class VMInstructionsReader(object):
             self.index = old_index
             raise ReaderException("Wrong condition: %s" % str(res))
         return res
+
+    def peek(self):
+        old_index = self.index
+        res = self.get()
+        self.index = old_index
+        return res
