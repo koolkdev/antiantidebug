@@ -831,9 +831,11 @@ int Cleaner::clearMovConstant(uint64_t * address, instruction_info * result) {
 	instruction_info last;
 	last.opcode = UD_Iinvalid;
 	int instructions = 0;
+	bool have_fake_jumps = false;
 	// I am not checking that there are up to 6 operations..
 	while ((is_math_op(GET_OPCODE(next)) && IS_SAME_OPERANDS2(next, 0, real_operand) && (!IS_OPERAND(next, 1) || IS_OPERAND_IMM(next, 1))) || (is_cond_jump(GET_OPCODE(next)) && instructions > 0 && IS_OPERAND_JIMM(next, 0))) {
 		if (is_cond_jump(GET_OPCODE(next))) {
+			have_fake_jumps = true;
 			if (is_jump_taken(GET_OPCODE(next), &flags)) {
 				mark_fake_jump(*address - 6, true);
 				*address = get_immediate_value(&next, 0);
@@ -889,7 +891,9 @@ check_op:
 		// NOT X
 		// SUB X, 1
 		// It will turn into neg. So accept neg if size < 4 (It is not probable that it will happen with 32 bit)
-		if ((GET_OPCODE(last) != ADD && GET_OPCODE(last) != SUB && GET_OPCODE(last) != XOR && !(size < 4 && GET_OPCODE(last) == NEG)) || (instructions == 0)) return false;
+		if (options[StringHash("movConstant_strict_check_op")] || !have_fake_jumps) { // If it is non strict and we have fake jumps, convert it to mov without checking the last opcode
+			if ((GET_OPCODE(last) != ADD && GET_OPCODE(last) != SUB && GET_OPCODE(last) != XOR && !(size < 4 && GET_OPCODE(last) == NEG)) || (instructions == 0)) return false;
+		}
 		*address = last_address;
 	} else if (size == 8) {
 		// The completion have to happen thru another reg if our wanted result is bigger than 32bit.
@@ -1874,6 +1878,7 @@ Cleaner::Cleaner(reader_f reader, int mode, void * opaque) : reader(reader), mod
 	options[StringHash("ignore_nontop_jumps")] = false;
 	options[StringHash("ignore_calls")] = false;
 	options[StringHash("fix_inc_dec")] = true;
+	options[StringHash("movConstant_strict_check_op")] = true;
 
 	options[StringHash("end_address")] = 0;
 }
