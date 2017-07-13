@@ -389,12 +389,37 @@ class VMHandlers(object):
 
 class ObfuscatedVMHandlers(VMHandlers):
     def __init__(self, file, vm_info):
+        self.first = True
+        self.full_deobf = False
         VMHandlers.__init__(self, file, vm_info)
 
     def _read_handler_function(self, address):
-        return self.deobfuscate_function(instruction.Function(self.file, address))
+        if self.first:
+            self.first = False
+            try:
+                return self.deobfuscate_function(instruction.Function(self.file, address))
+            except:
+                self.full_deobf = True
+        if self.full_deobf:
+            self._reader = cleaner.Cleaner(self.file)
+            self._reader.set_option("ignore_jumps", False)
+            self._reader.set_option("ignore_nontop_jumps", True)
+            self._reader.set_option("fix_inc_dec", False)
+            self._reader.set_option("fixPush_allowConstants", True)
+            self._reader.set_option("fixLods", False)
+            # Should be none strict, since we may have something like that:
+            # mov eax, 0x32482938
+            # or eax, 0x80
+            # We don't care about it because the decompiler will get rid of it, but the issue is when there are
+            # fake jumps in the middle, so movConstant_strict_check_op will do it always when there are fake jumps
+            self._reader.set_option("movConstant_strict_check_op", False)
+            self._reader.cleaner.mark_fake_jumps()
+            function = instruction.Function(self._reader, address)
+            return self.deobfuscate_function(instruction.Function(self.file, address, fake_jumps=self._reader.cleaner.fake_jumps), fake_jumps=self._reader.cleaner.fake_jumps)
+        else:
+            return self.deobfuscate_function(instruction.Function(self.file, address))
 
-    def deobfuscate_block(self, block):
+    def deobfuscate_block(self, block, fake_jumps=None):
         if len(block.instructions) == 0:
             return
         block_start = block.instructions[0].address
@@ -410,16 +435,17 @@ class ObfuscatedVMHandlers(VMHandlers):
         self._reader.set_option("fixPush_allowConstants", True)
         self._reader.set_option("fixLods", False)
         self._reader.set_option("end_address", block_end)
-        new_func = instruction.Function(self._reader, block_start, stop_condition=lambda inst: get_next_address(inst) == block_end)
+        self._reader.set_option("movConstant_strict_check_op", False)
+        new_func = instruction.Function(self._reader, block_start, stop_condition=lambda inst: get_next_address(inst) == block_end, fake_jumps=fake_jumps)
         assert len(new_func.blocks) == 1
         new_block = new_func.blocks.values()[0]
         while len(block.instructions):
             block.instructions.pop()
         block.instructions.extend(new_block.instructions)
 
-    def deobfuscate_function(self, function):
+    def deobfuscate_function(self, function, fake_jumps=None):
         for block in function.blocks.itervalues():
-            self.deobfuscate_block(block)
+            self.deobfuscate_block(block, fake_jumps)
         return function
 
     # def deobfuscate_last_block(self, function):

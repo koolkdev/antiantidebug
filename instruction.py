@@ -321,7 +321,7 @@ CONDITIONAL_JUMPS = ("ja", "jae", "jb", "jbe", "jz", "jg", "jge", "jl", "jle", "
 
 
 class Function(object):
-    def __init__(self, file, address, stop_condition=None, filter=None):
+    def __init__(self, file, address, stop_condition=None, filter=None, fake_jumps={}):
         self.blocks_cache = {}
         instructions_blocks = {}
         self.blocks = {}
@@ -368,7 +368,8 @@ class Function(object):
                 continue
             while True:
                 if len(instructions_blocks) > 10000:
-                    raise Exception("Too complex function")
+                    if not fake_jumps or len(instructions_blocks) > 1000000:
+                        raise Exception("Too complex function")
                 if instructions_blocks.has_key(address):
                     if instructions_blocks[address].address != address:
                         nblock = FunctionBlock(address)
@@ -426,6 +427,12 @@ class Function(object):
                 if inst.opcode == "jmp" or inst.opcode == "ret":  # and not immediate
                     break
                 if inst.opcode in CONDITIONAL_JUMPS:
+                    if inst.address in fake_jumps:
+                        if fake_jumps[inst.address]:
+                            address = inst.operands[0].value
+                        else:
+                            address = inst.next
+                        continue
                     block.next = get_block(inst.next)
                     block.next.froms.append(block)
                     block.next_cond = get_block(inst.operands[0].value)
