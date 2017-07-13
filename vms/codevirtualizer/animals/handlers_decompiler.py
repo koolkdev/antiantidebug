@@ -447,6 +447,25 @@ class SignedConversion(Conversion):
     def get_format(self):
         return "(S%s){0}" % self._get_size_name()
 
+class Call(Expression):
+    def __init__(self, address, parameters):
+        super(Call, self).__init__()
+        self.address = address
+        self.parameters = parameters
+
+    def get_children(self):
+        return [self.address] + self.parameters
+
+    def replace_child(self, child, new_child):
+        if self.address == child:
+            self.address = new_child
+        for i in xrange(len(self.parameters)):
+            if self.parameters[i] == child:
+                self.parameters[i] = new_child
+
+    def get_format(self):
+        return "Call(%s)" % ", ".join(["{%d}" % i for i in xrange(1 + len(self.parameters))])
+
 class Std(Expression):
     def get_format(self):
         return "Std()"
@@ -1024,7 +1043,16 @@ class Handler(object):
                         val = 0
                     instructions.append(Return(val))
                 elif inst.opcode == "call":
-                    return state, instructions
+                    if not inst.operands[0].is_immediate():
+                        return state, instructions
+                    values = state.stack[::-1]
+                    state.stack = []
+                    state.stack_variables = []
+                    state.stack_instructions = []
+                    for value in values:
+                        self.make_visible(value)
+                    instructions.append(Call(get_operand_value(inst.operands[0]), values))
+                    self.make_visible(instructions[-1])
                 elif inst.opcode == "std":
                     instructions.append(Std())
                 elif inst.opcode == state.mode.translate("movs{SB}") and inst.prefix == "rep":

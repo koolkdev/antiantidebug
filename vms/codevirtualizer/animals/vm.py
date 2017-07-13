@@ -197,6 +197,7 @@ class VMOpcodeHandler(VMHandler):
         self.info = None
         self.decode = None
         self.extra_info = {}
+        self.address = None
 
 class VMHandlers(object):
     RESET_KEYS_OLD = None
@@ -260,6 +261,7 @@ class VMHandlers(object):
         for i in xrange(vm_info.init_handler.handlers_count):
             func = self._decompile_handler(funcs[i])
             self.handlers[i] = VMOpcodeHandler(func)
+            self.handlers[i].address = funcs[i].original_address
             self._update_progress_bar()
         print "Decompiling handlers... SUCCESS"
 
@@ -289,7 +291,7 @@ class VMHandlers(object):
         self._start_progress_bar()
         for handler in self.handlers.itervalues():
             self._process_pre_decoding(handler)
-            handler.decode = vm_encoding.get_reading_decoding_info(handler.handler, self.fields, arch)
+            handler.decode = vm_encoding.get_reading_decoding_info(self.handlers, handler.handler, self.fields, arch)
             self._process_final(handler)
             self._update_progress_bar()
 
@@ -510,8 +512,11 @@ class TIGERVMHandlers(ObfuscatedVMHandlers):
         self.xchg = {}
         super(TIGERVMHandlers, self).__init__(file, vm_info)
 
+    def _preprocess_handlers(self):
+        tiger_handlers_cleaner.fix_handler_calls(self.handlers)
+        tiger_handlers_cleaner.clean_get_speical_push_value_reg(self.handlers)
+
     def _process_pre_decoding(self, handler):
-        tiger_handlers_cleaner.clean_get_speical_push_value_reg(handler.handler)
         VMHandlers._process_pre_decoding(self, handler)
         self.tiger_parser_encoding.clean_handler(handler.handler, self.fields)
 
@@ -582,7 +587,7 @@ class SHARKVMHandlers(FISHVMHandlers):
         inst = self.file.get_instruction(address)
         assert inst.opcode == "jmp" and inst.operands[0].is_immediate()
         naddress, bytes = vmtools.VMS["TIGER"].get_vm(self.file, inst.operands[0].value).compile_code()
-        return instruction.Function(mappedfile.BytesMappedFile(bytes, naddress, self.file.mode), naddress)
+        return instruction.Function(mappedfile.BytesMappedFile(bytes, naddress, self.file.mode), naddress, original_address=address)
 
 
 class PUMAVMHandlers(TIGERVMHandlers):
@@ -590,7 +595,7 @@ class PUMAVMHandlers(TIGERVMHandlers):
         inst = self.file.get_instruction(address)
         assert inst.opcode == "jmp" and inst.operands[0].is_immediate()
         naddress, bytes = vmtools.VMS["FISH"].get_vm(self.file, inst.operands[0].value).compile_code()
-        return instruction.Function(mappedfile.BytesMappedFile(bytes, naddress, self.file.mode), naddress)
+        return instruction.Function(mappedfile.BytesMappedFile(bytes, naddress, self.file.mode), naddress, original_address=address)
 
 
 class EAGLEVMHandlers(FISHVMHandlers):
@@ -598,7 +603,7 @@ class EAGLEVMHandlers(FISHVMHandlers):
         inst = self.file.get_instruction(address)
         assert inst.opcode == "jmp" and inst.operands[0].is_immediate()
         naddress, bytes = vmtools.VMS["DOLPHIN"].get_vm(self.file, inst.operands[0].value).compile_code()
-        return instruction.Function(mappedfile.BytesMappedFile(bytes, naddress, self.file.mode), naddress)
+        return instruction.Function(mappedfile.BytesMappedFile(bytes, naddress, self.file.mode), naddress, original_address=address)
 
 
 class VMInfo(vm.VMInfo):
@@ -736,12 +741,12 @@ class VMFunction(vm.VMFunction):
                     break
 
                 h = self.vm_info.handlers.handlers[handler]
-                params = h.decode.decode(state)
-                self._do_handler(h, params, state)
-                handler_reader = h.info.reader(h.info, params, arch, state, self.vm_info.handlers.global_vars)
+                decoded = h.decode.decode(state)
+                self._do_handler(h, decoded.params, state)
+                handler_reader = h.info.reader(h.info, decoded, arch, state, self.vm_info.handlers.global_vars)
 
                 inst = self._get_instruction(handler_reader.get_name(), handler_reader.get_params(), state)
-                self._do_handler_end(h, params, state)
+                self._do_handler_end(h, decoded.params, state)
 
                 inst.address = state.address
                 inst.set_info("labled", next_labeled)

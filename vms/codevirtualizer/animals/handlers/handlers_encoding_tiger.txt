@@ -32,3 +32,8 @@ DEFINE_TEMPLATE
 If((VMStructFieldByte($O[KEY_CHOOSE_BYTE]) > $N[NUMBER]))
 =>
 None
+
+DEFINE_EXPRESSION_TEMPLATE
+(Pop() $G[SIMPLE_MATH:OP] $N[NUMBER])
+=>
+PopDecode(SimpleOperation(Operation($[OP]), $[NUMBER]))

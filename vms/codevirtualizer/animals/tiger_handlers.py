@@ -25,8 +25,15 @@ def create_tiger_handler_reader_class(name, params=[]):
         def get_name(self):
             return create_string_from_params(name, self.info.vars)
 
+        def _get_param(self, name):
+            # HACK for now
+            if name not in self.params:
+                assert self.info.vars[name] == "HANDLER_CALL"
+                return self.decoded.function_calls[0]
+            return self.params[name]
+
         def get_params(self):
-            return [(create_string_from_params(x, self.info.vars), self.params[y]) for x, y in params]
+            return [(create_string_from_params(x, self.info.vars), self._get_param(y)) for x, y in params]
 
     return GenericHandlerReader
 
@@ -155,9 +162,17 @@ def match_src_operation(name="SRC"):
             if parser.match_expression(expr, arch.translate("*($G[WORD_SIZE:WORD_%s]*)VMStructField{SS}(ReadParameterWord($P[%s_VALUE]))" % (name, name)), nparams):
                 src_type = "MEMVAR"
                 size = 1 << parser.groups["WORD_SIZE"].index(nparams.vars["WORD_%s" % name].value)
+            elif parser.match_expression(expr, arch.translate("*($G[WORD_SIZE:WORD_%s]*)VMStructField{SS}(CallResult())" % name), nparams):
+                src_type = "MEMVAR"
+                size = 1 << parser.groups["WORD_SIZE"].index(nparams.vars["WORD_%s" % name].value)
+                assert nparams.set_handler_var_value("%s_VALUE" % name, "HANDLER_CALL")
             elif parser.match_expression(expr, "$G[FIELD_SIZE:FIELD_%s](ReadParameterWord($P[%s_VALUE]))" % (name, name), nparams):
                 src_type = "VAR"
                 size = 1 << parser.groups["FIELD_SIZE"].index(nparams.vars["FIELD_%s" % name].value)
+            elif parser.match_expression(expr, "$G[FIELD_SIZE:FIELD_%s](CallResult())" % name, nparams):
+                src_type = "VAR"
+                size = 1 << parser.groups["FIELD_SIZE"].index(nparams.vars["FIELD_%s" % name].value)
+                assert nparams.set_handler_var_value("%s_VALUE" % name, "HANDLER_CALL")
             elif parser.match_expression(expr, "$G[READ_SIZE:READ_%s]($P[%s_VALUE])" % (name, name), nparams):
                 src_type = "IMM"
                 size = 1 << parser.groups["READ_SIZE"].index(nparams.vars["READ_%s" % name].value)
@@ -675,6 +690,43 @@ UNKNOWN_JUNK = HandlerMatch(match_funcs([
     lambda parser, instructions, index, params, arch, info: (True, len(instructions)),
 ]), None)
 
+class GetValueHandlerReader(HandlerReader):
+    def get_result(self):
+        return self.decoded.values[self.params["CHOOSE"]]
+
+    def get_result_size(self):
+        if self.params["CHOOSE"] == "VALUE_DWORD":
+            return 4
+        else:
+            return 2
+
+def get_value_handler_set_param(parser, instructions, index, params, arch, info):
+    # The first param to this handler is TYPE
+    params.set_param_value("CHOOSE", 0)
+    return True, index
+
+#TODO: this function starts with push all registers and ends with pop all register, this is why the sp pointer is weird
+#Fixing the decompiler is needed..
+GET_VALUE_HANDLER = HandlerMatch(match_funcs([
+    lines_matcher(["$V[CHOOSE] = *({SU}*)(SP + $H[STACK_ARG1])"]), # 8*4 / 16*8
+    any_order([
+        lines_matcher([
+            "If(($V[CHOOSE] == $H[CHOOSE_VALUE_WORD_1]))",
+            "    $V[VAL] = VMStructFieldWord(?O[VALUE_WORD_1])"
+        ]),
+        lines_matcher([
+            "If(($V[CHOOSE] == $H[CHOOSE_VALUE_WORD_2]))",
+            "    $V[VAL] = VMStructFieldWord(?O[VALUE_WORD_2])"
+        ])]),
+    lines_matcher([
+        "If(($V[CHOOSE] == $H[CHOOSE_VALUE_DWORD]))",
+        "    $V[VAL] = VMStructFieldDword(?O[VALUE_DWORD])",
+        "*({SU}*)(SP + $H[STACK_ARG2]) = $V[VAL]", # 9*4 / 17*8
+        "Return({N})",
+    ]),
+    get_value_handler_set_param,
+]), GetValueHandlerReader)
+
 HANDLERS = [
     CALL,
     PUSH,
@@ -695,5 +747,6 @@ HANDLERS = [
     ADD_VAR_BASEADDRESS,
     NOP,
     UNKNOWN_SET,
-    UNKNOWN_JUNK
+    UNKNOWN_JUNK,
+    GET_VALUE_HANDLER,
     ] + COMMON_HANDLERS

@@ -321,12 +321,15 @@ CONDITIONAL_JUMPS = ("ja", "jae", "jb", "jbe", "jz", "jg", "jge", "jl", "jle", "
 
 
 class Function(object):
-    def __init__(self, file, address, stop_condition=None, filter=None, fake_jumps={}):
+    def __init__(self, file, address, stop_condition=None, filter=None, fake_jumps={}, original_address=None):
         self.blocks_cache = {}
         instructions_blocks = {}
         self.blocks = {}
         self.mode = file.mode
         self.address = address
+        self.original_address = self.address
+        if original_address is not None:
+            self.original_address = original_address
         blocks_to_explores = deque()
 
         def get_block(address):

@@ -18,12 +18,15 @@ class HandlerInfo(object):
 
 
 class HandlerReader(object):
-    def __init__(self, info, params, arch, state, global_vars):
+    def __init__(self, info, decoded, arch, state, global_vars, params=None):
         self.info = info
         self.params = {}
         self.arch = arch
         self.state = state
+        self.decoded = decoded
         self.global_vars = global_vars
+        if params is None:
+            params = self.decoded.params
         for name, index in self.info.params.iteritems():
             self.params[name] = params[index]
         #assert len(self.params) == len(params)
@@ -60,6 +63,12 @@ class HandlerReader(object):
 
     def get_size(self):
         return self.info.vars["OPCODE_SIZE"]
+
+    def get_result(self):
+        pass
+
+    def get_result_size(self):
+        pass
 
 def create_handler_reader_class(name, params=[]):
     def create_handler_name_from_params(reader):

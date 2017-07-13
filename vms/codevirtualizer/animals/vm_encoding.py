@@ -354,6 +354,21 @@ class SetValue(DecodingValueOperation):
         return self.read.get_offset()
 
 
+class ReadValue(DecodingOperation):
+    def __init__(self, name, size):
+        self.name = name
+        self.size = size
+
+    def decode(self, state):
+        return state.get_key(self.name).value
+
+    def get_size(self):
+        return self.size
+
+    def get_name(self):
+        return self.name
+
+
 class DecodeParameter(DecodingValueOperation):
     class UpdateKeyDecode(object):
         def __init__(self, key, op1, op2=None, value2=None):
@@ -388,6 +403,22 @@ class DecodeParameter(DecodingValueOperation):
         return self.offset
 
 
+
+class DecodeHandlerCall(DecodingOperation):
+    def __init__(self, handler, params, ops):
+        self.handler = handler
+        self.params = params
+        self.ops = ops
+
+    def decode(self, state):
+        # get handler
+        decoded = self.handler.decode.decode(state)
+        reader = self.handler.info.reader(self.handler.info, decoded, None, state, None, params=self.params)
+        res, size = reader.get_result(), reader.get_result_size()
+        for op in self.ops:
+            res = op.decode(state, res) & ((1 << (size * 8)) - 1)
+        return res
+
 class DecodeQwordParameter(DecodingValueOperation):
     def __init__(self, offset, low_dword, high_dword):
         self.offset = offset
@@ -406,20 +437,31 @@ class DecodeQwordParameter(DecodingValueOperation):
     def get_offset(self):
         return self.offset
 
+class DecodeResult(object):
+    def __init__(self):
+        self.params = {}
+        self.values = {}
+        # self.values_sizes = {}
+        self.function_calls = []
 
 class DecodeHandler(DecodingOperation):
     def __init__(self, decodes):
         self.decodes = decodes
 
     def decode(self, state):
-        params = {}
+        res = DecodeResult()
         for decode in self.decodes:
             if isinstance(decode, DecodingValueOperation):
                 # We apply the size mask here, because UpdateValue must get the value as is.
-                params[decode.get_offset()] = decode.decode(state) & ((1 << (decode.get_size() * 8)) - 1)
+                res.params[decode.get_offset()] = decode.decode(state) & ((1 << (decode.get_size() * 8)) - 1)
+            elif isinstance(decode, ReadValue):
+                res.values[decode.get_name()] = decode.decode(state)
+                # res.values_sizes[decode.get_name()] = decode.get_size()
+            elif isinstance(decode, DecodeHandlerCall):
+                res.function_calls.append(decode.decode(state))
             else:
                 decode.decode(state)
-        return params
+        return res
 
 
 class ResetKeys(DecodingOperation):
@@ -462,7 +504,7 @@ def get_all_read_offsets(instructions, fields):
     return res
 
 
-def get_reading_decoding_info(handler, fields, arch):
+def get_reading_decoding_info(handlers, handler, fields, arch):
     parser = handlers_parser.HandlerParser.get_default_parser()
 
     parser.dont_optimize = True
@@ -495,6 +537,9 @@ def get_reading_decoding_info(handler, fields, arch):
     current_xchg_middle = False
     current_xchg_key1 = None
     current_xchg_key2 = None
+
+    call_handler = None
+    call_params = None
 
     offsets = {}
 
@@ -808,6 +853,36 @@ def get_reading_decoding_info(handler, fields, arch):
                     assert size == tsize
                 i += 1
                 continue
+            elif parser.match_expression(inst, "If(($[X] == $[Y]))", params) and \
+                    parser.match_expression(inst.instructions[0], "$V[VAR] = $G[FIELDS:FIELD](?O[VALUE_*:VALUE])", params) and \
+                    len(params.vars["VAR"].used_instructions) == 1 and isinstance(params.vars["VAR"].used_instructions[0], handlers_parser.SetValue) and \
+                    params.vars["VAR"].used_instructions[0].rvalue.equals(params.vars["VAR"]):
+                assert current_decoding is None
+                size = {"VMStructFieldByte": 1, "VMStructFieldWord": 2, "VMStructFieldDword": 4}[params.vars["FIELD"].value]
+                dec = ReadValue(params.real_field_name["VALUE"], size)
+                i += 1
+            elif parser.match_expression(inst, "CallHandler($N[HANDLER_INDEX], $[PARAMS])", params):
+                call_handler = handlers[params.vars["HANDLER_INDEX"].value]
+                assert isinstance(params.vars["PARAMS"], handlers_parser.Macro) and params.vars["PARAMS"].name == "Parameters"
+                assert not any(param for param in params.vars["PARAMS"].parameters if not isinstance(param, handlers_parser.Immediate))
+                call_params = [param.value for param in params.vars["PARAMS"].parameters]
+                parser.replace_instructions(handler, handler, i, 1, [])
+                continue
+            elif call_handler is not None:
+                res = find_child(inst, "PopDecode(SimpleOperation(Operation($[OP]), $N[NUMBER]))", params)
+                if res is not None:
+                    expr, parent = res
+                    dec = DecodeHandlerCall(call_handler, call_params, [DecodeNumber(params.vars["OP"].value, params.vars["NUMBER"].value)])
+                    parent.replace_child(expr, parser.create_macro_result("CallResult()", params))
+                else:
+                    res = find_child(inst, "Pop()", params)
+                    if res is not None:
+                        expr, parent = res
+                        dec = DecodeHandlerCall(call_handler, call_params, [])
+                        parent.replace_child(expr, parser.create_macro_result("CallResult()", params))
+                    else:
+                        assert False
+                call_handler = None
             else:
                 if current_decoding:
                     # We need to skip UpdateEip
