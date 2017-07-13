@@ -375,7 +375,7 @@ class DecodeParameter(DecodingValueOperation):
                 if op.op2 is not None:
                     num = DecodeNumber(op.op2, op.value2).decode(state, num)
                 UpdateKey(op.key, DecodeNumber(op.op1, num)).decode(state)
-            elif type(op) is UpdateKey or isinstance(op, UpdateOperation):
+            elif isinstance(op, UpdateKey) or isinstance(op, UpdateKeyEx) or isinstance(op, UpdateKeyCond) or isinstance(op, UpdateOperation):
                 op.decode(state)
             else:
                 res = op.decode(state, res) & 0xffffffff
@@ -662,8 +662,10 @@ def get_reading_decoding_info(handler, fields, arch):
             else:
                 op2 = None
             dec = UpdateKeyCond(params.real_field_name["KEY"], params.vars["BIT"].value, op1, op2)
-            assert current_decoding is None
             parser.replace_instructions(handler, handler, i, 1, [])
+            if current_decoding is not None:
+                assert i > 0
+                i -= 1
         elif parser.match_expression(inst, "UpdateKeyComplex(VMStructFieldDword(?O[KEY_*:KEY1]), Operation($[OP1]), VMStructFieldDword(?O[KEY_*:KEY2]), $[OPT])", params):
             if type(params.vars["OPT"]) is not handlers_parser.NoneExpression:
                 assert parser.match_expression(params.vars["OPT"], "SimpleOperation(Operation($[OP2]), $[NUM])", params)
@@ -789,7 +791,7 @@ def get_reading_decoding_info(handler, fields, arch):
                 continue
             elif parser.match_expression(inst, "$V[VAR] = $G[READ_PARAMETER:READ_OP]($N[OFFSET])", params) and \
                     len(params.vars["VAR"].instructions) == 1 and len(params.vars["VAR"].used_instructions) >= 2 and \
-                    type(handler.instructions[i+1]) is handlers_parser.Macro and handler.instructions[i+1].name in ("UpdateKey", "UpdateKeyComplex"):
+                    type(handler.instructions[i+1]) is handlers_parser.Macro and handler.instructions[i+1].name in ("UpdateKey", "UpdateKeyCond", "UpdateKeyComplex"):
                 # For UpdateKey,... UpdateKeyDecode
                 # TODO: Check for UpdateKey,.. UpdateKeyDecode, because right now this flow may do troubles
                 # Checking only for UpdateKey isn't enough
