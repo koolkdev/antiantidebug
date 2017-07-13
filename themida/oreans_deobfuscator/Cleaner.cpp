@@ -1011,11 +1011,11 @@ int Cleaner::fixPushMovMovPop(uint64_t * address, instruction_info * result) {
 
 	instruction_info first = getCleanInstructionAt(address);
 	if (GET_OPCODE(first) != MOV || !is_releated_reg(&first, 0, result, 0) || IS_OPERAND_SP_RELATED(first, 1, this->mode)) return false;
-	
+
 	instruction_info second = getCleanInstructionAt(address);
 	if (GET_OPCODE(second) != MOV || !IS_SAME_OPERANDS(second, 1, first, 0) || IS_OPERAND_SP_RELATED(second, 0, this->mode)) return false;
 
-	if (IS_OPERAND_MEM(first, 1) && IS_OPERAND_REG(second, 0)) return false;
+	if (IS_OPERAND_MEM(first, 1) && IS_OPERAND_MEM(second, 0)) return false;
 
 	instruction_info next = getCleanInstructionAt(address);
 	if (GET_OPCODE(next) != POP || !IS_SAME_OPERANDS(next, 0, *result, 0)) return false;
@@ -1105,7 +1105,7 @@ int Cleaner::fixPushMovMovCalcPop(uint64_t * address, instruction_info * result)
 	case 4: GET_OPERAND(*result, 1).value = operation<uint32_t>(get_immediate_value(&calc, 1), GET_OPCODE(second), get_immediate_value(&first, 1)); break;
 	case 8: GET_OPERAND(*result, 1).value = operation<uint64_t>(get_immediate_value(&calc, 1), GET_OPCODE(second), get_immediate_value(&first, 1)); break;
 	}
-	
+
 	if (GET_OPERAND_SIZE(*result, 0) == 8 && ((int64_t)GET_OPERAND(*result, 1).value > INT32_MAX || (int64_t)GET_OPERAND(*result, 1).value < INT32_MIN)) {
 		GET_OPERAND(*result, 1).size = GET_OPERAND(*result, 0).size;
 		GET_OPERAND(*result, 1).type = OP_IMM_64;
@@ -1839,7 +1839,7 @@ instruction_info Cleaner::getCleanInstructionAt(uint64_t * address, bool top) {
 		GET_OPERAND(result, 0).type = (this->mode == 64) ? OP_IMM_64 : OP_IMM_32;
 		SET_OPCODE(result, PUSH);
 		*address = new_address;
-	} 
+	}
 	while (changed) {
 		changed = false;
 		if (is_math_op(GET_OPCODE(result)) || GET_OPCODE(result) == PUSH || GET_OPCODE(result) == POP || GET_OPCODE(result) == MOV || GET_OPCODE(result) == XCHG) {
@@ -1874,7 +1874,7 @@ Cleaner::Cleaner(reader_f reader, int mode, void * opaque) : reader(reader), mod
 	options[StringHash("ignore_nontop_jumps")] = false;
 	options[StringHash("ignore_calls")] = false;
 	options[StringHash("fix_inc_dec")] = true;
-	
+
 	options[StringHash("end_address")] = 0;
 }
 
