@@ -387,7 +387,12 @@ signed long long get_immediate_value(instruction_info * instruction, int operand
 	switch (GET_OPERAND_SIZE(*instruction, operand)){
 	case 1:	return (signed char)instruction->operands[operand].value;
 	case 2:	return (signed short)instruction->operands[operand].value;
-	case 4:	return (signed long)instruction->operands[operand].value;
+	case 4:
+		// If dst is 64 bit and it isn't mov instruction, than don't convert positive value to negative
+		if (GET_OPERAND_SIZE(*instruction, 0) == 8 && GET_OPCODE(*instruction) != MOV)
+			return (signed long long)instruction->operands[operand].value;
+		else
+			return (signed long)instruction->operands[operand].value;
 	case 8:	return (signed long long)instruction->operands[operand].value;
 	}
 	return 0;
@@ -1557,7 +1562,8 @@ int Cleaner::fixOperationConstantThruReg(uint64_t * address, instruction_info * 
 	bool fix_size = false;
 	if (IS_OPERAND_IMM(first, 1) && GET_OPERAND_SIZE(first, 1) == 8 && GET_OPCODE(main) != MOV) {
 		int64_t val = get_immediate_value(&first, 1);
-		if (val >= INT32_MIN && val <= INT32_MAX) {
+		// -0x100 is the smallest negative immediate that operation that isn't mov can hold
+		if (val > -0x100 && val <= UINT32_MAX) {
 			// It can be 32bit number
 			fix_size = true;
 		} else return false;
