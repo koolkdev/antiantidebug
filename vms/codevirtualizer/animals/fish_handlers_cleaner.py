@@ -31,14 +31,19 @@ def clean_junk_field(handlers, fields, arch):
                 handler.handler.optimize_instructions()
                 handler.handler.clean_instructions()
                 break
-            elif parser.match_expression(inst, arch.translate("$V[VAR] = ({R:bp} + ?O[JUNK])"), params) and \
-                    i < len(handler.handler.instructions) - 1 and \
-                    parser.match_expression(handler.handler.instructions[i+1], arch.translate("*({SU}*)$V[VAR] $G[SIMPLE_MATH:OP]= $[SOMETHING]"), params):
-                # If JUNK use the register that was used to get its offset..
-                handler.handler.make_unvisible(handler.handler.instructions[i+1])
-                handler.handler.optimize_instructions()
-                handler.handler.clean_instructions()
-                break
+            elif parser.match_expression(inst, arch.translate("$V[VAR] = ({R:bp} + ?O[JUNK])"), params):
+                found_use = False
+                for use in params.vars["VAR"].used_instructions:
+                    if parser.match_expression(use, arch.translate("*({SU}*)$V[VAR] $G[SIMPLE_MATH:OP]= $[SOMETHING]"), params):
+                        # If JUNK use the register that was used to get its offset...
+                        # Or if the second junk field (KEY_CHOOSE_BYTE) uses this register (than there will be two used instructions)
+                        handler.handler.make_unvisible(use)
+                        handler.handler.optimize_instructions()
+                        handler.handler.clean_instructions()
+                        found_use = True
+                        break
+                if found_use:
+                    break
 
 def clean_junk_field2(handlers, fields, arch):
     # In FISH, the KEY_CHOOSE_BYTE isn't actually important value. It is just used for junk checks (see clean_junk_check).
@@ -56,10 +61,10 @@ def clean_junk_field2(handlers, fields, arch):
             instructions_container.clean_instructions()
             return True
         elif parser.match_expression(inst, arch.translate("$V[VAR] = ({R:bp} + ?O[KEY_CHOOSE_BYTE])"), nparams) and \
-                index < len(instructions_container.instructions) - 1 and \
-                parser.match_expression(instructions_container.instructions[index+1], arch.translate("*(BYTE*)$V[VAR] $G[SIMPLE_MATH:OP]= $[SOMETHING]"), nparams):
+                len(nparams.vars["VAR"].used_instructions) == 1 and \
+                parser.match_expression(nparams.vars["VAR"].used_instructions[0], arch.translate("*(BYTE*)$V[VAR] $G[SIMPLE_MATH:OP]= $[SOMETHING]"), nparams):
             # If JUNK use the register that was used to get its offset..
-            instructions_container.make_unvisible(instructions_container.instructions[index+1])
+            instructions_container.make_unvisible(nparams.vars["VAR"].used_instructions[0])
             instructions_container.optimize_instructions()
             instructions_container.clean_instructions()
             return True
