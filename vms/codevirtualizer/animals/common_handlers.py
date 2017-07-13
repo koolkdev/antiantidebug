@@ -12,6 +12,7 @@ class HandlerInfo(object):
     def __init__(self):
         self.params = {}
         self.vars = {}
+        self.global_vars = {}
         self.read_info = []
         self.reader = None
 
@@ -698,5 +699,6 @@ def match_handlers(parser, handler, fields, handlers, arch, global_vars={}):
         fields.update(params.fields)
         if global_vars is not None:
             global_vars.update(params.global_vars)
+            info.global_vars = global_vars
         return info
     return None

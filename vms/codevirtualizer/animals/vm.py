@@ -237,6 +237,8 @@ class VMHandlers(object):
                 assert already_parsed or i == 0
                 already_parsed = True
                 self.handlers[i] = vm_info.handlers_cache[handler_address]
+                # TODO: Check that it is consistent
+                self.global_vars.update(self.handlers[i].info.global_vars)
             else:
                 assert not already_parsed
                 funcs.append(self._read_handler_function(handler_address))
