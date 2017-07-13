@@ -1,4 +1,4 @@
-OPTION RUN_ONCE
+#OPTION RUN_ONCE
 OPTION DONT_OPTIMIZE
 
 DEFINE_MACRO[32] SIZE_WORD Dword
@@ -10,6 +10,11 @@ DEFINE_MACRO[64] LOG_SIZE 0x3
 
 DEFINE_EXPRESSION_TEMPLATE
 *(@SIZE_WORD_B@*)(VMStructField@SIZE_WORD@(?O[HANDLERS]) + ((ReadParameterWord($N[OFFSET]) & 0xFFFF) << @LOG_SIZE@))
+=>
+HandlerIndex(ReadParameterWord($N[OFFSET]))
+
+DEFINE_EXPRESSION_TEMPLATE
+*(@SIZE_WORD_B@*)(VMStructField@SIZE_WORD@(?O[HANDLERS]) + (ReadParameterWord($N[OFFSET]) << @LOG_SIZE@))
 =>
 HandlerIndex(ReadParameterWord($N[OFFSET]))
 
