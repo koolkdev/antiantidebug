@@ -16,6 +16,14 @@ ADD_SP_IMM 0x8
 =>
 START_VM
 
+# For the new VM_START
+DEFINE_TEMPLATE[32]
+MOV_DWORD_VAR_REG X SP
+ADD_DWORD_VAR_IMM X Y
+MOV_DWORD_REG_MEMVAR Z X
+=>
+MOV_DWORD_REG_MEMREGIMM Z SP Y
+
 # Those instructions are shuffled, so we don't know here the order of the registers
 # TODO: Verify that the reg and the offest are consistent along the vm
 DEFINE_TEMPLATE[32]

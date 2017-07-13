@@ -886,7 +886,16 @@ class VMFunction(vm.VMFunction):
         templates.Templates.get_template(r"codevirtualizer\animals\animals_00_clean.txt", self.mode).clean(instructions, update_instructions=instructions_map)
 
     def _clean_vm_start(self, instructions, instructions_map):
-        templates.Templates.get_template(r"codevirtualizer\animals\animals_00_clean_vm_start.txt", self.mode).clean(instructions, update_instructions=instructions_map)
+        vm_start_end = None
+        # Find end of VM_START. We don't want to clean anything else right now
+        for i in xrange(len(instructions)):
+            if instructions[i].name == "ADD_SP_IMM" and instructions[i].args[0] == 8:
+                vm_start_end = i + 1
+                break
+        assert vm_start_end is not None
+        tinsts = instructions[:vm_start_end]
+        templates.Templates.get_template(r"codevirtualizer\animals\animals_00_clean_vm_start.txt", self.mode).clean(tinsts, update_instructions=instructions_map, vars=dict(self.vm_info.regs_fields))
+        instructions[:vm_start_end] = tinsts
 
     def _get_instruction(self, name, args, state):
         nargs = []
