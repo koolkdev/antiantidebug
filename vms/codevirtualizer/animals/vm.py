@@ -975,10 +975,11 @@ class VMFunction(vm.VMFunction):
                         pass
 
                 if section_counter == 1:
-                    code = cleaner.clean_animals_vm_code(code, self.file.get_arch())
+                    arch = self.file.get_arch()
+                    code = cleaner.clean_animals_vm_code(code, arch)
                     if self.integrity_used:
                         # TODO: Find the end in a proper way...
-                        index = max(max(code.rfind("add esp, 0x"), code.rfind("pop esp")), code.rfind("mov esp, dword [esp]"))
+                        index = max(max(code.rfind(arch.translate("add {R:sp}, 0x")), code.rfind(arch.translate("pop {R:sp}"))), code.rfind(arch.translate("mov {R:sp}, {S} [{R:sp}]")))
                         if index != -1:
                             code = code[code.find("\n", index+1)+1:]
                 section_counter += 1
@@ -1014,10 +1015,11 @@ class VMFunction(vm.VMFunction):
             code += sectioncode
 
         if section_counter == 1:
-            code = cleaner.clean_animals_vm_code(code, self.file.get_arch())
+            arch = self.file.get_arch()
+            code = cleaner.clean_animals_vm_code(code, arch)
             if self.integrity_used:
                 # TODO: Find the end in a proper way...
-                index = max(max(code.rfind("add esp, 0x"), code.rfind("pop esp")), code.rfind("mov esp, dword [esp]"))
+                index = max(max(code.rfind(arch.translate("add {R:sp}, 0x")), code.rfind(arch.translate("pop {R:sp}"))), code.rfind(arch.translate("mov {R:sp}, {S} [{R:sp}]")))
                 if index != -1:
                     code = code[code.find("\n", index+1)+1:]
 
