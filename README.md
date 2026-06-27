@@ -1,5 +1,9 @@
 # Themida Code Virtualizer Research Notes
 
+## Required Dependency
+
+**This project requires [`x86utils`](https://github.com/koolkdev/x86utils).**
+
 This repository contains legacy Python research code for studying Themida's Code
 Virtualizer protection, with a focus on devirtualizing protected code back into
 native code. The work includes VM handler analysis, instruction cleanup, and
